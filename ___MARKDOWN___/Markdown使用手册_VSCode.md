@@ -26,20 +26,37 @@
 
 ``` css
 .markdown-preview.markdown-preview {
-  VT, vt {color: rgb(133, 34, 103);}
-  GN, gn {color: rgb(50, 78, 0);}
+  /* 个性化字体 */
+  VT, vt {color: rgb(126, 0, 98);}
+  GN, gn {color: rgb(74, 117, 0);}
   RD, rd {color: rgb(255, 0, 0);}
   DRD, drd {color: rgb(131, 0, 15);}
   BL, bl {color: rgb(45, 0, 129);}
   YL, yl {color: rgb(180, 121, 0);}
-  BG, bg {font-size:1.5em;}
-  BBG, bbg {font-size:2em;}
-  BBBG, bbbg {font-size:2.5em;}
+  BG, bg {font-size:1.25em;}
+  BBG, bbg {font-size:1.5em;}
+  BBBG, bbbg {font-size:2em;}
+  T, t {font-size:2.5em;}
 
   /* 限制代码块最大高度 */
   pre {
-    max-height: 500px;
+    max-height: 515px;
     overflow: auto;
+  }
+  
+  /* 更改标题色 */
+  h1, h2, h3, h4, h5, h6 {
+    color: #0857a5;
+  }
+  /* 更改标题大小 */
+  h1 {
+    font-size: 2.0em;
+  }
+  h2 {
+    font-size: 1.5em;
+  }
+  h3, h4, h5, h6 {
+    font-size: 1.15em;
   }
 }
 ```
