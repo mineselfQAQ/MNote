@@ -42,6 +42,8 @@
   pre {
     max-height: 515px;
     overflow: auto;
+
+    margin-top: -15px;/* 上间距缩小 */
   }
   
   /* 更改标题色 */
