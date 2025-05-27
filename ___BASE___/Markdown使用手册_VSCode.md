@@ -8,7 +8,11 @@
 - [超链接测试](#%E8%B6%85%E9%93%BE%E6%8E%A5%E6%B5%8B%E8%AF%95)
 - [图片测试](#%E5%9B%BE%E7%89%87%E6%B5%8B%E8%AF%95)
 
-<!-- /TOC -->Code搜索栏中搜索`> customize css`，然后像在`<style>`中添加字体模板
+<!-- /TOC -->
+
+<BR>
+
+Code搜索栏中搜索`> customize css`，然后像在`<style>`中添加字体模板
 ![CSS更改方法](Pic/CSS1.png)
 
 ``` css
@@ -70,9 +74,14 @@
 
 可以看到名字叫`style.less`，位置就在`C:\Users\Administrator\.crossnote\style.less`
 
+**实用插件：<GN>Markdown Paste (telesoho)</GN>**
+**配置：**在设置中修改Path
+![MarkdownPaste](Pic/MarkdownPaste.png)
+然后使用<B>Ctrl+Alt+V</B>进行粘贴即可
+
 <!-- 标题开头不能是数字字符，否则无法使用TOC -->
 <!-- 但是可以通过手动将某个改为如[1.xxx](#1.xxx)的形式，保存后即可使用 -->
-# 1.字体测试
+# 字体测试
 
 **加粗** | *斜体* | ***斜体加粗***  
 
@@ -82,7 +91,7 @@ HTML语法：
 CSS语法：　　**<VT>我通常会使用该方法</VT>**
 这是<VT>注释色</VT> | 这是<RD>警告色</RD> | 这是<DRD>注意色</DRD> | 这是<GN>名词色</GN> | 这是<YL>例子色</YL> | 这是<BL>问题色</BL>
 
-# 2.代码测试
+# 代码测试
 
 代码句：`print("Hello")`  
 
@@ -106,7 +115,7 @@ private void PrintHello()
 }
 ```
 
-# 3.列表测试
+# 列表测试
 
 - first
   
@@ -122,12 +131,12 @@ private void PrintHello()
 2. second
 3. third
 
-# 4.超链接测试
+# 超链接测试
 
 这是 **[BILIBILI](https://www.bilibili.com "备注:视频网站")** 网站
 这也是<https://www.bilibili.com>
 
-# 5.图片测试
+# 图片测试
 
 ![图片1](Pic/sylvain-sarrailh-lostremains.jpg){width=200 height=100 align=left}
 
