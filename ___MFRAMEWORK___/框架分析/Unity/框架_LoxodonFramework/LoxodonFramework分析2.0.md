@@ -24,6 +24,10 @@
       - [Configuration](#configuration)
     - [触发相关](#触发相关)
       - [Observables](#observables)
+      - [Interactivity](#interactivity)
+      - [Messaging](#messaging)
+      - [区别](#区别)
+    - [Asynchronous](#asynchronous)
 
 <!-- /TOC -->
 
@@ -622,7 +626,7 @@ public virtual GameObject Create(IMixedObjectPool<GameObject> pool, string typeN
 ```
 
 整体是完全一致的，只是多了一个typeName
-拿一个<B><YL>官方例子</YL></B>就能很清晰的说明了：
+拿一个<B><YL>作者例子</YL></B>就能很清晰的说明了：
 
 ``` csharp
 public class CubeMixedObjectFactory : UnityMixedGameObjectFactoryBase
@@ -751,7 +755,7 @@ public AbstractFactory(ISerializer serializer, IEncryptor encryptor)
     this.serializer = serializer;
     this.encryptor = encryptor;
 
-    // 当然，官方提供了默认的工具
+    // 当然，作者提供了默认的工具
     if (this.serializer == null)
         this.serializer = new DefaultSerializer();
 
@@ -1259,7 +1263,7 @@ Observables/Interactivity/Messaging三者都是有关触发的内容
 当然它们有着**不同的侧重点**：
 
 - Observables：观察者模式
-- Interactivity：
+- Interactivity：交互请求模式
 - Messaging：发布订阅模式
 
 #### Observables
@@ -1362,3 +1366,767 @@ namespace System.Collections.Specialized
 ```
 
 即<B><VT>INotifyCollectionChanged针对旧平台提供了支持</VT></B>
+
+**<GN>ObservableProperty</GN>**
+ObservableProperty本质上和ObservablesList/ObservableDictionary可以**归为一类**，但是有一点**明显不同**：
+**<VT>ObservableProperty不继承C#接口而是自定义了接口</VT>**
+其**声明与接口**如下：
+
+``` csharp
+[Serializable]
+public class ObservableProperty : ObservablePropertyBase<object>, IObservableProperty {...}
+    
+public interface IObservableProperty
+{
+    event EventHandler ValueChanged;
+    Type Type { get; }
+    object Value { get; set; }
+}
+```
+
+由该接口我们可以得知：<B><VT>Property指的是Value，应该会用于某种属性的包装</VT></B>
+实际上**触发原理**还是完全一致的：
+
+``` csharp
+[Serializable]
+public abstract class ObservablePropertyBase<T>
+{
+    private EventHandler valueChanged;
+
+    public event EventHandler ValueChanged
+    {
+        add { lock (_lock) { this.valueChanged += value; } }
+        remove { lock (_lock) { this.valueChanged -= value; } }
+    }
+
+    protected void RaiseValueChanged()
+    {
+        this.valueChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ...
+}
+
+[Serializable]
+public class ObservableProperty : ObservablePropertyBase<object>, IObservableProperty
+{
+    public virtual object Value
+    {
+        get { return this._value; }
+        set
+        {
+            if (this.Equals(this._value, value))
+                return;
+
+            this._value = value;
+            this.RaiseValueChanged();
+        }
+    }
+
+    // ...
+}
+```
+
+**<GN>ObservableObject</GN>**
+ObservableObject是4种中**最特殊**的一种，也是**最关键**的一种，原因就在于：
+<B><VT>ViewModelBase继承于ObservableObject</VT></B>
+先看一下其**声明**：
+`[Serializable] public abstract class ObservableObject : INotifyPropertyChanged`
+最明显的一点**区别**就是：<B><VT>ObservableObject是抽象的，而非直接创建的实例</VT></B>
+正因该区别**实现**也有所不同：
+
+``` csharp
+protected virtual void RaisePropertyChanged(PropertyChangedEventArgs eventArgs)
+{
+    try
+    {
+        if (propertyChanged != null)
+            propertyChanged(this, eventArgs);
+    }
+    catch (Exception e)
+    {
+        if (log.IsWarnEnabled)
+            log.WarnFormat("Set property '{0}', raise PropertyChanged failure.Exception:{1}", eventArgs.PropertyName, e);
+    }
+}
+
+protected bool Set<T>(ref T field, T newValue, [CallerMemberName] string propertyName = null)
+{
+    if (EqualityComparer<T>.Default.Equals(field, newValue))
+        return false;
+
+    field = newValue;
+    RaisePropertyChanged(propertyName);
+    return true;
+}
+```
+
+触发由`Set()`进行，<B><YL>如：<YL></B>
+
+``` csharp
+public string Username
+{
+    get { return this.username; }
+    set
+    {
+        if (this.Set(ref this.username, value))
+        {
+            this.ValidateUsername();
+        }
+    }
+}
+```
+
+由此我们能更加明白**Object的含义**：
+**<VT>ObservableObject本身就是一种需要观察者功能的集合，是其中的属性需要进行`Set()`操作</VT>**
+
+**<BL>问题：`[CallerMemberName]`是什么</BL>**
+<BL><B><GN>[CallerMemberName]</GN></B>，这是一个**编译期特性**，可以<B><VT>自动传入属性名</VT></B>
+所以对于上述例子，就相当于是：`this.Set(ref this.username, value, "Username")`
+那么这里的**含义**就是：<B><VT>先将`username`设置为value，然后通过该string转换为PropertyChangedEventArgs后进行propertyChanged回调</VT></B></BL>
+
+<BR>
+
+#### Interactivity
+
+Interactivity即**互动性**，对于该组内容需要先<B><YL>举一个例子</YL></B>明确一下用法：
+
+``` csharp
+// InterationExample(View)
+protected override void Start()
+{
+    // ...
+    bindingSet.Bind().For(v => v.OnOpenAlert).To(vm => vm.AlertDialogRequest);
+
+    bindingSet.Bind(this.openAlert).For(v => v.onClick).To(vm => vm.OpenAlertDialog);
+    // ...
+}
+private void OnOpenAlert(object sender, InteractionEventArgs args)
+{
+    DialogNotification notification = args.Context as DialogNotification;
+    var callback = args.Callback;
+
+    if (notification == null)
+        return;
+
+    AlertDialog.ShowMessage(notification.Message, notification.Title, notification.ConfirmButtonText, null, notification.CancelButtonText, notification.CanceledOnTouchOutside, (result) =>
+        {
+            notification.DialogResult = result;
+            callback?.Invoke();
+        });
+}
+
+// InterationViewModel
+public InterationViewModel()
+{
+    this.OpenAlertDialog = new SimpleCommand(() =>
+    {
+        this.OpenAlertDialog.Enabled = false;
+
+        DialogNotification notification = new DialogNotification("Interation Example", "This is a dialog test.", "Yes", "No", true);
+
+        Action<DialogNotification> callback = n =>
+        {
+            this.OpenAlertDialog.Enabled = true;
+
+            if (n.DialogResult == AlertDialog.BUTTON_POSITIVE)
+            {
+                Debug.LogFormat("Click: Yes");
+            }
+            else if (n.DialogResult == AlertDialog.BUTTON_NEGATIVE)
+            {
+                Debug.LogFormat("Click: No");
+            }
+        };
+
+        this.AlertDialogRequest.Raise(notification, callback);
+    });
+}
+```
+
+**由此我们可以得知：**
+
+- **<VT>Interactivity是一系列用于绑定情况(Button)的事件触发机制</VT>**
+- **涉及项**有如下几种：
+  - Request：请求，ViewModel定义
+  - Action：触发事件(如上述的`OnOpenAlert()`)，View定义
+    - Notification：通知，即一组信息
+- **流程**如下：
+  Button触发Command，Command中`request.Raise()`触发callback，即Action
+
+<BR>
+
+**Request**
+Request都继承于**接口IInteractionRequest**，如下所示：
+
+``` csharp
+public interface IInteractionRequest
+{
+    event EventHandler<InteractionEventArgs> Raised;
+}
+
+public class InteractionEventArgs : EventArgs
+{
+    private object context;
+    private Action callback;
+    public InteractionEventArgs(object context, Action callback)
+    {
+        this.context = context;
+        this.callback = callback;
+    }
+    public object Context { get { return this.context; } }
+    public Action Callback { get { return this.callback; } }
+}
+```
+
+说到底还是一个<B><VT>运用事件的机制</VT></B>
+派生了2种形态：
+
+- **InteractionRequest**
+- **AsyncInteractionRequest**：异步形态
+
+<BR>
+
+那么就以基础的<B><GN>InteractionRequest</GN></B>来看一下：
+
+``` csharp
+public class InteractionRequest : IInteractionRequest
+{
+    private static readonly InteractionEventArgs emptyEventArgs = new InteractionEventArgs(null, null);
+
+    private object sender;
+
+    public InteractionRequest() : this(null)
+    {
+    }
+
+    public InteractionRequest(object sender)
+    {
+        this.sender = sender != null ? sender : this;
+    }
+
+    public event EventHandler<InteractionEventArgs> Raised;
+
+    public void Raise()
+    {
+        this.Raise(null);
+    }
+    public void Raise(Action callback)
+    {
+        var handler = this.Raised;
+        if (handler != null)
+            handler(this.sender, callback == null ? emptyEventArgs : new InteractionEventArgs(null, () => { if (callback != null) callback(); }));
+    }
+}
+```
+
+可以说这就是一个<B><VT>简单的EventHandler触发器</VT></B>
+
+**Action**
+在上述例子中，Action并没有任何类，而是<B><VT>通过一个形参为`(object sender, InteractionEventArgs args)`形式的函数</VT></B>完成的，但作者提供了一些**预制Action**，有：
+
+- 基于InteractionActionBase
+  - ToastInteractionAction
+  - DialogInteractionAction
+  - LoadingInteractionAction
+- 基于AsyncInteractionActionBase
+  - AsyncDialogInteractionAction
+  - AsyncViewInteractionAction
+  - AsyncWindowInteractionAction
+
+要**注意**的是：
+<B><VT>这些Action都是属于Views.InteractionActions命名空间的，即用于View(Base不是)</VT></B>
+
+先来看看**Base**：
+
+``` csharp
+public abstract class InteractionActionBase<TNotification> : IInteractionAction
+{
+    public void OnRequest(object sender, InteractionEventArgs args)
+    {
+        Action callback = args.Callback;
+        TNotification notification = (TNotification)args.Context;
+        this.Action(notification, callback);
+    }
+
+    public abstract void Action(TNotification notification, Action callback);
+}
+```
+
+显然使用Action的话<B><VT>只需在指定时刻调用`OnRequest()`即可执行已override的`Action()`</VT></B>
+在此我们了解到其中心主旨即可，
+但我们要知道到：<B><VT>Request与Action需要<GN>绑定</GN>是完整的</VT></B>
+
+#### Messaging
+
+Messaging即消息，涉及类不多，**核心**为<B><GN>Messenger</GN></B>，在项目中我们可能会看见：
+`public static readonly IMessenger Messenger = new Messenger();`
+显然Messenger是<B><VT>以单例的形式存在的</VT></B>
+其**声明**为：
+`public class Messenger : IMessenger`
+接口IMessenger异常简单，仅有2类函数：<B>`Subscribe()`/`Publish()`</B>，显然这是<B><VT>发布订阅模式</VT></B>
+
+**<YL>用法如下：</YL>**
+
+``` csharp
+public class Launcher : MonoBehaviour
+{
+    ISubscription<WindowStateEventArgs> subscription;
+    void Awake()
+    {
+        // ...
+
+        /* Subscribe to window state change events */
+        subscription = Window.Messenger.Subscribe<WindowStateEventArgs>(e =>
+        {
+            Debug.LogFormat("The window[{0}] state changed from {1} to {2}", e.Window.Name, e.OldState, e.State);
+        });
+    }
+}
+
+// Window
+protected WindowState State
+{
+    get { return this.state; }
+    set
+    {
+        if (this.state.Equals(value))
+            return;
+
+        WindowState old = this.state;
+        this.state = value;
+        this.RaiseStateChanged(old, this.state);
+    }
+}
+protected void RaiseStateChanged(WindowState oldState, WindowState newState)
+{
+    try
+    {
+        WindowStateEventArgs eventArgs = new WindowStateEventArgs(this, oldState, newState);
+        if (GlobalSetting.enableWindowStateBroadcast && stateBroadcast)
+            Messenger.Publish(eventArgs);
+
+        if (this.stateChanged != null)
+            this.stateChanged(this, eventArgs);
+    }
+    catch (Exception e)
+    {
+        if (log.IsWarnEnabled)
+            log.WarnFormat("{0}", e);
+    }
+}
+```
+
+可以看出这里就是<VT>完成了一个状态记录，一旦状态改变则通知输出Debug</VT>
+由此我们也能看出：<B><VT>Messenger通常用于debug输出，并不担任什么必须品</VT></B>
+
+先来看<B>订阅`Messenger.Subscribe()`</B>：
+
+``` csharp
+public virtual ISubscription<T> Subscribe<T>(Action<T> action)
+{
+    Type type = typeof(T);
+    SubjectBase notifier;
+    if (!notifiers.TryGetValue(type, out notifier))
+    {
+        notifier = new Subject<T>();
+        // 保证线程安全
+        if (!notifiers.TryAdd(type, notifier))
+            notifiers.TryGetValue(type, out notifier);
+    }
+    return (notifier as Subject<T>).Subscribe(action);
+}
+```
+
+可以看到这里的**核心操作**就是<VT>获取SubjectBase然后用它来`Subscribe()`</VT>
+**<VT>对于每一个Type都只有一个notifier(因为是字典)</VT>**
+`Subscribe()`的另一个版本增加了一个名为channel的string，其实就是在外面再包了一层字典
+
+再来看<B>发布`Messenger.Publish()`</B>：
+
+``` csharp
+public virtual void Publish<T>(T message)
+{
+    if (message == null || notifiers.Count <= 0)
+        return;
+
+    Type messageType = message.GetType();
+    foreach (var kv in notifiers)
+    {
+        if (kv.Key.IsAssignableFrom(messageType))
+            kv.Value.Publish(message);
+    }
+}
+```
+
+很简单，<VT>找到相应SubjectBase，`Publish()`即可</VT>
+
+<B><GN>Subject</GN></B>显然是<B><VT>`Subscribe()`/`Publish()`的本质，而Messenger仅仅是一层封装</VT></B>
+
+先来看<B>订阅`Subject.Subscribe()`</B>：
+
+``` csharp
+public ISubscription<T> Subscribe(Action<T> action)
+{
+    return new Subscription(this, action);
+}
+```
+
+仅仅是创建一个Subscription
+
+再来看<B>发布`Subject.Publish()`</B>：
+
+``` csharp
+public void Publish(T message)
+{
+    if (subscriptions.Count <= 0)
+        return;
+
+    foreach (var kv in subscriptions)
+    {
+        Subscription subscription;
+        kv.Value.TryGetTarget(out subscription);
+        if (subscription != null)
+            subscription.Publish(message);
+        else
+            subscriptions.TryRemove(kv.Key, out _);
+    }
+}
+```
+
+**可以发现：**
+**<VT>Subject依旧是一层封装，由`Messenger.Subscribe()`会保存Subscription在内部，最终还是通过`Subscription.Publish()`完成发布操作</VT>**
+
+<B><GN>Subscription</GN></B>是**Publish的本质**，如下所示：
+
+``` csharp
+public void Publish(T message)
+{
+    try
+    {
+        if (this.context != null)
+            context.Post(state => action?.Invoke((T)state), message);
+        else
+            action?.Invoke(message);
+    }
+    catch (Exception e)
+    {
+#if DEBUG
+        throw;
+#else
+        if (log.IsWarnEnabled)
+            log.Warn(e);
+#endif
+    }
+}
+```
+
+可以发现就是简单的**Action调用**
+可以看到有一种`context.Post()`形式，context是通过`ObserveOn()`传入的，就像这种：
+`this.subscriptionInUIsThread = this.messenger.Subscribe<TestMessage>(OnMessageInUIThread).ObserveOn(SynchronizationContext.Current);`
+也就是说：<B><VT>`ObserveOn()`可以用来指定执行线程的同步上下文</VT></B>
+
+#### 区别
+
+我们会发现三者的相似程度太高了，整体来说都是一种事件机制，但是写法与用途有着很大的区别
+三者其实分别是**设计模式的不同体现**：
+
+- Observables：观察者模式，用于<B><VT>数据通知</VT></B>
+- Interactivity：观察者模式，用于<B><VT>沟通V与VM</VT></B>
+- Messaging：发布订阅模式，用于<B><VT>解耦通信</VT></B>
+
+**<BL>问题：观察者模式与发布订阅模式的区别</BL>**
+<BL><B>核心点</B>在于：</BL>
+**<VT>观察者模式下观察者与被观察者是耦合的---观察者订阅被观察者事件
+发布订阅模式下发布者与订阅者完全不耦合---发布者与订阅者不知道彼此的存在，完全通过中间件通信</VT>**
+
+**关于用法**
+
+- **对于Observables：**
+  我们可能创建一个ObservableList并进行回调的添加，在后续使用中会由数据的变动而进行回调
+- **对于Interactivity：**
+  在VM中创建Request，在V中创建Action，通过绑定使得V与VM联系起来
+- **对于Messaging：**
+  可通过订阅T，发布T的方式进行通讯
+
+<BR>
+
+发布订阅模式的Messaging与观察者模式的Observables/Interactivity具有较大的区别，正如上述介绍的，Messaging仅需在A处订阅，B处发布即可，无需考虑之间的关系
+**Observables与Interactivity的区别在于：**
+**<VT>Observables是传统的观察者模式，而Interactivity是针对于MVVM的观察者模式(将Request与Action拆解在VM与V中，由绑定构成观察者模式)</VT>**
+
+### Asynchronous
+
+Async我们肯定很熟悉，即**异步**，但它的全称就是Asynchronous(adj.)
+在Unity中我们可能完全用不到异步，因为使用携程即可代替，但是这不意味着异步是没有用的
+
+对于异步部分，有一个**基础核心类**，为<B><GN>AsyncResult</GN></B>：
+`public class AsyncResult : IAsyncResult, IPromise`
+从Result一词来看，这是一个<B><VT>用于获取结果的类</VT></B>
+先看**两接口**：
+
+``` csharp
+public interface IAsyncResult
+{
+    object Result { get; }
+    Exception Exception { get; }
+    bool IsDone { get; }
+    bool IsCancelled { get; }
+    bool Cancel();
+    ICallbackable Callbackable();
+    ISynchronizable Synchronized();
+    object WaitForDone();
+}
+public interface IPromise
+{
+    object Result { get; }
+    Exception Exception { get; }
+    bool IsDone { get; }
+    bool IsCancelled { get; }
+    bool IsCancellationRequested { get; }
+    void SetCancelled();
+    void SetException(string error);
+    void SetException(Exception exception);
+    void SetResult(object result = null);
+}
+```
+
+- **IAsyncResult接口**显然是AsyncResult的基，可以看到最重要的2数据：
+  - Result：异步完成结果
+  - IsDone/IsCancelled：状态(完成/取消)
+- **IPromise**接口从名字上指的是承诺，即<B><VT>承诺完成并给出结果(无论成功还是失败)</VT></B>，这是**JavaScript异步中的一个概念**
+
+**<BL>问题：IAsyncResult与IPromise的区别</BL>**
+<BL>可以发现两接口实在太像了，都能返回Result以及判断结果情况
+它们的<B>区别</B>在于：</BL>
+
+- <BL>IAsyncResult核心在于<B><VT>使用</VT></B>：`WaitForDone()`等待执行完毕，获取`Result`</BL>
+- <BL>IPromise核心在于<B><VT>设置</VT></B>：`SetResult()`设置`Result`</BL>
+
+但是要注意的一点就是：<B><VT>IAsyncResult与IPromise有一定的公用部分，当然，只需要实现一次即可</VT></B>
+
+**回到AsyncResult：**
+
+说到底一切都是为了在异步情况下用一个实例存储Result并记录状态，那么**Set**显然是其中**最重要**的
+**函数`SetXXX()`**
+Set一共有3种，即`SetResult()`/`SetException()`/`SetCancelled()`
+用最常见的<B>`SetResult()`</B>举例：
+
+``` csharp
+public virtual void SetResult(object result = null)
+{
+    lock (_lock)
+    {
+        if (this.done) 
+            return;
+
+        this.result = result;
+        this.done = true;
+        Monitor.PulseAll(_lock); // 唤醒等待线程
+    }
+
+    this.RaiseOnCallback();
+}
+```
+
+**这里的`Monitor.PulseAll(_lock)`非常关键：**
+该函数是有着一对**匹配项**的：
+
+- `Monitor.Wait()`：等待
+- `Monitor.PulseAll()`：唤醒
+
+也就是说：<B><VT>在`Monitor.PulseAll()`之前，会有一处`Monitor.Wait()`用于"卡住"线程</VT></B>
+
+**函数`WaitForDone()`**
+从名字上来看，这是一个<B><VT>用于等待执行完成</VT></B>的函数，其**用法**如下：
+`yield return show.WaitForDone();`
+可以看到是<B><VT>与携程配合使用的</VT></B>
+
+``` csharp
+public virtual object WaitForDone()
+{
+    return Executors.WaitWhile(() => !IsDone);
+}
+
+public static object WaitWhile(Func<bool> predicate)
+{
+    if (executor != null && IsMainThread)
+        return new WaitWhile(predicate);
+
+    throw new NotSupportedException("The function must execute on main thread.");
+}
+```
+
+**本质：<VT>Unity的`UnityEngine.WaitWhile()`</VT>**
+这个函数我们可能不熟悉，但是我们一定见过**WaitForSeconds类**，其实是一样的
+
+<BR>
+
+除了以上两种函数外，仅剩2种**比较特殊的函数**了，即`Callbackable()`/`Synchronized()`
+
+<B><GN>Synchronizable</GN></B>从名字上来看就能知道是一种<B><VT>同步器</VT></B>
+其**用法**如下：
+`result.Synchronized().WaitForResult()` <VT>等待结果</VT>
+
+``` csharp
+public virtual ISynchronizable Synchronized()
+{
+    lock (_lock)
+    {
+        return this.synchronizable ?? (this.synchronizable = new Synchronizable(this, this._lock));
+    }
+}
+```
+
+实现类为**Synchronizable**：
+`internal class Synchronizable : ISynchronizable`
+其**接口**如下：
+
+``` csharp
+public interface ISynchronizable
+{
+    bool WaitForDone();
+    object WaitForResult(int millisecondsTimeout = 0);
+    object WaitForResult(TimeSpan timeout);
+}
+```
+
+以<B>`WaitForResult()`</B>为例：
+
+``` csharp
+public object WaitForResult(int millisecondsTimeout = 0)
+{
+    // 已经完成则直接返回结果
+    if (result.IsDone)
+    {
+        if (result.Exception != null)
+            throw result.Exception;
+
+        return result.Result;
+    }
+
+    // 等待结果返回
+    lock (_lock)
+    {
+        if (!result.IsDone)
+        {
+            if (millisecondsTimeout > 0)
+                Monitor.Wait(_lock, millisecondsTimeout);
+            else
+                Monitor.Wait(_lock);
+        }
+    }
+
+    if (!result.IsDone)
+        throw new TimeoutException();
+
+    if (result.Exception != null)
+        throw result.Exception;
+
+    return result.Result; // 返回结果
+}
+```
+
+这里就是前面提及到的`Monitor.PulseAll()`的另一半`Monitor.Wait()`，
+即<B><VT>在此处等待`Monitor.PulseAll()`的执行恢复</VT></B>
+而<B><VT>`WaitForDone()`则是仅返回完成情况版，本质上是一样的</VT></B>
+
+<B><GN>Callbackable</GN></B>从名字上我们也能了解到这是一个<B><VT>回调器</VT></B>
+其**用法**如下：
+`result.Callbackable().OnCallback((r) => ...);` <VT>添加回调</VT>
+
+``` csharp
+public virtual ICallbackable Callbackable()
+{
+    lock (_lock)
+    {
+        return this.callbackable ?? (this.callbackable = new Callbackable(this));
+    }
+}
+```
+
+实现类为**Callbackable**：
+`internal class Callbackable : ICallbackable`
+其**接口**如下：
+
+``` csharp
+public interface ICallbackable
+{
+    void OnCallback(Action<IAsyncResult> callback);
+}
+```
+
+`OnCallback()`具体实现如下：
+
+``` csharp
+public void OnCallback(Action<IAsyncResult> callback)
+{
+    lock (_lock)
+    {
+        if (callback == null)
+            return;
+
+        if (this.result.IsDone)
+        {
+            try
+            {
+                callback(this.result);
+            }
+            catch (Exception e)
+            {
+                if (log.IsWarnEnabled)
+                    log.WarnFormat("Class[{0}] callback exception.Error:{1}", this.GetType(), e);
+            }
+            return;
+        }
+
+        this.callback += callback;
+    }
+}
+```
+
+即<VT>已完成直接调，未完成存到回调列表中</VT>
+
+显然<B><VT>回调是在AsyncResult完成时执行的</VT></B>，有`AsyncResult.RaiseOnCallback()`：
+
+``` csharp
+protected virtual void RaiseOnCallback()
+{
+    if (this.callbackable != null)
+        this.callbackable.RaiseOnCallback();
+}
+
+public void RaiseOnCallback()
+{
+    lock (_lock)
+    {
+        try
+        {
+            if (this.callback == null)
+                return;
+
+            var list = this.callback.GetInvocationList();
+            this.callback = null;
+
+            foreach (Action<IAsyncResult> action in list)
+            {
+                try
+                {
+                    action(this.result);
+                }
+                catch (Exception e)
+                {
+                    if (log.IsWarnEnabled)
+                        log.WarnFormat("Class[{0}] callback exception.Error:{1}", this.GetType(), e);
+                }
+            }
+        }
+        catch (Exception e) {...}
+    }
+}
+```
+
+由此我们可以得知：
+**<VT>Callbackable是一个回调缓存地，这是因为异步的不确定性而添加的，我们不清楚当前的完成状态</VT>**
+
+TODO：更多版本的Async
