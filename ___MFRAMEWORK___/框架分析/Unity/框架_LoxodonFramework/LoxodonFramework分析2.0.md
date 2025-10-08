@@ -2129,4 +2129,80 @@ public void RaiseOnCallback()
 由此我们可以得知：
 **<VT>Callbackable是一个回调缓存地，这是因为异步的不确定性而添加的，我们不清楚当前的完成状态</VT>**
 
-TODO：更多版本的Async
+当然，AsyncResult只是最基础的一种异步Result，还有一些**派生**于它的**类**：
+
+- ProgressResult
+- ImmutableAsyncResult
+- ImmutableProgressResult
+- CoroutineResult<VT>(来自Loxodon.Framework.Execution)</VT>
+- CoroutineProgressResult<VT>(同上)</VT>
+
+<BR>
+
+**<GN>ProgressResult</GN>**
+Progress即进度，显然是一种<B><VT>可以获取与更新当前进度的Result</VT></B>
+其**声明**如下：
+`public class ProgressResult<TProgress> : AsyncResult, IProgressResult<TProgress>, IProgressPromise<TProgress>`
+额外的**接口**具体如下：
+
+``` csharp
+public interface IProgressResult<TProgress> : IAsyncResult
+{
+    TProgress Progress { get; }
+    new IProgressCallbackable<TProgress> Callbackable(); // new覆盖形式
+}
+
+public interface IProgressPromise<TProgress> : IPromise
+{
+    TProgress Progress { get; }
+    void UpdateProgress(TProgress progress);
+}
+```
+
+**目的**为：当UpdateProgress()时，<B><VT>根据注册回调完成相应操作</VT></B>，<B><YL>可能有：</YL></B>
+
+``` csharp
+public ProgressResult<float, bool> DownloadFileAsync(string url)
+{
+    var result = new ProgressResult<float, bool>();
+    
+    Task.Run(() => {
+        try {
+            for (int i = 0; i <= 100; i++) {
+                if (result.IsCancellationRequested) break;
+                
+                // 模拟下载进度
+                result.UpdateProgress(i / 100f);
+                Thread.Sleep(50);
+            }
+            
+            if (!result.IsCancellationRequested)
+            {
+                result.SetResult(true);
+            }
+            else
+            {
+                result.SetCancelled();
+            }
+        }
+        catch (Exception ex) {
+            result.SetException(ex);
+        }
+    });
+    
+    return result;
+}
+
+// 使用
+var download = DownloadFileAsync("file.zip");
+download.Callbackable().OnProgressCallback(p => UpdateProgressBar(p));
+download.Callbackable().OnCallback((r, ex) => {
+    if (ex != null) {
+        ShowMessage($"下载失败: {ex.Message}");
+    } else if (r.IsCancelled) {
+        ShowMessage("下载已取消");
+    } else {
+        ShowMessage("下载完成!");
+    }
+});
+```
