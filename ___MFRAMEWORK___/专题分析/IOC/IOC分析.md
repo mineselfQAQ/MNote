@@ -4,13 +4,14 @@
 
 - [简述](#简述)
 - [参考实现](#参考实现)
-  - [QFramework](#qframework)
-    - [IOCContainer](#ioccontainer)
-    - [IOCKit](#iockit)
-  - [LoxodonFramework](#loxodonframework)
-  - [CatLib](#catlib)
-    - [解析详析](#解析详析)
-  - [MicrosoftDI](#microsoftdi)
+  - [SL](#sl)
+    - [QFramework](#qframework)
+    - [LoxodonFramework](#loxodonframework)
+  - [DI](#di)
+    - [QFramework](#qframework-1)
+    - [CatLib](#catlib)
+      - [解析详析](#解析详析)
+    - [MicrosoftDI](#microsoftdi)
 
 <!-- /TOC -->
 
@@ -30,20 +31,17 @@ IOC的实现方式一般有2种：
 
 # 参考实现
 
-参考对象有以下几个：
+## SL
 
-- **MicrosoftDI** 　<VT>复杂DI</VT>
-- **CatLib** 　<VT>复杂DI</VT>
-- **QFramework**　<VT>简单SL+简单DI</VT>
-- **LoxodonFramework**　<VT>复杂SL</VT>
+SL的参考对象有： <VT>由易到难</VT>
 
-## QFramework
+- **QFramework**
+- **LoxodonFramework**
 
-QFramework提供了2种IOC实现，一种是QFramework核心附带的**IOCContainer**，一种是**IOCKit**
+### QFramework
 
-### IOCContainer
-
-IOCContainer是一种SL实现，极其简单，其实就是<B><VT>用一个字典去存储实例</VT></B>：
+QFramework中的SL实现为**IOCContainer**，是核心中附带的(DI是Kit中的)
+IOCContainer其实就是<B><VT>用一个字典去存储实例</VT></B>：
 
 ``` csharp
 public class IOCContainer
@@ -86,8 +84,155 @@ public class IOCContainer
 }
 ```
 
-### IOCKit
+### LoxodonFramework
 
+LoxodonFramework中用于提供IOC的是<B><GN>ServiceContainer</GN></B>
+其**声明**如下：
+`public class ServiceContainer : IServiceContainer, IDisposable`
+**IServiceContainer接口**是这样的：
+
+``` csharp
+public interface IServiceContainer : IServiceLocator, IServiceRegistry {}
+
+public interface IServiceLocator
+{
+    object Resolve(Type type);
+    T Resolve<T>();
+    object Resolve(string name);
+    T Resolve<T>(string name);
+}
+public interface IServiceRegistry
+{
+    void Register(Type type, object target);
+    void Register<T>(T target);
+    void Register(string name, object target);
+    void Register<T>(string name, T target);
+    void Register<T>(Func<T> factory);
+    void Register<T>(string name, Func<T> factory);
+    void Unregister<T>();
+    void Unregister(Type type);
+    void Unregister(string name);
+}
+```
+
+这很好理解：
+
+- IServiceLocator：提供SL功能，即获取
+- IServiceRegistry：获取前需要注册，这样才能知道获取内容
+
+<BR>
+
+在分析前先了解一下**创建流程**：
+`IServiceContainer container = context.GetContainer();`
+context为<B><GN>ApplicationContext</GN></B>，是项目的核心之一，有：
+
+``` csharp
+public Context(IServiceContainer container, Context contextBase)
+{
+    this.attributes = new Dictionary<string, object>();
+    this.contextBase = contextBase;
+    this.container = container;
+    if (this.container == null)
+    {
+        this.innerContainer = true;
+        this.container = new ServiceContainer(); // 自动创建
+    }
+}
+
+public virtual IServiceContainer GetContainer()
+{
+    return this.container;
+}
+```
+
+<BR>
+
+**回到ServiceContainer：**
+根据上述接口可知：作为SL形态的IOC，无非就是`Register()`/`Resolve()`/`Unregister()`三个操作
+
+**<GN>Entry</GN>**
+Entry是用于存储的数据结构，如下：
+
+``` csharp
+public Entry(string name, Type type, IFactory factory)
+{
+    this.Name = name;
+    this.Type = type;
+    this.Factory = factory;
+}
+```
+
+显然是`Resolve()`所需要的数据
+其中IFactory即工厂，当然是用于实例化的，有2种实现：
+
+- `GenericFactory<T>`：泛型工厂，传入`Func<T>`，创建时调用返回T
+- `SingleInstanceFactory`：单例工厂，传入target实例，创建时获取返回即可
+
+显然：**泛型工厂**是<B><VT>延迟创建</VT></B>，**单例工厂**相当于是<B><VT>预存结果</VT></B>
+
+**`Register()`**
+注册有6种形式，但无非就是两种工厂选一个，注册的核心为`Register0()`：
+
+``` csharp
+// GenericFactory
+public virtual void Register<T>(Func<T> factory)
+{
+    // Type
+    this.Register0(typeof(T), new GenericFactory<T>(factory));
+}
+// SingleInstanceFactory
+public virtual void Register<T>(T target)
+{
+    // Type
+    this.Register0(typeof(T), new SingleInstanceFactory(target));
+}
+
+internal void Register0(Type type, IFactory factory)
+{
+    lock (_lock)
+    {
+        string name = type.IsGenericType ? null : type.Name;
+        Entry entry = new Entry(name, type, factory);
+        if (!typeServiceMappings.TryAdd(type, entry))
+            throw new DuplicateRegisterServiceException(string.Format("Duplicate key {0}", type));
+
+        // 在nameServiceMappings也加一份，避免重复
+        // 那么后续也可通过name解析了
+        if (!string.IsNullOrEmpty(name))
+            nameServiceMappings.TryAdd(name, entry);
+    }
+}
+
+internal void Register0(string name, IFactory factory)
+{
+    lock (_lock)
+    {
+        if (!nameServiceMappings.TryAdd(name, new Entry(name, null, factory)))
+            throw new DuplicateRegisterServiceException(string.Format("Duplicate key {0}", name));
+    }
+}
+```
+
+整体来说相当简单，无非就是<VT>将信息收集到字典中，供解析使用</VT>
+
+**`Resolve()`**
+解析那就更简单了，<VT>从字典中获取了调用工厂</VT>即可
+
+**`Unregister()`**
+反注册同样简单，<VT>从字典中移除相应Entry</VT>即可
+有一点需要注意：由于Type形式注册中为两个字典都添加了一份，所以反注册时需要考虑到这一点
+
+## DI
+
+DI的参考对象有： <VT>由易到难</VT>
+
+- **QFramework**
+- **CatLib**
+- **MicrosoftDI**
+
+### QFramework
+
+QFramework除了核心附带的**IOCContainer**，另一种是**IOCKit**
 IOCKit作为一个Kit提供，实现的是最精简版的DI
 提供了2种注入手段：**[Inject]特性/QFrameworkContainer派生**
 
@@ -254,7 +399,8 @@ public interface IQFrameworkContainer
   - `Resolve()`
   - `ResolveAll()`
   
-  由`RegisterInstance()`/`InjectAll()`可知：Instances的核心在于**注入**：
+  其中`RegisterInstance()`是相当关键的：
+
   <BR>
 
   ``` csharp
@@ -348,7 +494,7 @@ public object CreateInstance(Type type, params object[] constructorArgs)
     ConstructorInfo[] constructor = type.GetTypeInfo().DeclaredConstructors.ToArray();
 #endif
 
-    // 唯一构造
+    // 没有public构造
     if (constructor.Length < 1)
     {
         var obj2 = Activator.CreateInstance(type);
@@ -372,6 +518,7 @@ public object CreateInstance(Type type, params object[] constructorArgs)
     {
         if (p.ParameterType.IsArray)
         {
+            // 对于数组，解析所有注册命名过的类型
             return ResolveAll(p.ParameterType);
         }
 
@@ -389,168 +536,38 @@ public object CreateInstance(Type type, params object[] constructorArgs)
 逻辑其实很清晰，这里<B><YL>用上述例子举例</YL></B>：
 
 - 开始时通过`RegisterInstance()`提前注册了实例，如果遇到需要时则会去Instances寻找
-- 注入流：
+- **注入流：**
   在类中声明了需要的接口属性(具有[Inject]特性)，`Inject()`则会对其设置，设置方法为`Resolve()`，此时由于Instances中已有，所以可直接获取并设置
-- 解析流：
+  <DRD>注意：Inject的对象为this，大概率就是MonoBehaviour类中的一员</DRD>
+- **解析流：**
   这种方式就是直接去获取了，跳过了`Inject()`一步，同样由于提前注册可直接获取
 
 显然**大致流程**就是：
 **<VT>Register建立映射，后续可通过Resolve直接解析，也可通过Inject注入，整体来说就是`Resolve()`/`Inject()`/`CreateInstance()`三者不断递归</VT>**
-**更清晰地来讲：**
 
-- 我们可以认为`Resolve()`是起点，目的是为了获取接口实例
-- 首先要做的就是创建实例`CreateInstance()`(也可提前缓存`RegisterInstance()`)，创建实例需要找到最完整的那个构造，对于构造的参数，需要递归`Resolve()`进行获取
-- 创建完毕后需要`Inject()`对实例中存在的[Inject]特性属性赋值，同样需要递归`Resolve()`进行获取
+**一些注意点：**
 
-可以发现：<B><VT>`Inject()`其实是脱离注册解析流程的附加函数，提供了一种更便捷的功能(当然要说Resolve才是附加的也是可行的，但不太合理)</VT></B>
+- Register是必须的，无论使用`Register()`还是`RegisterInstance()`，只要是需要解析的一员
+- `RegisterInstance()`仅可用于简单情况，如果注册内容有形参就不太适合了，此时应该完全使用`Register()`，以自动递归解析
+- `Resolve()`可选择手动传参或自动解析，显然手动传参仅适用于基础类型
+- [Inject]特性其实<B><DRD>没啥作用</DRD></B>，仅仅是一种便捷的注册方式，以作者的例子来看两者完全是等价的：
+  `MainContainer.Container.Inject(this)`
+  `MainContainer.Container.Resolve<INetworkExampleService>()`
+  区别就是无论对象有多少，Inject方式只要添加[Inject]特性并调用同样的`MainContainer.Container.Inject(this)`即可获取对象，而Resolve方式则需要一个一个获取且是局部的
+  可以想象到的是Inject有一极其便捷的功能，<VT>任意属性都可注入，无需在构造函数中存在</VT>
+  但是<B><VT>显然是直接Resolve比较好(性能好，一般也不会麻烦太多)</VT></B>，所以总的来说还是需要**按序选择**
+  同时：Inject完全是一种附加功能，如不需要此特性，可在流程中排除
+- `CreateInstance()`中的一段是**不太正确**的：
+  `if (constructor.Length < 1)`，结合BindingFlags筛选，这意味着没有public构造，这种情况一定是写了非public构造的(默认是public无参构造)，也就是该类不想公开，更应该的选择应该是**不创建**
+  `if (p.ParameterType.IsArray)`，这里的IsArray仅能处理数组情况(`int[]`)
+  可以使用`if (p.ParameterType.IsGenericType && p.ParameterType.GetGenericTypeDefinition() == typeof(IEnumerable<>))`，其中`IsGenericType`判断自身，`GetGenericTypeDefinition() == typeof(IEnumerable<>)`判断自身接口
+- `ResolveAll()`只有确认name才能进行
 
 **问题点：**
 **<DRD>没有依赖循环检查</DRD>**
 这点是比较致命的，其它只是功能性内容，依赖循环是**必须避免**的
 
-<BR>
-
-## LoxodonFramework
-
-LoxodonFramework中用于提供IOC的是<B><GN>ServiceContainer</GN></B>
-其**声明**如下：
-`public class ServiceContainer : IServiceContainer, IDisposable`
-**IServiceContainer接口**是这样的：
-
-``` csharp
-public interface IServiceContainer : IServiceLocator, IServiceRegistry {}
-
-public interface IServiceLocator
-{
-    object Resolve(Type type);
-    T Resolve<T>();
-    object Resolve(string name);
-    T Resolve<T>(string name);
-}
-public interface IServiceRegistry
-{
-    void Register(Type type, object target);
-    void Register<T>(T target);
-    void Register(string name, object target);
-    void Register<T>(string name, T target);
-    void Register<T>(Func<T> factory);
-    void Register<T>(string name, Func<T> factory);
-    void Unregister<T>();
-    void Unregister(Type type);
-    void Unregister(string name);
-}
-```
-
-这很好理解：
-
-- IServiceLocator：提供SL功能，即获取
-- IServiceRegistry：获取前需要注册，这样才能知道获取内容
-
-<BR>
-
-在分析前先了解一下**创建流程**：
-`IServiceContainer container = context.GetContainer();`
-context为<B><GN>ApplicationContext</GN></B>，是项目的核心之一，有：
-
-``` csharp
-public Context(IServiceContainer container, Context contextBase)
-{
-    this.attributes = new Dictionary<string, object>();
-    this.contextBase = contextBase;
-    this.container = container;
-    if (this.container == null)
-    {
-        this.innerContainer = true;
-        this.container = new ServiceContainer(); // 自动创建
-    }
-}
-
-public virtual IServiceContainer GetContainer()
-{
-    return this.container;
-}
-```
-
-<BR>
-
-**回到ServiceContainer：**
-根据上述接口可知：作为SL形态的IOC，无非就是`Register()`/`Resolve()`/`Unregister()`三个操作
-
-**<GN>Entry</GN>**
-Entry是用于存储的数据结构，如下：
-
-``` csharp
-public Entry(string name, Type type, IFactory factory)
-{
-    this.Name = name;
-    this.Type = type;
-    this.Factory = factory;
-}
-```
-
-显然是`Resolve()`所需要的数据
-其中IFactory即工厂，当然是用于实例化的，有2种实现：
-
-- `GenericFactory<T>`：泛型工厂，传入`Func<T>`，创建时调用返回T
-- `SingleInstanceFactory`：单例工厂，传入target实例，创建时获取返回即可
-
-显然：**泛型工厂**是<B><VT>延迟创建</VT></B>，**单例工厂**相当于是<B><VT>预存结果</VT></B>
-
-**`Register()`**
-注册有6种形式，但无非就是两种工厂选一个，注册的核心为`Register0()`：
-
-``` csharp
-// GenericFactory
-public virtual void Register<T>(Func<T> factory)
-{
-    // Type
-    this.Register0(typeof(T), new GenericFactory<T>(factory));
-}
-// SingleInstanceFactory
-public virtual void Register<T>(T target)
-{
-    // Type
-    this.Register0(typeof(T), new SingleInstanceFactory(target));
-}
-
-internal void Register0(Type type, IFactory factory)
-{
-    lock (_lock)
-    {
-        string name = type.IsGenericType ? null : type.Name;
-        Entry entry = new Entry(name, type, factory);
-        if (!typeServiceMappings.TryAdd(type, entry))
-            throw new DuplicateRegisterServiceException(string.Format("Duplicate key {0}", type));
-
-        // 在nameServiceMappings也加一份，避免重复
-        // 那么后续也可通过name解析了
-        if (!string.IsNullOrEmpty(name))
-            nameServiceMappings.TryAdd(name, entry);
-    }
-}
-
-internal void Register0(string name, IFactory factory)
-{
-    lock (_lock)
-    {
-        if (!nameServiceMappings.TryAdd(name, new Entry(name, null, factory)))
-            throw new DuplicateRegisterServiceException(string.Format("Duplicate key {0}", name));
-    }
-}
-```
-
-整体来说相当简单，无非就是<VT>将信息收集到字典中，供解析使用</VT>
-
-**`Resolve()`**
-解析那就更简单了，<VT>从字典中获取了调用工厂</VT>即可
-
-**`Unregister()`**
-反注册同样简单，<VT>从字典中移除相应Entry</VT>即可
-有一点需要注意：由于Type形式注册中为两个字典都添加了一份，所以反注册时需要考虑到这一点
-
-<BR>
-
-## CatLib
+### CatLib
 
 对于CatLib和MicrosoftDI，相对来说CatLib实现的DI还是简单一些的
 具体可以参考**CatLib分析**中的，这里简短地再总结一下：
@@ -559,6 +576,7 @@ internal void Register0(string name, IFactory factory)
   - `Bind()`：绑定的核心是<B><GN>BindData</GN></B>，本质上是信息集合，即传入的`IOC容器container`/`服务名service`/`创建事件Concrete`/`生命周期IsStatic`，同时提供了一些扩展函数以及内部函数
   - `Make()`：收集到了信息即可解析，核心流程如下：
     - `Make()`几乎等价于`Resolve()`(只是多了一层检测)
+    - 最简单的情况是`instances`中已收集，则可以直接获取，这需要通过`Instance()`添加(和Concrete是类似的)
     - 获取到BindData后核心是进行`Build()`，这样就能得到所需实例
       - `Build()`：创建实例的操作
         - 有Concrete：用事件创即可
@@ -569,7 +587,7 @@ internal void Register0(string name, IFactory factory)
       - !IsStatic：不操作
 - 核心流程如上，其余的都是扩展功能，都是使用连写形式方便执行，内容穿插在上述流程的各处
 
-### 解析详析
+#### 解析详析
 
 在上述主流程中，最值得注意的部分是这里：
 
@@ -603,6 +621,7 @@ protected virtual Type SpeculatedServiceType(string service)
 ```
 
 这里就是上述所提到的：必须通过`OnFindType()`添加映射后才能使用
+`OnFindType()`：<B><VT>string转Type(因为创建需要具体Type)</VT></B>
 回到函数本身：
 
 ``` csharp
@@ -644,7 +663,7 @@ public static TService Make<TService>(params object[] userParams)
 }
 ```
 
-结合来看，<B><VT>userParams必定用于TService实例的构造</VT></B>
+问题在于：**userParams不一定包含所有的参数，有可能参数来自于自动注入流程**(如int交给传入params，ILog通过Make后自动解析)
 继续看：
 
 ``` csharp
@@ -995,10 +1014,16 @@ protected virtual string GetContextualService(
   ```
 
 经过以上几种尝试，最终目的都是获取一个instance，之后只要通过`CanInject()`确认是否符合即可确认其中一个baseParams，遍历完成后dependencies组成完毕
+总之，对于任意一个参数，想要获取instance流程都是：
+1. 尝试`GetParamsMatcher()`委托获取(默认有一套流程，也可override自定义)
+2. 尝试紧凑匹配，即仅存在一个object[]/object情况(传入内容已"压缩"，可确保之后直接处理Make内容或直接结束)
+3. 尝试顺序匹配
+4. 尝试解析(如果userParams已经用完，则直接开始解析)
+5. 失败
 
 <BR>
 
-## MicrosoftDI
+### MicrosoftDI
 
 MicrosoftDI是更加完善的一种DI，毕竟也是Microsoft官方的，CatLib的DI虽然也挺复杂，但是从结构上来看，并没有拆分很多，而Microsoft是十分完善的
 
