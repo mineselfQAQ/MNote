@@ -19,6 +19,7 @@
       - [高级](#高级)
         - [泛型](#泛型)
         - [其它](#其它)
+- [常用实例](#常用实例)
 
 <!-- /TOC -->
 
@@ -342,3 +343,8 @@ class A<T1>
 - `IsSpecialName`可用于检查是否为语法糖名，适用于Field/Property/Method/Constructor/Event
 - `Attributes`是一更底层的属性，对应一个XXXAttributes枚举，适用于Field/Property/Method/Constructor/Event/Parameter，其中可以发现如`FieldAttributes.Private`这种值，而更多的是一些高级的值
 - 如果想获取一个virtual方法的根，可以通过`GetBaseDefinition()`获取
+
+<BR>
+
+# 常用实例
+
