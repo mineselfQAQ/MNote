@@ -24,3 +24,14 @@ setx NO_PROXY "localhost,127.0.0.1"
 ![](Pic/codex2.png)
 由此即可对应上</BL>
 
+**<BL>问题：VSCode下使用Codex插件依旧重试</BL>**
+<BL>这是因为VSCode可能不完全走全局设置，在设置中找到Proxy Authorization按如下设置即可</BL>
+![](Pic/codex3.png)
+
+``` json
+"http.proxyAuthorization": null,
+"http.proxy": "http://127.0.0.1:20081",
+"https.proxy": "http://127.0.0.1:20081",
+"http.proxySupport": "override",
+"http.proxyStrictSSL": false
+```
