@@ -34,6 +34,4 @@ setx NO_PROXY "localhost,127.0.0.1"
 "https.proxy": "http://127.0.0.1:20081",
 "http.proxySupport": "override",
 "http.proxyStrictSSL": false
-```
-
-<VT>dsaijdsa</VT>
+```s
