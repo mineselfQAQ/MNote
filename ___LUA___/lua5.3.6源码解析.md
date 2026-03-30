@@ -12,6 +12,13 @@
       - [SemInfo](#seminfo)
   - [\_ENV](#_env)
     - [沙箱机制](#沙箱机制)
+- [数据结构](#数据结构)
+  - [数据结构基础](#数据结构基础)
+    - [类型](#类型)
+    - [GC](#gc)
+  - [字符串](#字符串)
+  - [创建](#创建)
+    - [短字符串](#短字符串)
 - [函数执行](#函数执行)
   - [函数执行](#函数执行-1)
   - [安全执行（异常处理）](#安全执行异常处理)
@@ -26,6 +33,7 @@
       - [总览](#总览)
   - [执行期](#执行期)
     - [虚拟机执行](#虚拟机执行)
+  - [示例](#示例)
 
 <!-- /TOC -->
 
@@ -323,6 +331,290 @@ end
 ---
 ---
 
+# 数据结构
+
+在lua中，数据结构具有一定的封装，最常见在源码中见到的就是TValue
+
+## 数据结构基础
+
+<B><GN>TValue</GN></B>即值，是lua最关键的一层封装：
+
+``` c
+typedef struct lua_TValue {
+  TValuefields;
+} TValue;
+
+#define TValuefields	Value value_; int tt_
+
+typedef union Value {
+  GCObject *gc;    /* collectable objects */
+  void *p;         /* light userdata */
+  int b;           /* booleans */
+  lua_CFunction f; /* light C functions */
+  lua_Integer i;   /* integer numbers */
+  lua_Number n;    /* float numbers */
+} Value;
+```
+
+可以看到TValue由2字段组成：
+
+- `Value value_`：值本身
+- `int tt_`：type
+
+<B><BL>问题：为什么要封装成TValue</BL></B>
+<BL>因为lua是动态类型语言，变量类型随时可变，只靠Value是无法知道当前存储类型的，所以需要额外数据`tt_`</BL>
+
+### 类型
+
+在lua.h中有所定义：
+
+``` c
+#define LUA_TNONE		(-1)
+
+#define LUA_TNIL		0
+#define LUA_TBOOLEAN		1
+#define LUA_TLIGHTUSERDATA	2
+#define LUA_TNUMBER		3
+#define LUA_TSTRING		4
+#define LUA_TTABLE		5
+#define LUA_TFUNCTION		6
+#define LUA_TUSERDATA		7
+#define LUA_TTHREAD		8
+
+#define LUA_NUMTAGS		9
+```
+
+注意：LUA_XXX并非完整`tt_`，在lobject.h有注释：
+
+``` c
+/*
+** tags for Tagged Values have the following use of bits:
+** bits 0-3: actual tag (a LUA_T* value)
+** bits 4-5: variant bits
+** bit 6: whether value is collectable
+*/
+```
+
+在lobject.h可以看到：
+
+``` c
+/* Variant tags for functions */
+#define LUA_TLCL	(LUA_TFUNCTION | (0 << 4))  /* Lua closure */
+#define LUA_TLCF	(LUA_TFUNCTION | (1 << 4))  /* light C function */
+#define LUA_TCCL	(LUA_TFUNCTION | (2 << 4))  /* C closure */
+/* Variant tags for strings */
+#define LUA_TSHRSTR	(LUA_TSTRING | (0 << 4))  /* short strings */
+#define LUA_TLNGSTR	(LUA_TSTRING | (1 << 4))  /* long strings */
+/* Variant tags for numbers */
+#define LUA_TNUMFLT	(LUA_TNUMBER | (0 << 4))  /* float numbers */
+#define LUA_TNUMINT	(LUA_TNUMBER | (1 << 4))  /* integer numbers */
+/* Bit mark for collectable types */
+#define BIT_ISCOLLECTABLE	(1 << 6)
+```
+
+即对于某些类型，会派生出细分类型
+对于这些派生类型，创建时就会直接用上，如：
+`ts = createstrobj(L, l, LUA_TSHRSTR, h);`
+对于可GC类型，需要通过`ctb()`宏额外补充：
+`#define ctb(t) ((t) | BIT_ISCOLLECTABLE)`
+对于TValue设置类操作（如：`setsvalue()`）就会进行设置
+
+具体操作如下：
+
+- 获取：
+
+``` c
+#define rttype(o)	((o)->tt_) // 完整tt_(0-6位)
+#define ttype(o)	(rttype(o) & 0x3F) // 基础类型+派生类型(0-5位)
+#define ttnov(o)	(novariant(rttype(o))) // 基础类型(0-3位)
+
+#define novariant(x)	((x) & 0x0F)
+```
+
+### GC
+
+对于需要回收的类型，会使用<B><GN>GCObject</GN></B>：
+
+``` c
+typedef struct GCObject GCObject;
+struct GCObject {
+  CommonHeader;
+};
+
+#define CommonHeader GCObject *next; lu_byte tt; lu_byte marked
+```
+
+<B><BL>问题：关于`TValue.tt_` / `GCObject.tt`</BL></B>
+<BL>对于GCObject来说，自身已经完全说明是带有GC的，所以tt不会存储第6位BIT_ISCOLLECTABLE信息</BL></B>
+
+GCObject是一个<B><VT>公共头</VT></B>，具体有以下对象：
+
+- TString
+- Table
+- Udata
+- Proto
+- Closure
+- lua_State
+
+<B><BL>问题：GCObject与TValue的关系</BL></B>
+<BL>某些TValue（就是GC类型）会指向GCObject</BL>
+<YL><B>举例</B>：TString是一个字符串对象，在lua中字符串是可复用的，某一个TString可能被多个TValue所引用</YL>
+
+---
+
+## 字符串
+
+字符串是lua中核心的数据类型
+对应结构<B><GN>TString</GN></B>：
+
+``` c
+typedef struct TString {
+  CommonHeader;
+  lu_byte extra;  /* reserved words for short strings; "has hash" for longs */
+  lu_byte shrlen;  /* length for short strings */
+  unsigned int hash;
+  union {
+    size_t lnglen;  /* length for long strings */
+    struct TString *hnext;  /* linked list for hash table */
+  } u;
+} TString;
+```
+
+根据注释可知：TString包含短字符串与长字符串两种，两种实际结构不同
+
+- 共有
+  - hash：字符串哈希
+- 短字符串
+  - extra：保留字
+  - shrlen：长度
+  - u.hnext：桶链表指针
+- 长字符串
+  - extra："是否已算过hash"的标记
+  - u.lnglen：长度
+
+<B>重点：</B>
+<B><VT>TString本身不带有字节数据（也就是说TString是字符串头），字节数据紧跟在<GN>UTString</GN>后</B>
+
+``` c
+typedef union UTString {
+  L_Umaxalign dummy;  /* ensures maximum alignment for strings */
+  TString tsv;
+} UTString;
+```
+
+``` txt
+地址 ts
+┌──────────────────────────────┐
+│ UTString (含 TString 头部)    │  sizeof(UTString)
+└──────────────────────────────┘
+┌──────────────────────────────┐
+│ 字节数据 char[0..len-1]       │  len 字节（可包含 '\0'）
+├──────────────────────────────┤
+│ 结尾 '\0'                     │  额外 1 字节
+└──────────────────────────────┘
+```
+
+所以可以看到取字符串宏`getstr()`是这么用的：
+`#define getstr(ts)  \`
+`check_exp(sizeof((ts)->extra), cast(char *, (ts)) + sizeof(UTString))`
+
+---
+
+## 创建
+
+`luaS_newlstr()`
+
+``` csharp
+TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
+  if (l <= LUAI_MAXSHORTLEN)  /* short string? */
+    return internshrstr(L, str, l);
+  else {
+    TString *ts;
+    if (l >= (MAX_SIZE - sizeof(TString))/sizeof(char))
+      luaM_toobig(L);
+    ts = luaS_createlngstrobj(L, l);
+    memcpy(getstr(ts), str, l * sizeof(char));
+    return ts;
+  }
+}
+```
+
+这里也能看到字符串的长短分类，其中：
+<B><VT>宏`LUAI_MAXSHORTLEN`区分了长短字符串的长度，界限为40</VT></B>
+
+### 短字符串
+
+短字符串走的是`internshrstr()`：
+
+``` c
+static TString *internshrstr (lua_State *L, const char *str, size_t l) {
+  TString *ts;
+  global_State *g = G(L);
+  unsigned int h = luaS_hash(str, l, g->seed);
+  TString **list = &g->strt.hash[lmod(h, g->strt.size)];
+  lua_assert(str != NULL);  /* otherwise 'memcmp'/'memcpy' are undefined */
+  for (ts = *list; ts != NULL; ts = ts->u.hnext) {
+    if (l == ts->shrlen &&
+        (memcmp(str, getstr(ts), l * sizeof(char)) == 0)) {
+      /* found! */
+      if (isdead(g, ts))  /* dead (but not collected yet)? */
+        changewhite(ts);  /* resurrect it */
+      return ts;
+    }
+  }
+  if (g->strt.nuse >= g->strt.size && g->strt.size <= MAX_INT/2) {
+    luaS_resize(L, g->strt.size * 2);
+    list = &g->strt.hash[lmod(h, g->strt.size)];  /* recompute with new size */
+  }
+  ts = createstrobj(L, l, LUA_TSHRSTR, h);
+  memcpy(getstr(ts), str, l * sizeof(char));
+  ts->shrlen = cast_byte(l);
+  ts->u.hnext = *list;
+  *list = ts;
+  g->strt.nuse++;
+  return ts;
+}
+```
+
+- 核心1：复用（哈希桶）
+  - 使用`luaS_hash()`计算哈希值
+    - `g->seed`会在`lua_newstate()`进行初始化，这也意味着`g->seed`仅存在一个值且不会变化
+  - 获取桶：`TString **list = &g->strt.hash[lmod(h, g->strt.size)];`
+    - `&g->strt`：stringtable类型，是<B><VT>全局的驻留短字符串</VT></B>
+  - 尝试在桶中找到TString
+- 核心2：扩容
+  - 如果负载过高（`g->strt`用超了或但还没到达上限（MAX_INT/2））则会调用`luaS_resize()`扩表
+- 核心3：设置
+  - 如果前面找不到复用就会创一个新的
+
+    ``` c
+    ts = createstrobj(L, l, LUA_TSHRSTR, h); // 创建短字符串
+    memcpy(getstr(ts), str, l * sizeof(char)); // 拷贝值
+    ts->shrlen = cast_byte(l); // 设置长度
+    // 头插法
+    ts->u.hnext = *list;
+    *list = ts;
+    ```
+
+在哈希计算中提到了驻留intern，这与`internshrstr()`对应（所以intern指的其实是驻留而非内部）
+<B><GN>stringtable</GN></B>可以说是专用于短字符串驻留的数据结构，具体结构如下：
+
+``` c
+typedef struct stringtable {
+  TString **hash;
+  int nuse;  /* number of elements */
+  int size;
+} stringtable;
+```
+
+<B><BL>问题：nuse和size的区别</BL></B>
+<BL>其实很明确，nuse即已存在数量，size为桶大小</BL>
+可以看到`hash`是TString**类型，即数组，这与哈希计算可以对应上，即<B><GN>拉链法</GN></B>哈希冲突方案
+
+---
+---
+---
+
 # 函数执行
 
 函数执行是核心部分之一，可以分为2部分：
@@ -557,11 +849,6 @@ l_noret luaD_throw (lua_State *L, int errcode) {
 ---
 
 # 编译与虚拟机执行流程
-
-以一个简单的例子为例：
-`local a = "hello world"`
-
----
 
 ## 启动
 
@@ -901,6 +1188,13 @@ typedef unsigned long Instruction;
 
 <YL><B>举例</B>：`CREATE_ABC(OP_MOVE, 2, 0, 0)` 将R0复制到R2</YL>
 
+<B>`RA(i)`宏</B>
+在虚拟机执行中，通常会调用`RA(i)`之类的宏获取R(A)真实地址：
+`#define RA(i)	(base+GETARG_A(i))`
+`#define GETARG_A(i)	getarg(i, POS_A, SIZE_A)`
+`#define getarg(i,pos,size)	(cast(int, ((i)>>pos) & MASK1(size,0)))`
+即 <B><VT>基地址+指令i中A的逻辑索引</VT></B>
+
 #### 总览
 
 - `luaY_parser()`：解析主函数，返回LClosure闭包
@@ -1024,10 +1318,108 @@ void luaV_execute (lua_State *L) {
 - `cl->u.l.base`：基址缓存
   - `goto newframe`会导致进入下一函数导致重置
   - `Protect()`会强制重新同步
-- ???
+- `L->top`：虚拟机栈顶
+  - 大多指令仅临时性修改，不改回去
+  - 收尾指令会`L->top = ci->top`恢复（如OP_CALL）
 
-<BR>
+<B><BL>问题：`L->top`与`ci->top`的关系</BL></B>
+<BL>两者指的都是`L->stack`的栈顶，但是具体含义不同：</BL>
 
-当虚拟机执行完毕，必然会遇到OP_RETURN执行返回
+- <BL>`L->top`：线程当前栈顶</BL>
+- <BL>`ci->top`：当前栈帧允许的栈顶</BL>
+
+<BL>规则：`L->top <= ci->top`
+简单理解：<B><VT>`ci->top`是边界，`L->top`会自行根据边界进行调整</VT></B></BL>
+
+<B><VT>相比`L->top`/`ci->top`，更应该关注的是`L->stack`即真正的上限，在`luaD_precall()`中可能会执行`luaD_growstack()`扩容</VT></B>
+
+当虚拟机执行完毕，<B>最后一次</B>必然会遇到OP_RETURN执行返回
 其中会进行`luaD_poscall()`进行善后处理
+
+## 示例
+
+<B>例1：简单局部变量</B>
+`local a = "hello world"`
+<B>编译期：</B>
+核心产物：LClosure（内部核心Proto）
+![](Pic/luaskill1.png)
+
+- 常量表k：存储"hello world"
+- locvars/lineinfo：调试信息（执行期无意义）
+- 槽位：2个槽位，即`Proto->maxstacksize = 2`
+- 指令：
+  - `LOADK 0 -1`，即：将第一个常量（`K[0]`）加载到寄存器0
+  - `RETURN 0 1`，即：结束，不返回值
+
+<B>执行期：</B>
+核心产物：CallInfo
+
+- 执行OP_LOADK：
+  - 找到ra：R(0)
+  - 取常量kb：K(0)
+  - 将kb写入ra：`setobj2s()`
+
+此时R(0)存放"hello world"，R(1)无用（但槽位存在）
+
+- 执行OP_RETURN：
+  - 直接结束chunk（因为只有一个CallInfo）
+
+<B><BL>问题："hello world"没有名字吗，后续怎么访问</BL></B>
+<BL>在执行期，变量没有名字，寄存器编号可以认为是它的名字
+关键：在回收前，局部变量位置永不变</BL>
+
+<B>例2：综合例子</B>
+
+``` lua
+local x = 10
+local y = 20
+
+function add(a, b)
+    local sum = a + b
+    return sum
+end
+
+local z = add(x, y)
+print(z)
+```
+
+![](Pic/lua2.png)
+
+关注于指令流程：
+
+- 指令1/2，LOADK：定义x和y，存放在R(0)/R(1)
+- 指令3，CLOSURE：创建add函数
+- 指令4，SETTABUP：设置全局变量add，设到`_ENV`
+- 指令5/6/7/8：调用add函数
+  - GETTABUP：获取add函数（在`_ENV`中）
+  - MOVE：传入x和y
+  - CALL：调用
+    - 子指令1，ADD：传入参数相加
+    - 子指令2，RETURN：返回结果
+    - 子指令3，RETURN：默认return出口（兜底），这里不触发
+- 指令9/10/11：调用print函数
+  - GETTABUP：获取print函数（也在`_ENV`中）
+  - MOVE：传入z
+  - CALL：调用
+- 指令12，RETURN：返回，没有返回值
+
+关注于栈变化：
+
+- 编译期处理：
+  - 5slots，最多只存在5个寄存器
+  - 已决定所有操作需要的寄存器
+- 执行期处理：
+  - 局部变量加载：R(0)=10 R(1)=20
+  - 函数创建：R(2)=add
+  - 复制参数：R(3)=10 R(4)=20
+  - 调用add：调用R(2)函数，使用R(3)/R(4)参数，返回到R(2)
+    - 内部新栈帧情况：
+      - R(0)=10 R(1)=20（复制到新栈帧）
+      - 相加：R(2)=30
+      - 返回：返回R(2)，即30
+    - 完成后R(2)被覆盖为30
+    - R(3)/R(4)大概率不会清理，但后续可直接覆盖
+  - 调用print：同add，但由于是CClosure，不走虚拟机执行
+  - 返回：无返回值
+
 
