@@ -2,6 +2,7 @@
 
 <!-- TOC -->
 
+- [注意事项](#注意事项)
 - [关键数据结构](#关键数据结构)
   - [lua\_State / global\_State](#lua_state--global_state)
   - [LexState / FuncState](#lexstate--funcstate)
@@ -17,8 +18,26 @@
     - [类型](#类型)
     - [GC](#gc)
   - [字符串](#字符串)
-  - [创建](#创建)
-    - [短字符串](#短字符串)
+    - [`luaS_newlstr`](#luas_newlstr)
+      - [短字符串](#短字符串)
+      - [长字符串](#长字符串)
+    - [c API](#c-api)
+      - [`luaS_newliteral`](#luas_newliteral)
+      - [`luaS_new`](#luas_new)
+      - [`luaX_newstring`](#luax_newstring)
+      - [`luaK_stringK`](#luak_stringk)
+    - [lua API](#lua-api)
+      - [`lua_pushstring`/`lua_pushlstring`](#lua_pushstringlua_pushlstring)
+      - [`lua_tostring`/`lua_tolstring`](#lua_tostringlua_tolstring)
+      - [`lua_rawlen`](#lua_rawlen)
+    - [使用实例](#使用实例)
+      - [词法解析器](#词法解析器)
+      - [语法解析器](#语法解析器)
+  - [表](#表)
+    - [`luaH_set`](#luah_set)
+    - [哈希值](#哈希值)
+    - [`luaH_get`](#luah_get)
+    - [`luaH_newkey`](#luah_newkey)
 - [函数执行](#函数执行)
   - [函数执行](#函数执行-1)
   - [安全执行（异常处理）](#安全执行异常处理)
@@ -37,17 +56,17 @@
 
 <!-- /TOC -->
 
-如果让我理解lua源码，我会以这个顺序进行：
+---
+---
+---
 
-- 编译与虚拟机执行流程
-  - 词法分析器
-  - 语法分析器
-  - 虚拟机
-- 虚拟栈
-- 函数执行
-- string / table
-- upvalue
-- metatable
+# 注意事项
+
+- lua的c代码可以分为lua层和c层：
+  - c层：通常为`lua_XXX()`/`luaL_XXX()`
+  - lua层：每个模块都有自己的名字，如字符串相关就是`luaS_XXX()`
+- lua层API源码都带有LUA_API标识，如：
+  `LUA_API const char *lua_pushlstring (lua_State *L, const char *s, size_t len)`
 
 ---
 ---
@@ -364,6 +383,55 @@ typedef union Value {
 <B><BL>问题：为什么要封装成TValue</BL></B>
 <BL>因为lua是动态类型语言，变量类型随时可变，只靠Value是无法知道当前存储类型的，所以需要额外数据`tt_`</BL>
 
+- 判断：`ttisxxx()`
+
+``` c
+// 以整数为例
+#define rttype(o)	((o)->tt_)
+#define checktag(o,t)		(rttype(o) == (t))
+#define ttisinteger(o) checktag((o), LUA_TNUMINT)
+```
+
+- 写：`setxxxvalue()`/`chgxxxvalue()`
+
+``` c
+// 以整数为例
+// 更改为整数类型
+#define setivalue(obj,x) \
+  { TValue *io=(obj); val_(io).i=(x); settt_(io, LUA_TNUMINT); }
+// 更改整数类型的值
+#define chgivalue(obj,x) \
+  { TValue *io=(obj); lua_assert(ttisinteger(io)); val_(io).i=(x); }
+
+// 如TString这种GCObject没有chg
+#define setsvalue(L,obj,x) \
+  { TValue *io = (obj); TString *x_ = (x); \
+    val_(io).gc = obj2gco(x_); settt_(io, ctb(x_->tt)); \
+    checkliveness(L,io); }
+```
+
+- 读：`xxxvalue()`
+
+``` c
+// 以整数为例
+#define ivalue(o) check_exp(ttisinteger(o), val_(o).i)
+```
+
+- 复制：`setobj()`
+
+``` c
+#define setobj(L,obj1,obj2) \
+	{ TValue *io1=(obj1); *io1 = *(obj2); \
+	  (void)L; checkliveness(L,io1); }
+```
+
+<B><VT>注意：浅拷贝，对于引用类型仅复制引用</VT></B>
+
+``` lua
+a = {}
+b = a -- 此时a和b都指向同一个table
+```
+
 ### 类型
 
 在lua.h中有所定义：
@@ -371,7 +439,7 @@ typedef union Value {
 ``` c
 #define LUA_TNONE		(-1)
 
-#define LUA_TNIL		0
+#define LUA_TNIL		        0
 #define LUA_TBOOLEAN		1
 #define LUA_TLIGHTUSERDATA	2
 #define LUA_TNUMBER		3
@@ -412,7 +480,7 @@ typedef union Value {
 #define BIT_ISCOLLECTABLE	(1 << 6)
 ```
 
-即对于某些类型，会派生出细分类型
+即<B><VT>对于某些类型，会派生出细分类型</VT></B>
 对于这些派生类型，创建时就会直接用上，如：
 `ts = createstrobj(L, l, LUA_TSHRSTR, h);`
 对于可GC类型，需要通过`ctb()`宏额外补充：
@@ -430,6 +498,8 @@ typedef union Value {
 
 #define novariant(x)	((x) & 0x0F)
 ```
+
+- 设置：在`setxxxvalue()`中会进行设置（第一次设置或类型改变）
 
 ### GC
 
@@ -459,6 +529,7 @@ GCObject是一个<B><VT>公共头</VT></B>，具体有以下对象：
 <B><BL>问题：GCObject与TValue的关系</BL></B>
 <BL>某些TValue（就是GC类型）会指向GCObject</BL>
 <YL><B>举例</B>：TString是一个字符串对象，在lua中字符串是可复用的，某一个TString可能被多个TValue所引用</YL>
+即：<B><VT>TValue是栈变量（也可能是单独的一个值），GCObject就是堆内存</VT></B>
 
 ---
 
@@ -518,11 +589,9 @@ typedef union UTString {
 `#define getstr(ts)  \`
 `check_exp(sizeof((ts)->extra), cast(char *, (ts)) + sizeof(UTString))`
 
----
+<BR>
 
-## 创建
-
-`luaS_newlstr()`
+### `luaS_newlstr`
 
 ``` csharp
 TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
@@ -539,10 +608,44 @@ TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
 }
 ```
 
+`luaS_newlstr()`：<B><VT>字符串创建，是核心</VT></B>
 这里也能看到字符串的长短分类，其中：
 <B><VT>宏`LUAI_MAXSHORTLEN`区分了长短字符串的长度，界限为40</VT></B>
 
-### 短字符串
+<B><BL>问题：长字符串/短字符串的区别</BL></B>
+<BL>短字符串是驻留的，由`g->strt`拉链法哈希桶完成缓存
+长字符串不会驻留
+<B><VT>因为：查重具有成本，长字符串不合适，同时全存的话压力会很大
+驻留的优势：可通过地址比较（2个TValue指向同一TString）</VT></B></BL>
+无论是长字符串还是短字符串，都需要创建TString（GCObject的扩展），方法为`createstrobj()`：
+
+``` c
+static TString *createstrobj (lua_State *L, size_t l, int tag, unsigned int h) {
+  TString *ts;
+  GCObject *o;
+  size_t totalsize;  /* total size of TString object */
+  totalsize = sizelstring(l);
+  o = luaC_newobj(L, tag, totalsize);
+  ts = gco2ts(o);
+  ts->hash = h;
+  ts->extra = 0;
+  getstr(ts)[l] = '\0';  /* ending 0 */
+  return ts;
+}
+```
+
+<B><DRD>注意：`createstrobj()`仅进行TString对象的创建，并不会填充字符串内容</DRD></B>
+简单来说，流程就是：
+
+- 计算分配大小
+- 分配内存（交给GC管理）
+- GCObject转TString
+- TString基础初始化
+
+在后续长字符串/短字符串会进行各自所需要设置的内容
+<B><VT>同理其它GCObject（如table）</VT></B>
+
+#### 短字符串
 
 短字符串走的是`internshrstr()`：
 
@@ -591,12 +694,12 @@ static TString *internshrstr (lua_State *L, const char *str, size_t l) {
     ts = createstrobj(L, l, LUA_TSHRSTR, h); // 创建短字符串
     memcpy(getstr(ts), str, l * sizeof(char)); // 拷贝值
     ts->shrlen = cast_byte(l); // 设置长度
-    // 头插法
+    // 头插法（TString已入链表）
     ts->u.hnext = *list;
     *list = ts;
     ```
 
-在哈希计算中提到了驻留intern，这与`internshrstr()`对应（所以intern指的其实是驻留而非内部）
+在哈希计算中提到了驻留intern，这与`internshrstr()`对应<VT>（所以intern指的其实是驻留而非内部）</VT>
 <B><GN>stringtable</GN></B>可以说是专用于短字符串驻留的数据结构，具体结构如下：
 
 ``` c
@@ -610,6 +713,472 @@ typedef struct stringtable {
 <B><BL>问题：nuse和size的区别</BL></B>
 <BL>其实很明确，nuse即已存在数量，size为桶大小</BL>
 可以看到`hash`是TString**类型，即数组，这与哈希计算可以对应上，即<B><GN>拉链法</GN></B>哈希冲突方案
+
+#### 长字符串
+
+长字符串走的是`luaS_createlngstrobj()`：
+
+``` c
+TString *luaS_createlngstrobj (lua_State *L, size_t l) {
+  TString *ts = createstrobj(L, l, LUA_TLNGSTR, G(L)->seed);
+  ts->u.lnglen = l;
+  return ts;
+}
+```
+
+设置值被放在了外面：`memcpy(getstr(ts), str, l * sizeof(char));`
+
+### c API
+
+前面的`luaS_newlstr()`就是c API的最核心部分，同时也存在不同情况下的扩展
+
+#### `luaS_newliteral`
+
+``` c
+#define luaS_newliteral(L, s)	(luaS_newlstr(L, "" s, \
+                                (sizeof(s)/sizeof(char))-1))
+```
+
+`luaS_newliteral()`：字面量版`luaS_newlstr()`，本质没区别
+<B><BL>问题：`"" s`是什么</BL></B>
+<BL>在c中，`"abc" "dec"`会自动拼接为`"abcdef"`，所以这里就其实是s，只要s是字符串字面量`</BL>
+
+#### `luaS_new`
+
+``` c
+TString *luaS_new (lua_State *L, const char *str) {
+  unsigned int i = (str) % STRCACHE_N;  /* hash */
+  int j;
+  TString **p = G(L)->strcache[i];
+  for (j = 0; j < STRCACHE_M; j++) {
+    if (strcmp(str, getstr(p[j])) == 0)  /* hit? */
+      return p[j];  /* that is it */
+  }
+  /* normal route */
+  for (j = STRCACHE_M - 1; j > 0; j--)
+    p[j] = p[j - 1];  /* move out last element */
+  /* new element is first in the list */
+  p[0] = luaS_newlstr(L, str, strlen(str));
+  return p[0];
+}
+```
+
+`luaS_new()`：<B><VT>在`luaS_newlstr()`的基础上添加额外缓存`G(L)->strcache`</VT></B>
+<B><DRD>重要：</DRD></B>
+<DRD>`strcache`是额外的一层前置缓存，如果没有获取到，还是会走`luaS_newlstr()`，即短字符串有缓存</DRD>
+
+`strcache`是一个TString二维数组，容量[53][2]，即<VT>53个桶，每个桶2个槽</VT>
+<B>哈希计算：</B>
+`% STRCACHE_N`很好理解，就是映射到桶里，那么真正的哈希就是`point2uint()`：
+`#define point2uint(p)	((unsigned int)((size_t)(p) & UINT_MAX))`
+从名字就可以知道，是指针到uint的映射，指针作为hash虽然效果不好，但在这里已经够用了
+
+#### `luaX_newstring`
+
+``` c
+TString *luaX_newstring (LexState *ls, const char *str, size_t l) {
+  lua_State *L = ls->L;
+  TValue *o;  /* entry for 'str' */
+  TString *ts = luaS_newlstr(L, str, l);  /* create new string */
+  setsvalue2s(L, L->top++, ts);  /* temporarily anchor it in stack */
+  o = luaH_set(L, ls->h, L->top - 1);
+  if (ttisnil(o)) {  /* not in use yet? */
+    /* boolean value does not need GC barrier;
+       table has no metatable, so it does not need to invalidate cache */
+    setbvalue(o, 1);  /* t[string] = true */
+    luaC_checkGC(L);
+  }
+  else {  /* string already present */
+    ts = tsvalue(keyfromval(o));  /* re-use value previously stored */
+  }
+  L->top--;  /* remove string from stack */
+  return ts;
+}
+```
+
+`luaX_newstring()`：<B><VT>编译期字符串创建</VT></B>
+该函数<B><DRD>仅用于编译期</DRD></B>，在llex.c/lparser.c中出现
+简单来说，就是<B><VT>`luaS_newlstr()`在编译期的一层封装</VT></B>
+<B>简单理解：</B>
+<B><VT>新字符串临时压栈防GC，后续存到lua_State->h表中真正锚定
+作用是对于长字符串同样驻留（`luaS_newlstr()`不驻留），同时长短字符串都不被GC回收（被表引用）</VT></B>
+
+#### `luaK_stringK`
+
+``` c
+int luaK_stringK (FuncState *fs, TString *s) {
+  TValue o;
+  setsvalue(fs->ls->L, &o, s);
+  return addk(fs, &o, &o);
+}
+
+static int addk (FuncState *fs, TValue *key, TValue *v) {
+  lua_State *L = fs->ls->L;
+  Proto *f = fs->f;
+  TValue *idx = luaH_set(L, fs->ls->h, key);  /* index scanner table */
+  int k, oldsize;
+  if (ttisinteger(idx)) {  /* is there an index there? */
+    k = cast_int(ivalue(idx));
+    /* correct value? (warning: must distinguish floats from integers!) */
+    if (k < fs->nk && ttype(&f->k[k]) == ttype(v) &&
+                      luaV_rawequalobj(&f->k[k], v))
+      return k;  /* reuse index */
+  }
+  /* constant not found; create a new entry */
+  oldsize = f->sizek;
+  k = fs->nk;
+  /* numerical value does not need GC barrier;
+     table has no metatable, so it does not need to invalidate cache */
+  setivalue(idx, k);
+  luaM_growvector(L, f->k, k, f->sizek, TValue, MAXARG_Ax, "constants");
+  while (oldsize < f->sizek) setnilvalue(&f->k[oldsize++]);
+  setobj(L, &f->k[k], v);
+  fs->nk++;
+  luaC_barrier(L, f, v);
+  return k;
+}
+```
+
+`luaK_stringK`：<B><VT>登记TString到Proto常量表中</VT></B>
+可以看到本质上其实是在执行`addk()`：
+
+- TString转TValue
+- 查缓存，验证通过就使用
+- 无缓存，先扩容，写入`Proto->k[k]`
+- 返回索引k
+
+### lua API
+
+除了以上的c API，对外API也有很多
+
+简单介绍一下不常用的：
+
+- `lua_pushfstring()`：基于...的format版
+- `lua_pushvfstring()`：基于va_list的format版
+
+#### `lua_pushstring`/`lua_pushlstring`
+
+``` c
+LUA_API const char *lua_pushstring (lua_State *L, const char *s) {
+  lua_lock(L);
+  if (s == NULL)
+    setnilvalue(L->top);
+  else {
+    TString *ts;
+    ts = luaS_new(L, s);
+    setsvalue2s(L, L->top, ts);
+    s = getstr(ts);  /* internal copy's address */
+  }
+  api_incr_top(L);
+  luaC_checkGC(L);
+  lua_unlock(L);
+  return s;
+}
+```
+
+用法：`lua_pushstring(L, "hello");`
+功能：字符串压栈
+
+``` c
+LUA_API const char *lua_pushlstring (lua_State *L, const char *s, size_t len) {
+  TString *ts;
+  lua_lock(L);
+  ts = (len == 0) ? luaS_new(L, "") : luaS_newlstr(L, s, len);
+  setsvalue2s(L, L->top, ts);
+  api_incr_top(L);
+  luaC_checkGC(L);
+  lua_unlock(L);
+  return getstr(ts);
+}
+```
+
+用法：
+`const char buf[] = {'a', 'b', '\0', 'c'};`
+`lua_pushlstring(L, buf, 4);` <VT>当然直接给字符也行</VT>
+功能：字符串（明确长度）压栈
+
+<B><VT>注意：</VT></B>
+<VT>入栈由`setvalue`+`api_incr_top()`完成，`setvalue`仅完成了往栈顶位置赋值操作，但还需要`L->top++`才算真正完成</VT>
+
+<B><BL>问题：`lua_pushstring()`/`lua_pushlstring()`的区别</BL></B>
+<BL>l指的是length，即指定长度操作
+对于`lua_pushstring()`来说，会依靠`\0`确定字符串结束位置，这会导致字符串中不能带`\0`，否则会在中间停下
+对于`lua_pushlstring()`来说，仅依靠len，所以如果是"abcdef"，长度为4则字符串会变为`"abcd"`，同时字符中也可以带有`\0`</BL>
+
+#### `lua_tostring`/`lua_tolstring`
+
+``` c
+LUA_API const char *lua_tolstring (lua_State *L, int idx, size_t *len) {
+  StkId o = index2addr(L, idx);
+  if (!ttisstring(o)) {
+    if (!cvt2str(o)) {  /* not convertible? */
+      if (len != NULL) *len = 0;
+      return NULL;
+    }
+    lua_lock(L);  /* 'luaO_tostring' may create a new string */
+    luaO_tostring(L, o);
+    luaC_checkGC(L);
+    o = index2addr(L, idx);  /* previous call may reallocate the stack */
+    lua_unlock(L);
+  }
+  if (len != NULL)
+    *len = vslen(o);
+  return svalue(o);
+}
+```
+
+用法：
+
+``` c
+size_t len;
+const char *s = lua_tolstring(L, 1, &len);
+if (s != NULL) {
+  /* s 指向 Lua 内部字符串，长度是 len */
+}
+```
+
+功能：读取（不弹栈）指定栈位置的指并获取长度
+根据代码所示：<VT>对于非string且不可转换为string的类型是无法操作的</VT>
+`#define cvt2str(o)	ttisnumber(o)` <B><VT>Tip：可以设置宏禁止转换</VT></B>
+更精准地来讲：
+
+- 常规情况来说，就是用于获取string的，只有string类型才能获取
+- 额外支持了number情况，会转换为string后返回<B><DRD>（这意味着该栈元素被直接转换为string了）</DRD></B>
+
+<BR>
+
+`#define lua_tostring(L,i)	lua_tolstring(L, (i), NULL)`
+所以说`lua_tostring()`只是`lua_tolstring()`的不求长度版
+这意味着：<B><VT>`lua_tostring()`仅应该用于不带有`\0`的字符串，否则后续没有长度无法辨别（使用c函数时）</VT></B>
+
+#### `lua_rawlen`
+
+``` c
+LUA_API size_t lua_rawlen (lua_State *L, int idx) {
+  StkId o = index2addr(L, idx);
+  switch (ttype(o)) {
+    case LUA_TSHRSTR: return tsvalue(o)->shrlen;
+    case LUA_TLNGSTR: return tsvalue(o)->u.lnglen;
+    case LUA_TUSERDATA: return uvalue(o)->len;
+    case LUA_TTABLE: return luaH_getn(hvalue(o));
+    default: return 0;
+  }
+}
+```
+
+### 使用实例
+
+#### 词法解析器
+
+词法解析器的核心是`llex()`，其中就有对字符串情况的解析：
+
+``` c
+case '-': {  /* '-' or '--' (comment) */
+}
+case '[': {  /* long string or simply '[' */
+}
+case '"': case '\'': {  /* short literal strings */
+}
+default: {
+  if (lislalpha(ls->current)) {  /* identifier or reserved word? */
+  }
+}
+```
+
+也就是：
+
+- `-- comment`：注释，调用`read_long_string()`
+- `[[hello]]`：长字符串字面量，调用`read_long_string()`
+- `"abc"`：字符串字面量，调用`read_string()`
+- `foo`：标识符，直接调用`luaX_newstring()`
+
+无论如何，本质上都是调用`luaX_newstring()`，最终读完的信息会被保存到`seminfo->ts`中
+
+#### 语法解析器
+
+词法解析器会完成按顺序完成对字符的解析，都会存入`seminfo->ts`中
+在语法解析器中：
+
+- 走`codestring()`，登记到`Proto->k`
+  - 字符串字面量：`"a"`/`[[hello]]`（TK_STRING）
+  - 全局变量：`foo = 1`的foo（`singlevar()`）
+  - 点号访问：`t.foo`的foo（`fieldsel()`）
+  - 冒号访问：`t:move()`的move（`fieldsel()`）
+  - 表字段名：`t = {x = 1}`的x（`recfield()`）
+- 走`new_localvar()`，登记到`Proto->locvars[i].varname`
+  - 局部变量名：`x`
+  - 局部函数名：`local function foo() end`的foo
+  - 其它局部情况：for循环变量/形参
+- 走`newupvalue()`，登记到`Proto->upvalues[].name`
+
+简记：
+<B><VT>如果运行时需要拿出来用，则需要放在`Proto->k`中，否则存在其它临时调试处即可</VT></B>
+
+---
+
+## 表
+
+表是lua中核心的数据类型
+核心：<B><VT>Lua中的Table是数组+哈希结合</VT></B>
+
+``` c
+typedef struct Table {
+  CommonHeader;
+  lu_byte flags;  /* 1<<p means tagmethod(p) is not present */
+  lu_byte lsizenode;  /* log2 of size of 'node' array */
+  unsigned int sizearray;  /* size of 'array' array */
+  TValue *array;  /* array part */
+  Node *node;
+  Node *lastfree;  /* any free position is before this position */
+  struct Table *metatable;
+  GCObject *gclist;
+} Table;
+```
+
+- 数组部分
+  - sizearray：数组长度
+  - array：数组本体指针
+- 哈希部分
+  - lsizenode：哈希大小（log2）
+  - node：哈希本体指针
+  - lastfree：最后一个空闲位置，向前扫描
+- metatable：元表
+
+<BR>
+
+哈希结构<B><GN>Node</GN></B>：
+
+``` c
+typedef struct Node {
+  TValue i_val;
+  TKey i_key;
+} Node;
+
+typedef union TKey {
+  struct {
+    TValuefields;
+    int next;  /* for chaining (offset for next node) */
+  } nk;
+  TValue tvk;
+} TKey;
+```
+
+也就是比较常规的哈希
+其中TKey是一个union，有2种形式：
+
+- key+next：nk
+- 纯key：tvk
+
+### `luaH_set`
+
+``` c
+TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
+  const TValue *p = luaH_get(t, key);
+  if (p != luaO_nilobject)
+    return cast(TValue *, p);
+  else return luaH_newkey(L, t, key);
+}
+```
+
+`luaH_set()`：核心函数，将key存到t中
+<B><DRD>注意：可以看出这里仅有设置key，没有设置key对应的值，因为都是拆成2步走的：</DRD></B> <YL>以`lua_rawset()`为例</YL>
+`slot = luaH_set(L, hvalue(o), L->top - 2);`
+`setobj2t(L, slot, L->top - 1);`
+
+### 哈希值
+
+``` c
+#define hashstr(t,str)		hashpow2(t, (str)->hash)
+#define hashboolean(t,p)	hashpow2(t, p)
+#define hashint(t,i)		hashpow2(t, i)
+```
+
+### `luaH_get`
+
+``` c
+const TValue *luaH_get (Table *t, const TValue *key) {
+  switch (ttype(key)) {
+    case LUA_TSHRSTR: return luaH_getshortstr(t, tsvalue(key));
+    case LUA_TNUMINT: return luaH_getint(t, ivalue(key));
+    case LUA_TNIL: return luaO_nilobject;
+    case LUA_TNUMFLT: {
+      lua_Integer k;
+      if (luaV_tointeger(key, &k, 0)) /* index is int? */
+        return luaH_getint(t, k);  /* use specialized version */
+      /* else... */
+    }  /* FALLTHROUGH */
+    default:
+      return getgeneric(t, key);
+  }
+}
+```
+
+`luaH_get()`：获取已存在key的value
+在`luaH_set()`中，`luaH_get()`作为获取缓存的手段
+<B><VT>重点：虽然说是Table，但是所有的内容都是包括数组部分的，不能认为是纯哈希计算</VT></B>
+
+`luaH_getint()`是最常见的，即整数key：
+
+- 先找数组，找到直接取出
+- 不在数组，去哈希找
+- 找不到返回luaO_nilobject
+
+### `luaH_newkey`
+
+``` c
+TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
+  Node *mp;
+  TValue aux;
+  if (ttisnil(key)) luaG_runerror(L, "table index is nil");
+  else if (ttisfloat(key)) {
+    lua_Integer k;
+    if (luaV_tointeger(key, &k, 0)) {  /* does index fit in an integer? */
+      setivalue(&aux, k);
+      key = &aux;  /* insert it as an integer */
+    }
+    else if (luai_numisnan(fltvalue(key)))
+      luaG_runerror(L, "table index is NaN");
+  }
+  mp = mainposition(t, key);
+  if (!ttisnil(gval(mp)) || isdummy(t)) {  /* main position is taken? */
+    Node *othern;
+    Node *f = getfreepos(t);  /* get a free place */
+    if (f == NULL) {  /* cannot find a free place? */
+      rehash(L, t, key);  /* grow table */
+      /* whatever called 'newkey' takes care of TM cache */
+      return luaH_set(L, t, key);  /* insert key into grown table */
+    }
+    lua_assert(!isdummy(t));
+    othern = mainposition(t, gkey(mp));
+    if (othern != mp) {  /* is colliding node out of its main position? */
+      /* yes; move colliding node into free position */
+      while (othern + gnext(othern) != mp)  /* find previous */
+        othern += gnext(othern);
+      gnext(othern) = cast_int(f - othern);  /* rechain to point to 'f' */
+      *f = *mp;  /* copy colliding node into free pos. (mp->next also goes) */
+      if (gnext(mp) != 0) {
+        gnext(f) += cast_int(mp - f);  /* correct 'next' */
+        gnext(mp) = 0;  /* now 'mp' is free */
+      }
+      setnilvalue(gval(mp));
+    }
+    else {  /* colliding node is in its own main position */
+      /* new node will go into free position */
+      if (gnext(mp) != 0)
+        gnext(f) = cast_int((mp + gnext(mp)) - f);  /* chain new position */
+      else lua_assert(gnext(f) == 0);
+      gnext(mp) = cast_int(f - mp);
+      mp = f;
+    }
+  }
+  setnodekey(L, &mp->i_key, key);
+  luaC_barrierback(L, t, key);
+  lua_assert(ttisnil(gval(mp)));
+  return gval(mp);
+}
+```
+
+`luaH_newkey`：
 
 ---
 ---
