@@ -34,10 +34,25 @@
       - [词法解析器](#词法解析器)
       - [语法解析器](#语法解析器)
   - [表](#表)
+    - [哈希部分](#哈希部分)
+      - [哈希值](#哈希值)
+      - [冲突链遍历](#冲突链遍历)
     - [`luaH_set`](#luah_set)
-    - [哈希值](#哈希值)
-    - [`luaH_get`](#luah_get)
-    - [`luaH_newkey`](#luah_newkey)
+      - [`luaH_get`](#luah_get)
+      - [`luaH_newkey`](#luah_newkey)
+      - [`rehash`](#rehash)
+    - [c API](#c-api-1)
+      - [`luaH_new`](#luah_new)
+      - [`luaH_next`](#luah_next)
+      - [`luaV_gettable`](#luav_gettable)
+      - [`luaV_settable`](#luav_settable)
+    - [lua API](#lua-api-1)
+      - [`lua_createtable`](#lua_createtable)
+      - [`lua_gettable`](#lua_gettable)
+      - [`lua_settable`](#lua_settable)
+      - [`lua_rawget`](#lua_rawget)
+      - [`lua_rawset`](#lua_rawset)
+    - [使用实例](#使用实例-1)
 - [函数执行](#函数执行)
   - [函数执行](#函数执行-1)
   - [安全执行（异常处理）](#安全执行异常处理)
@@ -1069,6 +1084,109 @@ typedef union TKey {
 - key+next：nk
 - 纯key：tvk
 
+### 哈希部分
+
+哈希部分显然是Table中更关键的部分，可以说数组部分只是优化
+回顾Table中的哈希部分：
+核心是`Node *node`，结合`TKey.nk.next`可知：
+<B><VT>node是首桶，本质上是一个Node数组，每个node通过next即可找到下一个冲突链node</VT></B>
+
+#### 哈希值
+
+对于哈希部分，哈希冲突的计算必然是重中之重，哈希计算使用的是<B>`mainposition()`</B>进行计算<B><VT>（也就是说`mainposition()`仅处理哈希部分，与数组部分无关）</VT></B>
+
+``` c
+static Node *mainposition (const Table *t, const TValue *key) {
+  switch (ttype(key)) {
+    case LUA_TNUMINT:
+      return hashint(t, ivalue(key));
+    case LUA_TNUMFLT:
+      return hashmod(t, l_hashfloat(fltvalue(key)));
+    case LUA_TSHRSTR:
+      return hashstr(t, tsvalue(key));
+    case LUA_TLNGSTR:
+      return hashpow2(t, luaS_hashlongstr(tsvalue(key)));
+    case LUA_TBOOLEAN:
+      return hashboolean(t, bvalue(key));
+    case LUA_TLIGHTUSERDATA:
+      return hashpointer(t, pvalue(key));
+    case LUA_TLCF:
+      return hashpointer(t, fvalue(key));
+    default:
+      lua_assert(!ttisdeadkey(key));
+      return hashpointer(t, gcvalue(key));
+  }
+}
+```
+
+具体来说就是以下部分：
+
+``` c
+// pow2流
+#define hashpow2(t,n)		(gnode(t, lmod((n), sizenode(t))))
+#define hashstr(t,str)		hashpow2(t, (str)->hash)
+#define hashboolean(t,p)	hashpow2(t, p)
+#define hashint(t,i)		hashpow2(t, i)
+// mod流
+#define hashmod(t,n)	(gnode(t, ((n) % ((sizenode(t)-1)|1))))
+#define hashpointer(t,p)	hashmod(t, point2uint(p))
+```
+
+对于以上几种哈希计算，核心是`hashpow2()`/`hashmod()`，其它都是它们2种的变体
+`gnode()`：即getnode，其实就是取出i而已 `#define gnode(t,i)	(&(t)->node[i])`
+所以需要关注的就是<B>参数2</B>
+<B>pow2流</B>
+`lmod((n), sizenode(t))`
+转换一下就是`n%表长`
+所以：n就是哈希函数结果，lmod映射到表中
+<B>mod流</B>
+`((n) % ((sizenode(t)-1)|1))`
+转换一下就是`n%(表长-1)`，<VT><B>重点：表长-1一定是奇数（本质上是非二次幂）</B>（在`sizenode(t)`为幂的基础下，`|1`保证最低位为1其实是重复的，但是出于安全性考虑添加保证为奇数）</VT>
+<B><BL>问题：为什么需要-1</BL></B>
+<BL>与lmod相同，本质有恒等式：`n%2^k = n&(2^k-1)`
+-1的本质就是保证为奇数，举几个十进制转二进制例子就清楚了：
+4：100 | 3：011
+8：1000 | 7：0111
+16：10000 | 15：01111
+对于&来说，无论n多大，永远只会应用低位，而对于%来说，是全应用的
+重点：一切都是因为二次幂导致了取余的退化，`&(2^k-1)`退化了仅应用低位分布不匀但可做到快速取余，`%(2^k-1)`虽然慢但是分布更均匀</B>
+<B><BL>问题：桶长为n，`%n-1`对吗</BL></B>
+<BL>事实上确实不完全映射，最后一处桶是放不进去的，但是无伤大雅，后续备用桶还能用</BL>
+
+由此也可以得出<B>pow2流与mod流的区别</B>：
+<B><VT>pow2流和mod流本质完全相同，只是取余方法不同，pow2更快但分布不匀，mod分布更匀但更慢</VT></B>
+
+观察变体，以及`mainposition()`传入值：
+`hashxxx()`的参数2为哈希值，通常由`xxxvalue()`直接获取，即值本身，对于值本身不带有哈希信息（LUA_TLNGSTR）或作为哈希不佳的（LUA_TNUMFLT），会额外补充
+不同`hashxxx()`变体区别不大，某些只是包装（完全一致），某些只是把哈希信息取出而已
+
+<B><BL>问题：为什么整数用pow2</BL></B>
+<BL>整数通常其实是放在数组部分的，只有负数/大数才会在哈希部分，此时通常具有一定的离散性了，冲突问题也不大</BL>
+
+#### 冲突链遍历
+
+冲突链遍历通常有一致的框架：
+
+``` c
+Node *n = 某个主位置;
+for (;;) {
+  if (当前节点 key 匹配目标 key)
+    return 对应值;
+  else {
+    int nx = gnext(n);
+    if (nx == 0)
+      结束，表示没找到;
+    n += nx;
+  }
+}
+
+```
+
+即：算主位置，寻找该桶的所有key直到找到匹配的后取出
+<B>注意：</B>
+`#define gnext(n)	((n)->i_key.nk.next)`
+<B><VT>由`gnext()`可知：`TKey.nk.next中`存储的是offset</VT></B>
+
 ### `luaH_set`
 
 ``` c
@@ -1084,16 +1202,10 @@ TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
 <B><DRD>注意：可以看出这里仅有设置key，没有设置key对应的值，因为都是拆成2步走的：</DRD></B> <YL>以`lua_rawset()`为例</YL>
 `slot = luaH_set(L, hvalue(o), L->top - 2);`
 `setobj2t(L, slot, L->top - 1);`
+<B><BL>问题：为什么`luaH_set()`中`luaH_get()`可获取数组或哈希部分，而创建`luaH_newkey()`仅放置在哈希部分</BL></B>
+<BL>对于get逻辑必然需要考虑数组部分，因为有可能存在数组部分，而由于哈希部分随时可加，所以会比可能扩容的数组部分更加稳定，所以调整被放在`rehash()`/`luaH_resize()`了</BL>
 
-### 哈希值
-
-``` c
-#define hashstr(t,str)		hashpow2(t, (str)->hash)
-#define hashboolean(t,p)	hashpow2(t, p)
-#define hashint(t,i)		hashpow2(t, i)
-```
-
-### `luaH_get`
+#### `luaH_get`
 
 ``` c
 const TValue *luaH_get (Table *t, const TValue *key) {
@@ -1113,17 +1225,28 @@ const TValue *luaH_get (Table *t, const TValue *key) {
 }
 ```
 
-`luaH_get()`：获取已存在key的value
+`luaH_get()`：获取已存在key的value的地址（表中本体）
 在`luaH_set()`中，`luaH_get()`作为获取缓存的手段
 <B><VT>重点：虽然说是Table，但是所有的内容都是包括数组部分的，不能认为是纯哈希计算</VT></B>
 
-`luaH_getint()`是最常见的，即整数key：
+其中`LUA_TNUMINT`是最常见的，即整数key：
 
-- 先找数组，找到直接取出
-- 不在数组，去哈希找
+- 先找数组部分，找到直接取出
+- 不在数组部分，去哈希部分找
 - 找不到返回luaO_nilobject
 
-### `luaH_newkey`
+除此以外还有：
+
+- `LUA_TSHRSTR`：短字符串，专用哈希查找
+- `LUA_TNIL`直接返回luaO_nilobject
+- `LUA_TNUMFLT`：针对能转换为整型的浮点数，用LUA_TNUMINT方法
+- 其它：通用哈希查找
+
+由此也可得知：
+<B><VT>对于数组部分，仅有整型会存放（浮点型存取都会尝试转换为整型）
+除此以外可以说只有短字符串是特殊的：由于短字符串是intern的，判断可以通过TString本身比较（同一TString只有一份）</VT></B>
+
+#### `luaH_newkey`
 
 ``` c
 TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
@@ -1178,7 +1301,320 @@ TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
 }
 ```
 
-`luaH_newkey`：
+`luaH_newkey()`：在表中插入一个新key
+该函数是<B><VT>解决冲突链的核心</VT></B>
+流程简述：
+
+- 可用性处理：对于float尝试转换为int，nil/NaN排除
+- 计算主位置（`mainposition()`）：
+  - 主位置空的，直接放
+  - 主位置被占据：
+    - 先确定一下有空位（没有多余的一个位置无论如何都放不了），没有就rehash后递归做一次
+    - 情况1：主位置Node本不该在该位置
+      f位置给原主位置Node，把新Node放过去
+    - 情况2：主位置Node本该在该位置
+      f位置给新Node
+
+放置本身很简单，就以主位置直接放为例：
+
+``` c
+setnodekey(L, &mp->i_key, key);
+luaC_barrierback(L, t, key);
+lua_assert(ttisnil(gval(mp)));
+return gval(mp);
+```
+
+更重要的是冲突链的解决：
+`mp = mainposition(t, key);`
+`othern = mainposition(t, gkey(mp));`
+
+- 主位置Node：链头
+- mp：key应该放入的主位置Node
+- othern：主位置Node上目前所占据的key所应该在的主位置Node
+
+这里处理的问题是：<B>key想要放到mp处，但是mp处已经被占了</B>
+情况被分为2种：
+
+- `othern != mp`：主Node不一致，说明原key本不该在该链上（新key刚算的，肯定在）
+- `othern == mp`：原key在该链上
+
+这是因为：<B><VT>每个桶都应该放应该在自己链上的key</VT></B>
+
+`othern != mp`
+``` c
+/* yes; move colliding node into free position */
+while (othern + gnext(othern) != mp)  /* find previous */
+  othern += gnext(othern);
+gnext(othern) = cast_int(f - othern);  /* rechain to point to 'f' */
+*f = *mp;  /* copy colliding node into free pos. (mp->next also goes) */
+if (gnext(mp) != 0) {
+  gnext(f) += cast_int(mp - f);  /* correct 'next' */
+  gnext(mp) = 0;  /* now 'mp' is free */
+}
+setnilvalue(gval(mp));
+```
+
+othern理解为原冲突链头的Node，mp理解为原key的Node：
+先寻找原key前驱（注意：othern复用，含义改变），将原key前驱的next指向f，将mp复制到f，此时如果存在后继，修正原key的next
+对于新key只需要将next与value设为0表示清空即可
+<B>也就是说：</B>
+<B><VT>当原Node并非该链Node时，应该把位置交还给当前key，原key去f</VT></B>
+
+`othern == mp`
+``` c
+/* new node will go into free position */
+if (gnext(mp) != 0)
+  gnext(f) = cast_int((mp + gnext(mp)) - f);  /* chain new position */
+else lua_assert(gnext(f) == 0);
+gnext(mp) = cast_int(f - mp);
+mp = f;
+```
+
+othern和mp指代同一对象，这里用mp，理解为冲突链头的Node：
+只要该链有2个Node，就使用<B>链头后插（即放到第二个位置）</B>
+<B>也就是说：</B>
+<B><VT>当原Node就是该链Node时，使用f放置当前key即可</VT></B>
+
+#### `rehash`
+
+在新建key`luaH_newkey()`中，有一相当关键的函数`rehash()`，仅发生在哈希桶数量不够的时候（没有freepos）
+同时这意味着：<B><VT>rehash只可能在`luaH_newkey()`（桶不够）时发生</VT></B>
+
+``` c
+static void rehash (lua_State *L, Table *t, const TValue *ek) {
+  unsigned int asize;  /* optimal size for array part */
+  unsigned int na;  /* number of keys in the array part */
+  unsigned int nums[MAXABITS + 1];
+  int i;
+  int totaluse;
+  for (i = 0; i <= MAXABITS; i++) nums[i] = 0;  /* reset counts */
+  na = numusearray(t, nums);  /* count keys in array part */
+  totaluse = na;  /* all those keys are integer keys */
+  totaluse += numusehash(t, nums, &na);  /* count keys in hash part */
+  /* count extra key */
+  na += countint(ek, nums);
+  totaluse++;
+  /* compute new size for array part */
+  asize = computesizes(nums, &na);
+  /* resize the table to new computed sizes */
+  luaH_resize(L, t, asize, totaluse - na);
+}
+```
+
+可以看到`rehash()`就是在进行大量计算求得数组和哈希部分的大小，然后调用`luaH_resize()`进行设置
+大小计算简单理解：
+
+- `numusearray()`：计算数组key数量
+- `numusehash()`：计算哈希key数量
+- `totaluse`：数组key+哈希key之和
+- `countint()`：key是否可以作为数组部分候选
+- `computesizes()`：统计实际分配情况（输出数组部分）
+
+这里的函数都相当重要：
+
+<B>使用情况统计</B>
+数组部分：
+
+``` c
+static unsigned int numusearray (const Table *t, unsigned int *nums) {
+  int lg;
+  unsigned int ttlg;  /* 2^lg */
+  unsigned int ause = 0;  /* summation of 'nums' */
+  unsigned int i = 1;  /* count to traverse all array keys */
+  /* traverse each slice */
+  for (lg = 0, ttlg = 1; lg <= MAXABITS; lg++, ttlg *= 2) {
+    unsigned int lc = 0;  /* counter */
+    unsigned int lim = ttlg;
+    if (lim > t->sizearray) {
+      lim = t->sizearray;  /* adjust upper limit */
+      if (i > lim)
+        break;  /* no more elements to count */
+    }
+    /* count elements in range (2^(lg - 1), 2^lg] */
+    for (; i <= lim; i++) {
+      if (!ttisnil(&t->array[i-1]))
+        lc++;
+    }
+    nums[lg] += lc;
+    ause += lc;
+  }
+  return ause;
+}
+```
+
+数组部分的统计中，重点是<B><VT>计算分布，分桶</VT></B>
+数组部分被分割为二次幂的区间：
+(0,1](1,2](2,4](4,8](8,16](16,32]...(2^30, 2^31]<VT>（本质：(`2^(lg - 1), 2^lg]`）</VT>
+
+哈希部分：
+
+``` c
+static int numusehash (const Table *t, unsigned int *nums, unsigned int *pna) {
+  int totaluse = 0;  /* total number of elements */
+  int ause = 0;  /* elements added to 'nums' (can go to array part) */
+  int i = sizenode(t);
+  while (i--) {
+    Node *n = &t->node[i];
+    if (!ttisnil(gval(n))) {
+      ause += countint(gkey(n), nums);
+      totaluse++;
+    }
+  }
+  *pna += ause;
+  return totaluse;
+}
+```
+
+哈希部分的统计非常常规，只是全遍历统计
+<B><VT>重要：哈希部分统计的不是仅仅是数量totaluse，还统计了可放入数组部分的候选项数ause</VT></B>
+
+<B>分配统计</B>
+
+``` c
+static unsigned int computesizes (unsigned int nums[], unsigned int *pna) {
+  int i;
+  unsigned int twotoi;  /* 2^i (candidate for optimal size) */
+  unsigned int a = 0;  /* number of elements smaller than 2^i */
+  unsigned int na = 0;  /* number of elements to go to array part */
+  unsigned int optimal = 0;  /* optimal size for array part */
+  /* loop while keys can fill more than half of total size */
+  for (i = 0, twotoi = 1;
+       twotoi > 0 && *pna > twotoi / 2;
+       i++, twotoi *= 2) {
+    if (nums[i] > 0) {
+      a += nums[i];
+      if (a > twotoi/2) {  /* more than half elements present? */
+        optimal = twotoi;  /* optimal size (till now) */
+        na = a;  /* all elements up to 'optimal' will go to array part */
+      }
+    }
+  }
+  lua_assert((optimal == 0 || optimal / 2 < na) && na <= optimal);
+  *pna = na;
+  return optimal;
+}
+```
+
+简单来说就是：<B><VT>每二次幂作为分割点进行检测，只要使用率超过一半就扩展至该大小</VT></B>
+<B>Tip：na被重新统计了，因为实际分配会有改变</B>
+
+<B>分配</B>
+
+``` c
+void luaH_resize (lua_State *L, Table *t, unsigned int nasize,
+                                          unsigned int nhsize) {
+  unsigned int i;
+  int j;
+  AuxsetnodeT asn;
+  unsigned int oldasize = t->sizearray;
+  int oldhsize = allocsizenode(t);
+  Node *nold = t->node;  /* save old hash ... */
+  if (nasize > oldasize)  /* array part must grow? */
+    setarrayvector(L, t, nasize);
+  /* create new hash part with appropriate size */
+  asn.t = t; asn.nhsize = nhsize;
+  if (luaD_rawrunprotected(L, auxsetnode, &asn) != LUA_OK) {  /* mem. error? */
+    setarrayvector(L, t, oldasize);  /* array back to its original size */
+    luaD_throw(L, LUA_ERRMEM);  /* rethrow memory error */
+  }
+  if (nasize < oldasize) {  /* array part must shrink? */
+    t->sizearray = nasize;
+    /* re-insert elements from vanishing slice */
+    for (i=nasize; i<oldasize; i++) {
+      if (!ttisnil(&t->array[i]))
+        luaH_setint(L, t, i + 1, &t->array[i]);
+    }
+    /* shrink array */
+    luaM_reallocvector(L, t->array, oldasize, nasize, TValue);
+  }
+  /* re-insert elements from hash part */
+  for (j = oldhsize - 1; j >= 0; j--) {
+    Node *old = nold + j;
+    if (!ttisnil(gval(old))) {
+      /* doesn't need barrier/invalidate cache, as entry was
+         already present in the table */
+      setobjt2t(L, luaH_set(L, t, gkey(old)), gval(old));
+    }
+  }
+  if (oldhsize > 0)  /* not the dummy node? */
+    luaM_freearray(L, nold, cast(size_t, oldhsize)); /* free old hash */
+}
+```
+
+在进入函数前先考虑一下输入：
+`luaH_resize(L, t, asize, totaluse - na)`
+
+- naszie（`asize`）：数组部分大小，为二次幂
+- nhsize（`totaluse-na`）：哈希部分大小，是目前会在哈希部分的数量
+
+虽然此时语义不同，但在后续计算中，<B><VT>哈希部分会被扩展为最小二次幂</VT></B>，实际上数组和哈希情况是类似的
+<B><BL>问题：数组和哈希都使用二次幂的原因</BL></B>
+<BL>对于数组和哈希，两者使用二次幂的原因是不同的：</BL>
+- <BL>数组部分：区间统计方便，可以使用前缀和</BL>
+- <BL>哈希部分：模运算可以简化为位运算（虽然丢失了精度），同时也只需要保存指数</BL>
+
+具体操作简述如下：
+
+- 新数组部分比原数组部分更大，扩展分配`setarrayvector()`
+- 重初始化哈希部分`auxsetnode()`
+- 新数组部分比原数组部分更小，迁移收缩部分元素至哈希并收缩分配`luaM_reallocvector()`
+- 重插入哈希部分
+- 释放旧哈希`luaM_freearray()`
+
+逻辑上是完全合理的：哈希需要在数组收缩前进行，因为需要迁移
+
+### c API
+
+#### `luaH_new`
+
+``` c
+Table *luaH_new (lua_State *L) {
+  GCObject *o = luaC_newobj(L, LUA_TTABLE, sizeof(Table));
+  Table *t = gco2t(o);
+  t->metatable = NULL;
+  t->flags = cast_byte(~0);
+  t->array = NULL;
+  t->sizearray = 0;
+  setnodevector(L, t, 0);
+  return t;
+}
+
+static void setnodevector (lua_State *L, Table *t, unsigned int size) {
+  if (size == 0) {  /* no elements to hash part? */
+    t->node = cast(Node *, dummynode);  /* use common 'dummynode' */
+    t->lsizenode = 0;
+    t->lastfree = NULL;  /* signal that it is using dummy node */
+  }
+  else {...}
+}
+```
+
+`luaH_new()`：创建Table并初始化
+由此可以得知：
+<B><VT>Table初始化后全为空，不会预创建</VT></B>
+
+#### `luaH_next`
+
+#### `luaV_gettable`
+
+#### `luaV_settable`
+
+### lua API
+
+#### `lua_createtable`
+#### `lua_gettable`
+#### `lua_settable`
+#### `lua_rawget`
+#### `lua_rawset`
+
+### 使用实例
+
+OP_NEWTABLE
+OP_SETLIST
+OP_GETTABLE
+OP_SETTABLE
+OP_GETTABUP
+OP_SETTABUP
 
 ---
 ---
