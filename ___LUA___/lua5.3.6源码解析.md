@@ -13,6 +13,8 @@
       - [SemInfo](#seminfo)
   - [\_ENV](#_env)
     - [沙箱机制](#沙箱机制)
+- [常用函数](#常用函数)
+  - [`index2addr`](#index2addr)
 - [数据结构](#数据结构)
   - [数据结构基础](#数据结构基础)
     - [类型](#类型)
@@ -41,9 +43,16 @@
       - [`luaH_get`](#luah_get)
       - [`luaH_newkey`](#luah_newkey)
       - [`rehash`](#rehash)
+    - [遍历](#遍历)
+      - [`luaH_next`](#luah_next)
+      - [`lua_next`](#lua_next)
+      - [`luaB_next`](#luab_next)
+      - [pairs/ipairs迭代](#pairsipairs迭代)
+        - [`luaB_pairs`](#luab_pairs)
+        - [`luaB_ipairs`](#luab_ipairs)
+        - [VM for循环](#vm-for循环)
     - [c API](#c-api-1)
       - [`luaH_new`](#luah_new)
-      - [`luaH_next`](#luah_next)
       - [`luaV_gettable`](#luav_gettable)
       - [`luaV_settable`](#luav_settable)
     - [lua API](#lua-api-1)
@@ -68,6 +77,14 @@
   - [执行期](#执行期)
     - [虚拟机执行](#虚拟机执行)
   - [示例](#示例)
+- [闭包](#闭包)
+  - [upvalue判定](#upvalue判定)
+  - [开启情况](#开启情况)
+  - [`openupval`](#openupval)
+    - [`luaF_findupval`](#luaf_findupval)
+    - [`luaF_close`](#luaf_close)
+- [元表](#元表)
+- [load](#load)
 
 <!-- /TOC -->
 
@@ -364,6 +381,51 @@ end
 ---
 ---
 ---
+
+# 常用函数
+
+总有些函数是出现在各个模块之中的，这里简单介绍一下
+
+## `index2addr`
+
+``` c
+static TValue *index2addr (lua_State *L, int idx) {
+  CallInfo *ci = L->ci;
+  if (idx > 0) {
+    TValue *o = ci->func + idx;
+    api_check(L, idx <= ci->top - (ci->func + 1), "unacceptable index");
+    if (o >= L->top) return NONVALIDVALUE;
+    else return o;
+  }
+  else if (!ispseudo(idx)) {  /* negative index */
+    api_check(L, idx != 0 && -idx <= L->top - (ci->func + 1), "invalid index");
+    return L->top + idx;
+  }
+  else if (idx == LUA_REGISTRYINDEX)
+    return &G(L)->l_registry;
+  else {  /* upvalues */
+    idx = LUA_REGISTRYINDEX - idx;
+    api_check(L, idx <= MAXUPVAL + 1, "upvalue index too large");
+    if (ttislcf(ci->func))  /* light C function? */
+      return NONVALIDVALUE;  /* it has no upvalues */
+    else {
+      CClosure *func = clCvalue(ci->func);
+      return (idx <= func->nupvalues) ? &func->upvalue[idx-1] : NONVALIDVALUE;
+    }
+  }
+}
+```
+
+`index2addr()`：idx转实际TValue指针
+简单来说有3类：
+
+- 正索引：从当前函数向后数
+- 负索引：从栈顶向下数
+- 伪索引：特殊的索引值
+  - 注册表LUA_REGISTRYINDEX
+  - upvalue索引
+
+<B><VT>Tip：`L->top`不是栈顶而是栈顶后下一个可用位置</VT></B>
 
 # 数据结构
 
@@ -1563,6 +1625,314 @@ void luaH_resize (lua_State *L, Table *t, unsigned int nasize,
 
 逻辑上是完全合理的：哈希需要在数组收缩前进行，因为需要迁移
 
+### 遍历
+
+在编写lua代码时，表的遍历极其常用：`next()`/`pair()`/`ipair()`
+在底层中相关内容很多，简述一下：
+
+- `luaH_next()`：底层核心
+
+#### `luaH_next`
+
+``` c
+int luaH_next (lua_State *L, Table *t, StkId key) {
+  unsigned int i = findindex(L, t, key);  /* find original element */
+  for (; i < t->sizearray; i++) {  /* try first array part */
+    if (!ttisnil(&t->array[i])) {  /* a non-nil value? */
+      setivalue(key, i + 1);
+      setobj2s(L, key+1, &t->array[i]);
+      return 1;
+    }
+  }
+  for (i -= t->sizearray; cast_int(i) < sizenode(t); i++) {  /* hash part */
+    if (!ttisnil(gval(gnode(t, i)))) {  /* a non-nil value? */
+      setobj2s(L, key, gkey(gnode(t, i)));
+      setobj2s(L, key+1, gval(gnode(t, i)));
+      return 1;
+    }
+  }
+  return 0;  /* no more elements */
+}
+```
+
+`luaH_next()`：给定key，获取下一个kv
+可以看到StkId，说明该函数已经在lua_State语义下了
+逻辑上很简单：
+
+- 先算一个index值
+- 在数组部分找，找到就设置，返回1
+- 在哈希部分找，找到就设置，返回1
+- 没找到，返回0
+
+这里能注意到一个关键点：
+<B><VT>在栈上已经存放着上一组kv<DRD>（不准确）</DRD>，现在做的是原地修改操作</VT></B>
+所以存在2种情况：
+
+- lua层：`next(t, k)`
+  解析后按指令存放在栈上
+- c层：
+  
+  ``` c
+  lua_pushnil(L);
+  while (lua_next(L, idx) != 0) {
+    // 栈顶: value
+    // 次栈顶: key
+    lua_pop(L, 1);  // 弹出 value，保留 key
+  }
+  ```
+
+  严格来说：
+  <B><DRD>栈顶永远是key，value会被弹栈，保证循环的正确性</DRD></B>
+
+在开始设置前需要先找到index，即`findindex()`：
+
+``` c
+static unsigned int findindex (lua_State *L, Table *t, StkId key) {
+  unsigned int i;
+  if (ttisnil(key)) return 0;  /* first iteration */
+  i = arrayindex(key);
+  if (i != 0 && i <= t->sizearray)  /* is 'key' inside array part? */
+    return i;  /* yes; that's the index */
+  else {
+    int nx;
+    Node *n = mainposition(t, key);
+    for (;;) {  /* check whether 'key' is somewhere in the chain */
+      /* key may be dead already, but it is ok to use it in 'next' */
+      if (luaV_rawequalobj(gkey(n), key) ||
+            (ttisdeadkey(gkey(n)) && iscollectable(key) &&
+             deadvalue(gkey(n)) == gcvalue(key))) {
+        i = cast_int(n - gnode(t, 0));  /* key index in hash table */
+        /* hash elements are numbered after array ones */
+        return (i + 1) + t->sizearray;
+      }
+      nx = gnext(n);
+      if (nx == 0)
+        luaG_runerror(L, "invalid key to 'next'");  /* key not found */
+      else n += nx;
+    }
+  }
+}
+```
+
+逻辑也很简单：
+
+- 传入nil，返回0，即第一次
+- 传入数组key，返回[1,sizearray]（需保证在数组部分中）
+- 传入哈希key，返回[sizearray+1,sizearray+sizenode]
+
+这里的index映射很关键，因为lua下标从1开始，数组本身是从0开始：
+
+- 数组部分：
+  - `t->array`：c内部数组，从0开始
+  - `key`：lua索引，从1开始
+  - `findindex()`找到的是lua索引，这里不进行-1映射，等价于从第二个元素开始
+- 哈希部分：
+  - `findindex()`计算出来的是一层映射，即接在数组后+哈希Node所在数组位置
+  - `luaH_next()`重新从哈希Node数组头开始遍历
+  - `findindex()`结果为`(i + 1) + t->sizearray`，`luaH_next()`初始值仅`-t->sizearray`，即从`i + 1`开始，等价于从第二个元素开始
+
+#### `lua_next`
+
+``` c
+LUA_API int lua_next (lua_State *L, int idx) {
+  StkId t;
+  int more;
+  lua_lock(L);
+  t = index2addr(L, idx);
+  api_check(L, ttistable(t), "table expected");
+  more = luaH_next(L, hvalue(t), L->top - 1);
+  if (more) {
+    api_incr_top(L);
+  }
+  else  /* no more elements */
+    L->top -= 1;  /* remove key */
+  lua_unlock(L);
+  return more;
+}
+```
+
+`lua_next()`：`luaH_next()`的一层封装，提供给外部使用
+逻辑相当简单：idx转TValue，执行`luaH_next()`并更改栈顶
+本质上就是<B><VT>`luaH_next()`的idx版</VT></B>
+
+#### `luaB_next`
+
+`luaB_next()`被注册为基础函数，有：`{"next", luaB_next}`
+
+``` c
+static int luaB_next (lua_State *L) {
+  luaL_checktype(L, 1, LUA_TTABLE);
+  lua_settop(L, 2);  /* create a 2nd argument if there isn't one */
+  if (lua_next(L, 1))
+    return 2;
+  else {
+    lua_pushnil(L);
+    return 1;
+  }
+}
+```
+
+`luaB_next()`：next逻辑，将kv压入栈，失败则压入nil
+<B><BL>问题：`lua_settop()`是将栈帧元素数量设为2，不会把需要的Pop吗</BL></B>
+<BL>不会，由于`next()`是一个函数调用，会开一个新栈帧，可能的也就是以下几种情况：
+`next(t)`即`next(t,nil)`
+`next(t,k)`
+`next(t,k,a,b)`即`next(t,k)`
+本质上只存在一种情况：在表中找当前key后一个kv</BL>
+
+#### pairs/ipairs迭代
+
+对于迭代，我们最关心的就是`pairs()`/`ipairs()`
+实际迭代能够运行，必然是<B><VT>由VM驱动</VT></B>
+
+##### `luaB_pairs`
+
+`luaB_pairs()`被注册为基础函数，有：`{"pairs", luaB_pairs}`
+
+``` c
+static int luaB_pairs (lua_State *L) {
+  return pairsmeta(L, "__pairs", 0, luaB_next);
+}
+
+static int pairsmeta (lua_State *L, const char *method, int iszero,
+                      lua_CFunction iter) {
+  luaL_checkany(L, 1);
+  if (luaL_getmetafield(L, 1, method) == LUA_TNIL) {  /* no metamethod? */
+    lua_pushcfunction(L, iter);  /* will return generator, */
+    lua_pushvalue(L, 1);  /* state, */
+    if (iszero) lua_pushinteger(L, 0);  /* and initial value */
+    else lua_pushnil(L);
+  }
+  else {
+    lua_pushvalue(L, 1);  /* argument 'self' to metamethod */
+    lua_call(L, 1, 3);  /* get 3 values from metamethod */
+  }
+  return 3;
+}
+```
+
+`luaB_pairs()`：三元组迭代
+`pairs()`我们都知道是全遍历，主要需要看如何迭代运作的
+
+- 检查`__pairs`元方法：
+  - 给了通过元方法获取三元组（要靠函数调用获取）
+  - 没有就手动把三元组入栈（已知初始状态）
+
+考虑已知默认初始状态，三元组为：
+
+- 函数：`luaB_next()`
+- 状态：实际`pairs(t)`中传入的t
+- 初始值：nil
+
+##### `luaB_ipairs`
+
+`luaB_ipairs()`被注册为基础函数，有：`{"ipairs", luaB_ipairs}`
+
+``` c
+static int luaB_ipairs (lua_State *L) {
+#if defined(LUA_COMPAT_IPAIRS)
+  return pairsmeta(L, "__ipairs", 1, ipairsaux);
+#else
+  luaL_checkany(L, 1);
+  lua_pushcfunction(L, ipairsaux);  /* iteration function */
+  lua_pushvalue(L, 1);  /* state */
+  lua_pushinteger(L, 0);  /* initial value */
+  return 3;
+#endif
+}
+```
+
+`luaB_ipairs()`：三元组迭代
+`ipairs()`与`pairs()`不同，我们知道仅从0开始连续遍历至nil
+根据代码会发现这里非常直接，是一个固定的三元组：
+
+- 函数：`ipairsaux()`
+- 状态：实际`pairs(t)`中传入的t
+- 初始值：nil
+
+也就是说与`pairs()`相比，`ipairs()`使用了一个<B>特制迭代函数</B>
+
+``` c
+static int ipairsaux (lua_State *L) {
+  lua_Integer i = luaL_checkinteger(L, 2) + 1;
+  lua_pushinteger(L, i);
+  return (lua_geti(L, 1, i) == LUA_TNIL) ? 1 : 2;
+}
+```
+
+迭代函数相当简单：
+
+- 取i（从栈上取索引+1，不改栈）
+- i压栈
+- 取t[i]压栈
+
+此时无非就是输出下一个（i | t[i]），或者结束（i | nil，返回nil）
+
+##### VM for循环
+
+VM中for循环由`forstat()`控制：
+
+``` c
+static void forstat (LexState *ls, int line) {
+  /* forstat -> FOR (fornum | forlist) END */
+  FuncState *fs = ls->fs;
+  TString *varname;
+  BlockCnt bl;
+  enterblock(fs, &bl, 1);  /* scope for loop and control variables */
+  luaX_next(ls);  /* skip 'for' */
+  varname = str_checkname(ls);  /* first variable name */
+  switch (ls->t.token) {
+    case '=': fornum(ls, varname, line); break;
+    case ',': case TK_IN: forlist(ls, varname); break;
+    default: luaX_syntaxerror(ls, "'=' or 'in' expected");
+  }
+  check_match(ls, TK_END, TK_FOR, line);
+  leaveblock(fs);  /* loop scope ('break' jumps to this point) */
+}
+```
+
+fornum指代的是一般for循环，而forlist指代的就是泛型for循环
+读到`,`与`in`必然就是泛型for情况
+<B><BL>问题：读到`,`不就知道是泛型for了吗，为什么需要`in`</BL></B>
+<BL>如果舍弃元素`,`不一定存在，需要通过`in`来判断</BL>
+
+在`forlist()`中，布局代码如下所示： <VT>Tip：嵌套了`forbody()`</VT>
+
+``` c
+/* create control variables */
+new_localvarliteral(ls, "(for generator)");
+new_localvarliteral(ls, "(for state)");
+new_localvarliteral(ls, "(for control)");
+/* create declared variables */
+new_localvar(ls, indexname);
+while (testnext(ls, ',')) {
+  new_localvar(ls, str_checkname(ls));
+  nvars++;
+}
+// ...
+// 重要：for语句体
+forbody(ls, base, line, nvars - 3, 0);
+```
+
+通常就会是：
+<B>generator | state | control | k | v</B>
+所以说：
+
+- 经过`pairs()`初始化，有：
+  luaB_next | t | nil | k | v
+- 经过`ipairs()`初始化，有：
+  ipairsaux | t | nil | k | v
+
+循环主要由2条指令控制：
+
+- 先OP_TFORCALL：组成`generator(state, control)`并调用，本质上就是调用`luaB_next(t, curKey)`
+- 再OP_TFORLOOP：
+  - 如果k（在R(base+3)处）不是nil（即找到下一次k了），保存至control（在R(base+2)处），跳回去（BODY）
+  - 如果是nil，结束
+- 回来执行BODY
+
+<B><VT>Tip：先OP_TFORCALL是由`forbody()`填写JMP指令跳转至OP_TFORCALL完成的，本应该是先BODY的</VT></B>
+
 ### c API
 
 #### `luaH_new`
@@ -1593,28 +1963,138 @@ static void setnodevector (lua_State *L, Table *t, unsigned int size) {
 由此可以得知：
 <B><VT>Table初始化后全为空，不会预创建</VT></B>
 
-#### `luaH_next`
-
 #### `luaV_gettable`
 
+``` c
+#define luaV_gettable(L,t,k,v) { const TValue *slot; \
+  if (luaV_fastget(L,t,k,slot,luaH_get)) { setobj2s(L, v, slot); } \
+  else luaV_finishget(L,t,k,v,slot); }
+```
+
+`luaV_gettable()`：VM下由key获取value（栈中替换）
+实际上该函数很简单，首先会使用`luaH_get()`进行获取，没有就会使用`luaV_finishget`，即`__index`元方法链调用
+<B><DRD>重要：`luaV_gettable()`并非仅用于table，只要是形如`xxx[]`都是可接受的，对于不是table情况（或没key），走`__index`即可</DRD></B>
+
+<B><VT>我们在VM中并不能找到函数的调用，这是因为lua复制了一份protect版本：</VT></B>
+
+``` c
+#define gettableProtected(L,t,k,v)  { const TValue *slot; \
+  if (luaV_fastget(L,t,k,slot,luaH_get)) { setobj2s(L, v, slot); } \
+  else Protect(luaV_finishget(L,t,k,v,slot)); }
+```
+
 #### `luaV_settable`
+
+``` c
+#define luaV_settable(L,t,k,v) { const TValue *slot; \
+  if (!luaV_fastset(L,t,k,slot,luaH_get,v)) \
+    luaV_finishset(L,t,k,v,slot); }
+```
+
+`luaV_settable()`：VM下设置t[k]（table情况）
+<B><VT>和`luaV_gettable()`类似，对于不是table情况（或没key），走`__newindex`即可</VT></B>
 
 ### lua API
 
 #### `lua_createtable`
+
+``` c
+LUA_API void lua_createtable (lua_State *L, int narray, int nrec) {
+  Table *t;
+  lua_lock(L);
+  t = luaH_new(L);
+  sethvalue(L, L->top, t);
+  api_incr_top(L);
+  if (narray > 0 || nrec > 0)
+    luaH_resize(L, t, narray, nrec);
+  luaC_checkGC(L);
+  lua_unlock(L);
+}
+```
+
+`lua_createtable()`：在栈上创建table
+
+- narray：数组元素数量
+- nrec：哈希元素数量
+
 #### `lua_gettable`
+
+``` c
+LUA_API int lua_gettable (lua_State *L, int idx) {
+  StkId t;
+  lua_lock(L);
+  t = index2addr(L, idx);
+  luaV_gettable(L, t, L->top - 1, L->top - 1);
+  lua_unlock(L);
+  return ttnov(L->top - 1);
+}
+```
+
+`lua_gettable()`：`luaV_gettable()`的简单封装，返回key对应value的类型
+
 #### `lua_settable`
+
+``` c
+LUA_API void lua_settable (lua_State *L, int idx) {
+  StkId t;
+  lua_lock(L);
+  api_checknelems(L, 2);
+  t = index2addr(L, idx);
+  luaV_settable(L, t, L->top - 2, L->top - 1);
+  L->top -= 2;  /* pop index and value */
+  lua_unlock(L);
+}
+```
+
+`lua_settable()`：`luaV_settable()`的简单封装
+
 #### `lua_rawget`
+
+``` c
+LUA_API int lua_rawget (lua_State *L, int idx) {
+  StkId t;
+  lua_lock(L);
+  t = index2addr(L, idx);
+  api_check(L, ttistable(t), "table expected");
+  setobj2s(L, L->top - 1, luaH_get(hvalue(t), L->top - 1));
+  lua_unlock(L);
+  return ttnov(L->top - 1);
+}
+```
+
+`lua_rawget()`：table原始get（跳过元方法）
+<B><VT>`luaB_rawget()`又封装了一层，作为基础库函数`rawget()`使用</VT></B>
+
 #### `lua_rawset`
+
+``` c
+LUA_API void lua_rawset (lua_State *L, int idx) {
+  StkId o;
+  TValue *slot;
+  lua_lock(L);
+  api_checknelems(L, 2);
+  o = index2addr(L, idx);
+  api_check(L, ttistable(o), "table expected");
+  slot = luaH_set(L, hvalue(o), L->top - 2);
+  setobj2t(L, slot, L->top - 1);
+  invalidateTMcache(hvalue(o));
+  luaC_barrierback(L, hvalue(o), L->top-1);
+  L->top -= 2;
+  lua_unlock(L);
+}
+```
+
+`lua_rawset()`：table原始set（跳过元方法）
+<B><VT>`luaB_rawset()`又封装了一层，作为基础库函数`rawset()`使用</VT></B>
 
 ### 使用实例
 
-OP_NEWTABLE
+OP_NEWTABLE：`luaH_new()`创table，有值设定数组/哈希大小就设置
 OP_SETLIST
-OP_GETTABLE
-OP_SETTABLE
-OP_GETTABUP
-OP_SETTABUP
+OP_GETTABLE：走`gettableProtected()`
+OP_SETTABLE：走`settableProtected()`
+OP_GETTABUP：同OP_GETTABLE，upvalue版
+OP_SETTABUP：同OP_SETTABLE，upvalue版
 
 ---
 ---
@@ -2077,6 +2557,8 @@ LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
 
 所以说：
 <B><VT>每次`luaY_parser()`解析都会生成一个LClosure，本质上是一个Proto附带其UpVal</VT></B>
+更重要：
+<B><DRD>Proto才是编译期真正产物，这里只是顺带完成了执行期的入口准备而已（所以才出现了LClosure，即实例创建）</DRD></B>
 
 #### mainfunc
 
@@ -2427,4 +2909,216 @@ print(z)
   - 调用print：同add，但由于是CClosure，不走虚拟机执行
   - 返回：无返回值
 
+---
+---
+---
 
+# 闭包
+
+闭包是lua或者说几乎所有语言中至关重要的一个组成部分
+
+简述：
+
+- 编译期：在Proto中有`Upvaldesc *upvalues`
+- 运行期：在Closure中有`c->upvalue`（CClosure）或`l->upvals`（LClosure）
+
+观察LClosure与CClosure：
+
+``` c
+typedef struct LClosure {
+  ClosureHeader;
+  struct Proto *p;
+  UpVal *upvals[1];  /* list of upvalues */
+} LClosure;
+
+typedef struct CClosure {
+  ClosureHeader;
+  lua_CFunction f;
+  TValue upvalue[1];  /* list of upvalues */
+} CClosure;
+```
+
+可以看到LClosure使用的是UpVal，而CClosure是TValue
+
+编译期信息<B><GN>Upvaldesc</GN></B>
+
+``` c
+typedef struct Upvaldesc {
+  TString *name;  /* upvalue name (for debug information) */
+  lu_byte instack;  /* whether it is in stack (register) */
+  lu_byte idx;  /* index of upvalue (in stack or in outer function's list) */
+} Upvaldesc;
+```
+
+- name：名字
+- instack：1代表当前函数栈局部变量
+  - idx：此时为外层栈帧的寄存器号（因为upvalue本来就是外层的）
+- instack：0代表外部函数自己upvalue列表
+  - idx：外层Closure的upvalue下标
+
+<YL><B>以最常见的`mainfunc()`下创建最外层环境upvalue为例：</B>
+`init_exp(&v, VLOCAL, 0)`
+`newupvalue(fs, ls->envn, &v)`
+名字为`_ENV` instack为1 idx为0</YL>
+
+执行期信息<B><GN>UpVal</GN></B>
+
+``` c
+struct UpVal {
+  TValue *v;  /* points to stack or to its own value */
+  lu_mem refcount;  /* reference counter */
+  union {
+    struct {  /* (when open) */
+      UpVal *next;  /* linked list */
+      int touched;  /* mark to avoid cycles with dead threads */
+    } open;
+    TValue value;  /* the value (when closed) */
+  } u;
+};
+```
+
+这里重要的就是：
+
+- v：upvalue所在真实位置（根据open/close放在栈/堆，作为同一访问指针）
+- u：开关情况数据
+  - open：开启状态
+  - value：关闭状态，upvalue此时存储在value中
+
+## upvalue判定
+
+在编译期中，寻找顺序如下：
+
+- 找当前函数局部变量
+- 找当前函数已有upvalue
+- 递归去外层函数找
+
+upvalue会用`newupvalue()`进行创建：
+
+``` c
+static int newupvalue (FuncState *fs, TString *name, expdesc *v) {
+  Proto *f = fs->f;
+  int oldsize = f->sizeupvalues;
+  checklimit(fs, fs->nups + 1, MAXUPVAL, "upvalues");
+  luaM_growvector(fs->ls->L, f->upvalues, fs->nups, f->sizeupvalues,
+                  Upvaldesc, MAXUPVAL, "upvalues");
+  while (oldsize < f->sizeupvalues)
+    f->upvalues[oldsize++].name = NULL;
+  f->upvalues[fs->nups].instack = (v->k == VLOCAL);
+  f->upvalues[fs->nups].idx = cast_byte(v->u.info);
+  f->upvalues[fs->nups].name = name;
+  luaC_objbarrier(fs->ls->L, f, name);
+  return fs->nups++;
+}
+```
+
+在`singlevaraux()`中根据情况都会设置好
+
+
+
+## 开启情况
+
+由LClosure/CClosure结构可知：
+<B><VT>只有LClosure具有开启关闭状态</VT></B>
+
+在UpVal中可以看到一个union结构`u`，开启时使用open，关闭时就是一个TValue
+其判断函数如下：
+`#define upisopen(up)	((up)->v != &(up)->u.value)`
+
+之所以有开关状态，是因为类似以下情况：
+
+``` lua
+function outer()
+  local x = 10
+  return function()
+    return x
+  end
+end
+
+f = outer()
+```
+
+流程：
+
+- 执行OP_CLOSURE，会创建UpVal<B><VT>（本质上创建子Closure）</VT></B>
+  - instack=1：`luaF_findupval(L, base + uv[i].idx)`
+    外层函数栈帧基址
+  - instack=0：`encup[uv[i].idx]`
+    外层Closure的encup（UpVal）
+- 函数返回前，为open状态，此时`UpVal.v`是栈上的值
+- 函数返回时，会执行`luaF_close()`，会把所有相关UpVal拷贝至堆(`uv->u.value`)并改指向（`uv->v`->`uv->u.value`）
+- 函数返回后，为closed状态，此时`UpVal->v`是`UpVal->u.value`（与`upisopen()`对应）
+
+## `openupval`
+
+在线程lua_State结构中，有一字段：
+`UpVal *openupval;  /* list of open upvalues in this stack */`
+指代的就是当前open的upvalue
+<B><VT>之所以在线程上，是因为多Closure都有可能需要使用，所以说UpVal是共享的，不会复制</VT></B>
+
+其创建方式来自于VM OP_CLOSURE的`luaF_findupval()`
+而其关闭方式为`luaF_close()`（通常是return或条件跳转）
+
+### `luaF_findupval`
+
+``` c
+UpVal *luaF_findupval (lua_State *L, StkId level) {
+  UpVal **pp = &L->openupval;
+  UpVal *p;
+  UpVal *uv;
+  lua_assert(isintwups(L) || L->openupval == NULL);
+  while (*pp != NULL && (p = *pp)->v >= level) {
+    lua_assert(upisopen(p));
+    if (p->v == level)  /* found a corresponding upvalue? */
+      return p;  /* return it */
+    pp = &p->u.open.next;
+  }
+  /* not found: create a new upvalue */
+  uv = luaM_new(L, UpVal);
+  uv->refcount = 0;
+  uv->u.open.next = *pp;  /* link it to list of open upvalues */
+  uv->u.open.touched = 1;
+  *pp = uv;
+  uv->v = level;  /* current value lives in the stack */
+  if (!isintwups(L)) {  /* thread not in list of threads with upvalues? */
+    L->twups = G(L)->twups;  /* link it to the list */
+    G(L)->twups = L;
+  }
+  return uv;
+}
+```
+
+`luaF_findupval()`：获取upval
+
+- 先查`L->openupval`链表，有没有可用UpVal，有就用
+- 没有就新建一个，加入链表
+
+### `luaF_close`
+
+``` c
+void luaF_close (lua_State *L, StkId level) {
+  UpVal *uv;
+  while (L->openupval != NULL && (uv = L->openupval)->v >= level) {
+    lua_assert(upisopen(uv));
+    L->openupval = uv->u.open.next;  /* remove from 'open' list */
+    if (uv->refcount == 0)  /* no references? */
+      luaM_free(L, uv);  /* free upvalue */
+    else {
+      setobj(L, &uv->u.value, uv->v);  /* move value to upvalue slot */
+      uv->v = &uv->u.value;  /* now current value lives here */
+      luaC_upvalbarrier(L, uv);
+    }
+  }
+}
+```
+
+`luaF_close()`：移除upval
+
+---
+---
+---
+
+# 元表
+
+# load
+
+`luaB_load`
