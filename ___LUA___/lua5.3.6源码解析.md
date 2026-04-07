@@ -85,6 +85,15 @@
     - [`luaF_close`](#luaf_close)
 - [元表](#元表)
 - [load](#load)
+  - [`luaB_load`](#luab_load)
+  - [`luaB_loadfile`](#luab_loadfile)
+  - [`luaB_dofile`](#luab_dofile)
+  - [require](#require)
+- [元表](#元表-1)
+  - [初始化](#初始化)
+  - [查询](#查询)
+  - [调用](#调用)
+  - [其它](#其它)
 
 <!-- /TOC -->
 
@@ -3121,4 +3130,329 @@ void luaF_close (lua_State *L, StkId level) {
 
 # load
 
-`luaB_load`
+load是加载流程，对于lua文件本身是必定会执行的
+回顾一下lua.c的`main()`执行，调用的是`luaL_loadfile()`，一种特殊入口（针对exe执行形式）的`lua_load()`
+
+lua中的函数有以下几种：
+
+- `load()`：字符串加载
+- `load()()`：字符串加载+执行
+- `loadfile()`：文件加载
+- `dofile()`：文件加载+执行
+
+这些都是被作为基础库函数存在的：
+
+``` c
+{"dofile", luaB_dofile},
+{"loadfile", luaB_loadfile},
+{"load", luaB_load},
+```
+
+## `luaB_load`
+
+``` c
+static int luaB_load (lua_State *L) {
+  int status;
+  size_t l;
+  const char *s = lua_tolstring(L, 1, &l);
+  const char *mode = luaL_optstring(L, 3, "bt");
+  int env = (!lua_isnone(L, 4) ? 4 : 0);  /* 'env' index or 0 if no 'env' */
+  if (s != NULL) {  /* loading a string? */
+    const char *chunkname = luaL_optstring(L, 2, s);
+    status = luaL_loadbufferx(L, s, l, chunkname, mode);
+  }
+  else {  /* loading from a reader function */
+    const char *chunkname = luaL_optstring(L, 2, "=(load)");
+    luaL_checktype(L, 1, LUA_TFUNCTION);
+    lua_settop(L, RESERVEDSLOT);  /* create reserved slot */
+    status = lua_load(L, generic_reader, NULL, chunkname, mode);
+  }
+  return load_aux(L, status, env);
+}
+```
+
+- 是string，走`luaL_loadbufferx()`
+- 否则只能是function，走`lua_load()`
+- 最终由`load_aux()`更改env
+
+## `luaB_loadfile`
+
+``` c
+static int luaB_loadfile (lua_State *L) {
+  const char *fname = luaL_optstring(L, 1, NULL);
+  const char *mode = luaL_optstring(L, 2, NULL);
+  int env = (!lua_isnone(L, 3) ? 3 : 0);  /* 'env' index or 0 if no 'env' */
+  int status = luaL_loadfilex(L, fname, mode);
+  return load_aux(L, status, env);
+}
+```
+
+`luaB_loadfile()`更简单，只有一种`luaL_loadfilex()`情况，同样需要`load_aux()`设置env
+
+<B><BL>问题：`load_aux()`是什么</BL></B>
+<BL>设置的就是`_ENV`，在此之前无论怎么进入都会执行`lua_load()`，此时第一个upvalue必定会被设置为全局表，经过`load_aux()`后，只要有env就可以进行覆盖</BL>
+
+## `luaB_dofile`
+
+``` c
+static int luaB_dofile (lua_State *L) {
+  const char *fname = luaL_optstring(L, 1, NULL);
+  lua_settop(L, 1);
+  if (luaL_loadfile(L, fname) != LUA_OK)
+    return lua_error(L);
+  lua_callk(L, 0, LUA_MULTRET, 0, dofilecont);
+  return dofilecont(L, 0, 0);
+}
+```
+
+`luaB_dofile()`就是`luaB_loadfile()`的自动执行阉割版
+
+- 不具有保护（不是pcall）
+- 不能指定mode（`t`/`b`/`bt`）
+- 不能指定env
+- 直接抛异常（loadfile是`nil, errmsg`）
+
+所以`luaB_dofile()`只是一种便捷调用封装，如果需要更细应该用`luaB_loadfile()`
+
+简单理解：
+
+``` c
+// loadfile
+local f, err = loadfile(fname, mode, env)
+return f, err
+
+// dofile
+local f = assert(loadfile(fname))
+return f()
+```
+
+## require
+
+`require()`也可以认为是一种load，是package基础包的内容
+`{LUA_LOADLIBNAME, luaopen_package}`
+<B><VT>Tip：`require()`之所以可以直接使用，是因为被注册到`_G`中了</VT></B>
+本质为：
+`{"require", ll_require}`
+
+``` c
+
+static int ll_require (lua_State *L) {
+  const char *name = luaL_checkstring(L, 1);
+  lua_settop(L, 1);  /* LOADED table will be at index 2 */
+  lua_getfield(L, LUA_REGISTRYINDEX, LUA_LOADED_TABLE);
+  lua_getfield(L, 2, name);  /* LOADED[name] */
+  if (lua_toboolean(L, -1))  /* is it there? */
+    return 1;  /* package is already loaded */
+  /* else must load package */
+  lua_pop(L, 1);  /* remove 'getfield' result */
+  findloader(L, name);
+  lua_pushstring(L, name);  /* pass name as argument to module loader */
+  lua_insert(L, -2);  /* name is 1st argument (before search data) */
+  lua_call(L, 2, 1);  /* run loader to load module */
+  if (!lua_isnil(L, -1))  /* non-nil return? */
+    lua_setfield(L, 2, name);  /* LOADED[name] = returned value */
+  if (lua_getfield(L, 2, name) == LUA_TNIL) {   /* module set no value? */
+    lua_pushboolean(L, 1);  /* use true as result */
+    lua_pushvalue(L, -1);  /* extra copy to be returned */
+    lua_setfield(L, 2, name);  /* LOADED[name] = true */
+  }
+  return 1;
+}
+```
+
+- 查`LUA_LOADED_TABLE`，即`package.loaded`
+  - 已存在直接返回
+- `findloader()`去`package.searchers`找loader，并调用
+  - 返回非nil，写回`package.loaded[name]`
+  - 返回nil，且`package.loaded[name]`还没有（也就是没有返回值的加载成功），将其设为true（代表加载过了）
+- 返回`package.loaded[name]`
+
+<B><BL>问题：package下有很多内容，哪来的</BL></B>
+<BL>在初始化`luaopen_package()`中会注册一些内容，有：
+`loadlib()`/`searchpath()`/`searchers`/`path`/`cpath`/`config`/`loaded`/`preload`</BL>
+这里有一注意点：<B>内部访问与对外访问</B>
+`luaL_getsubtable(L, LUA_REGISTRYINDEX, LUA_LOADED_TABLE);`
+`lua_setfield(L, -2, "loaded");`
+可以看到对于内部，都是通过`LUA_REGISTRYINDEX`对应的注册表进行访问，loaded对应的就是`registy["_LOADED"]`（在global_State中）
+而对于外部，由`lua_setfield()`设置后，即可通过`package.preload`进行`registry["_LOADED"]`
+
+
+`package.searchers`
+由`createsearcherstable()`创建，顺序如下：
+
+- searcher_preload
+- searcher_Lua
+- searcher_C
+- searcher_Croot
+
+通常就是`searcher_Lua()`：
+
+``` c
+static int searcher_Lua (lua_State *L) {
+  const char *filename;
+  const char *name = luaL_checkstring(L, 1);
+  filename = findfile(L, name, "path", LUA_LSUBSEP);
+  if (filename == NULL) return 1;  /* module not found in this path */
+  return checkload(L, (luaL_loadfile(L, filename) == LUA_OK), filename);
+}
+```
+
+lua版相当简单，本质上就是`luaL_loadfile()`，和`dofile()`的加载逻辑一致，随后使用`lua_call()`一般执行
+
+`searcher_preload()`是一个提前加载表：
+
+``` c
+static int searcher_preload (lua_State *L) {
+  const char *name = luaL_checkstring(L, 1);
+  lua_getfield(L, LUA_REGISTRYINDEX, LUA_PRELOAD_TABLE);
+  if (lua_getfield(L, -1, name) == LUA_TNIL)  /* not found? */
+    lua_pushfstring(L, "\n\tno field package.preload['%s']", name);
+  return 1;
+}
+```
+
+所以本质上<B><VT>只要在`package.preload[name]`进行注册，就可以以最高优先级进行加载</VT></B>
+所以可以做到<B><VT>覆盖默认模块/嵌入式（没有文件系统）</VT></B>
+
+有时也会遇到c文件加载`searcher_C()`：
+
+``` c
+static int searcher_C (lua_State *L) {
+  const char *name = luaL_checkstring(L, 1);
+  const char *filename = findfile(L, name, "cpath", LUA_CSUBSEP);
+  if (filename == NULL) return 1;  /* module not found in this path */
+  return checkload(L, (loadfunc(L, filename, name) == 0), filename);
+}
+```
+
+对于c来说：
+
+- 找`.so`/`.dll`文件（通过`cpath`进行搜寻）
+- 找到，加载动态库，并寻找`luaopen_xxx()`，找到即成功
+
+<BR>
+
+`searcher_Croot()`是单文件多模块版`searcher_C()`：
+`require("a.b.c")`：文件名使用Root（a.b.c取a），在a文件中会使用`luaopen_a_b_c()`
+
+---
+---
+---
+
+# 元表
+
+元表是lua重要的组成部分，table经常会需要元表的改写支持
+
+- table/userdata：对象级元表
+- number/string/function之类的基础类型：类型级元表
+
+## 初始化
+
+在`luaT_init()`中进行了元表名字的初始化：
+
+``` c
+void luaT_init (lua_State *L) {
+  static const char *const luaT_eventname[] = {  /* ORDER TM */
+    "__index", "__newindex",
+    "__gc", "__mode", "__len", "__eq",
+    "__add", "__sub", "__mul", "__mod", "__pow",
+    "__div", "__idiv",
+    "__band", "__bor", "__bxor", "__shl", "__shr",
+    "__unm", "__bnot", "__lt", "__le",
+    "__concat", "__call"
+  };
+  int i;
+  for (i=0; i<TM_N; i++) {
+    G(L)->tmname[i] = luaS_new(L, luaT_eventname[i]);
+    luaC_fix(L, obj2gco(G(L)->tmname[i]));  /* never collect these names */
+  }
+}
+```
+
+可以看到名字在`G(L)->tmname`中，<B><VT>后续查表方便</VT></B>
+
+## 查询
+
+查询一般会通过2个函数进行：
+
+- `luaT_gettm()`：已知元表，查元方法
+- `luaT_gettmbyobj()`：已知对象，找对象的元表，查元方法
+
+``` c
+const TValue *luaT_gettm (Table *events, TMS event, TString *ename) {
+  const TValue *tm = luaH_getshortstr(events, ename);
+  lua_assert(event <= TM_EQ);
+  if (ttisnil(tm)) {  /* no tag method? */
+    events->flags |= cast_byte(1u<<event);  /* cache this fact */
+    return NULL;
+  }
+  else return tm;
+}
+```
+
+可以看到一个关键优化：
+<B><VT>当元表没有元方法时，缓存到flags中（位运算）</VT></B>
+
+``` c
+const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
+  Table *mt;
+  switch (ttnov(o)) {
+    case LUA_TTABLE:
+      mt = hvalue(o)->metatable;
+      break;
+    case LUA_TUSERDATA:
+      mt = uvalue(o)->metatable;
+      break;
+    default:
+      mt = G(L)->mt[ttnov(o)];
+  }
+  return (mt ? luaH_getshortstr(mt, G(L)->tmname[event]) : luaO_nilobject);
+}
+```
+
+这里就能看出上述的一个情况：
+<B><VT>table/userdata是特殊的，对象具有metatable，而其他的在`G(L)->mt`存有类级别metatable</VT></B>
+
+## 调用
+
+调用最常用的是以下几种：
+
+- `luaT_callTM()`：元方法与参数压栈，并调用
+- `luaT_callbinTM()`：二元元方法版（如：`__add`）
+- `luaT_callorderTM()`：比较运算专用版
+
+``` c
+void luaT_callTM (lua_State *L, const TValue *f, const TValue *p1,
+                  const TValue *p2, TValue *p3, int hasres) {
+  ptrdiff_t result = savestack(L, p3);
+  StkId func = L->top;
+  setobj2s(L, func, f);  /* push function (assume EXTRA_STACK) */
+  setobj2s(L, func + 1, p1);  /* 1st argument */
+  setobj2s(L, func + 2, p2);  /* 2nd argument */
+  L->top += 3;
+  if (!hasres)  /* no result? 'p3' is third argument */
+    setobj2s(L, L->top++, p3);  /* 3rd argument */
+  /* metamethod may yield only when called from Lua code */
+  if (isLua(L->ci))
+    luaD_call(L, func, hasres);
+  else
+    luaD_callnoyield(L, func, hasres);
+  if (hasres) {  /* if has result, move it to its place */
+    p3 = restorestack(L, result);
+    setobjs2s(L, p3, --L->top);
+  }
+}
+```
+
+相当简单，就是压栈，函数调用
+
+元表调用情况如下：
+<B><VT>VM中，大多数运算会先走VM原生快路径（比如a+b可以当然就直接算掉了/表能找到value当然就直接取了），走不通才会尝试元方法，这是流程的一部分并非非法操作
+如果需要原生，则可以调用`rawget()`/`rawset()`/`rawequal()`之类的方法绕过</VT></B>
+
+## 其它
+
+一些特殊点：
+
+- `__le`即<=有回退机制，如果有`__lt`即<也是可行的，因为`a<=b`等价于`not(b<a)`
+- 对于字符串类型来说，string库把`__index`设为string库，所以可以这样调用`"abc":sub(1,2)`
