@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WPF简述</title>
+  <link rel="stylesheet" href="../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>WPF简述</BBBG></center></strong></p>
+<p>这里只是简单做一下WPF的笔记</p>
+<p>对于一个新创建的项目，<strong>解决方案</strong>通常是这样的：<br><img src="Pic/wpf1.png" alt="" class="mnote-img mnote-img-small" data-mnote-image="1" data-kind="small" data-width="276" data-height="194"><br>这里的控制源是App.xaml，其代码为：</p>
+<pre><code class="language-xaml">&lt;Application x:Class=&quot;Wpf_Study.App&quot;
+             xmlns=&quot;http://schemas.microsoft.com/winfx/2006/xaml/presentation&quot;
+             xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+             xmlns:local=&quot;clr-namespace:Wpf_Study&quot;
+             StartupUri=&quot;MainWindow.xaml&quot;&gt;
+    &lt;Application.Resources&gt;
+         
+    &lt;/Application.Resources&gt;
+&lt;/Application&gt;
+</code></pre>
+<p>这里需要知道：</p>
+<ul>
+<li>xmlns其实就是XML的namespace，是需要引用的</li>
+<li><code>:x</code>可以认为是别名，如<code>x:Class</code>就用到了，而<code>xmlns</code>这种没有的就可直接使用，如<code>&lt;Window&gt;...&lt;/Window&gt;</code></li>
+<li>StartupUri将对应需要启动的内容</li>
+</ul>
+<BR>
+
+<p>而需要显示的MainWindow.xaml其实是非常类似的：</p>
+<pre><code class="language-xaml">&lt;Window x:Class=&quot;Wpf_Study.MainWindow&quot;
+        xmlns=&quot;http://schemas.microsoft.com/winfx/2006/xaml/presentation&quot;
+        xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+        xmlns:d=&quot;http://schemas.microsoft.com/expression/blend/2008&quot;
+        xmlns:mc=&quot;http://schemas.openxmlformats.org/markup-compatibility/2006&quot;
+        xmlns:local=&quot;clr-namespace:Wpf_Study&quot;
+        mc:Ignorable=&quot;d&quot;
+        Title=&quot;MainWindow&quot; Height=&quot;450&quot; Width=&quot;800&quot;&gt;
+    &lt;Grid&gt;
+
+    &lt;/Grid&gt;
+&lt;/Window&gt;
+</code></pre>
+<p>可以看到只是多了一些内容，以及需要设置的Title/Height/Width<br>需要知道的一点：<B><VT><code>&lt;Grid&gt;...&lt;/Grid&gt;</code>之间的内容可以认为是客户区，即窗体部分，所以标题所对应的Title并不在此范围内</VT></B><br>如果我们需要添加一个<code>&lt;Window&gt;</code>，那么会添加到<code>&lt;Grid&gt;</code>之中，当然：<B><VT><code>&lt;Grid&gt;</code>不是必要的，可直接添加控件，但只能添加一个，如果添加多个则会报错：属性&quot;Content&quot;只能设置一次</VT></B><br><code>&lt;Grid&gt;</code>被称为<B><GN>布局</GN></B>，有几种布局(不全)：</p>
+<ul>
+<li><code>&lt;Grid&gt;</code>：表格布局</li>
+<li><code>&lt;StackPanel&gt;</code>：栈式布局</li>
+</ul>
+<p>而<code>&lt;Button&gt;</code>之类的则被称为<B><GN>控件</GN></B></p>
+<p><strong><YL>举例：</YL></strong></p>
+<pre><code class="language-xaml">&lt;Window x:Class=&quot;Wpf_Study.MainWindow&quot;
+        xmlns=&quot;http://schemas.microsoft.com/winfx/2006/xaml/presentation&quot;
+        xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+        xmlns:d=&quot;http://schemas.microsoft.com/expression/blend/2008&quot;
+        xmlns:mc=&quot;http://schemas.openxmlformats.org/markup-compatibility/2006&quot;
+        xmlns:local=&quot;clr-namespace:Wpf_Study&quot;
+        mc:Ignorable=&quot;d&quot;
+        Title=&quot;MainWindow&quot; Height=&quot;450&quot; Width=&quot;800&quot;&gt;
+    &lt;Grid ShowGridLines=&quot;True&quot;&gt;
+        &lt;Grid.RowDefinitions&gt;
+            &lt;RowDefinition Height=&quot;20&quot; /&gt;
+            &lt;RowDefinition Height=&quot;20&quot; /&gt;
+            &lt;RowDefinition/&gt;
+            &lt;RowDefinition Height=&quot;20&quot; /&gt;
+        &lt;/Grid.RowDefinitions&gt;
+
+        &lt;StackPanel Grid.Row=&quot;0&quot; Grid.Column=&quot;0&quot; Orientation=&quot;Horizontal&quot;&gt;
+            &lt;Button Height=&quot;20&quot; Width=&quot;160&quot; Content=&quot;11&quot;/&gt;
+            &lt;Button Height=&quot;20&quot; Width=&quot;160&quot; Content=&quot;12&quot;/&gt;
+            &lt;Button Height=&quot;20&quot; Width=&quot;160&quot; Content=&quot;13&quot;/&gt;
+            &lt;Button Height=&quot;20&quot; Width=&quot;160&quot; Content=&quot;14&quot;/&gt;
+            &lt;Button Height=&quot;20&quot; Width=&quot;160&quot; Content=&quot;15&quot;/&gt;
+        &lt;/StackPanel&gt;
+
+        &lt;StackPanel Grid.Row=&quot;1&quot; Grid.Column=&quot;0&quot; Orientation=&quot;Horizontal&quot;&gt;
+            &lt;Button Height=&quot;20&quot; Width=&quot;400&quot; Content=&quot;21&quot;/&gt;
+            &lt;Button Height=&quot;20&quot; Width=&quot;400&quot; Content=&quot;22&quot;/&gt;
+        &lt;/StackPanel&gt;
+
+        &lt;Grid ShowGridLines=&quot;True&quot; Grid.Row=&quot;2&quot; Grid.Column=&quot;0&quot;&gt;
+            &lt;Grid.ColumnDefinitions&gt;
+                &lt;ColumnDefinition Width=&quot;70&quot; /&gt;
+                &lt;ColumnDefinition /&gt;
+            &lt;/Grid.ColumnDefinitions&gt;
+
+            &lt;StackPanel&gt;
+                &lt;Button Height=&quot;20&quot; Content=&quot;1&quot;/&gt;
+                &lt;Button Height=&quot;20&quot; Content=&quot;2&quot;/&gt;
+                &lt;Button Height=&quot;20&quot; Content=&quot;3&quot;/&gt;
+                &lt;Button Height=&quot;20&quot; Content=&quot;4&quot;/&gt;
+            &lt;/StackPanel&gt;
+
+            &lt;TextBox Grid.Row=&quot;0&quot; Grid.Column=&quot;1&quot; TextWrapping=&quot;Wrap&quot;/&gt;
+        &lt;/Grid&gt;
+
+        &lt;Grid ShowGridLines=&quot;True&quot; Grid.Row=&quot;3&quot; Grid.Column=&quot;0&quot;&gt;
+            &lt;Grid.ColumnDefinitions&gt;
+                &lt;ColumnDefinition /&gt;
+                &lt;ColumnDefinition /&gt;
+                &lt;ColumnDefinition /&gt;
+                &lt;ColumnDefinition /&gt;
+            &lt;/Grid.ColumnDefinitions&gt;
+
+            &lt;Button Content=&quot;41&quot; Grid.Column=&quot;0&quot;/&gt;
+            &lt;Button Content=&quot;42&quot; Grid.Column=&quot;1&quot;/&gt;
+            &lt;Button Content=&quot;43&quot; Grid.Column=&quot;2&quot;/&gt;
+            &lt;Button Content=&quot;44&quot; Grid.Column=&quot;3&quot;/&gt;
+        &lt;/Grid&gt;
+    &lt;/Grid&gt;
+&lt;/Window&gt;
+</code></pre>
+<p><YL>效果如下：</YL><br><img src="Pic/wpf2.png" alt="" class="mnote-img mnote-img-normal" data-mnote-image="1" data-kind="normal" data-width="786" data-height="443"></p>
+<p>简单讲述一下<strong>注意点</strong>：</p>
+<ul>
+<li><code>&lt;Grid&gt;</code>可嵌套，那么在某一行或某一列时可进行细分</li>
+<li>对于<code>&lt;Grid.RowDefinitions&gt;</code>/<code>&lt;Grid.ColumnDefinitions&gt;</code>来说，可填写<code>Height</code>/<code>Width</code>，其中：<ul>
+<li><strong><VT>Tip：<code>1*</code>代表着一份</VT></strong></li>
+<li>没有填写则会分配<code>1*</code>，也可指定具体数值/<code>x*</code>/<code>&quot;AUTO&quot;</code></li>
+</ul>
+</li>
+<li>可以看到<B><VT><code>&lt;StackPanel&gt;</code>形成的是非动态的，而<code>&lt;Grid&gt;</code>结合Definitions可形成动态的</VT></B>，将窗口大小改变即可发现：<img src="Pic/wpf3.png" alt="" class="mnote-img mnote-img-normal" data-mnote-image="1" data-kind="normal" data-width="357" data-height="443"></li>
+</ul>
+<BR>
+
+<p><B><GN>样式</GN></B>也是比较关键的内容，<strong>一般写法</strong>可能如下：</p>
+<pre><code class="language-xaml">&lt;Window&gt;
+    &lt;Window.Resources&gt;
+        &lt;Style x:Key = &quot;Style1&quot; TargetType=&quot;Button&quot;&gt;
+            &lt;Setter Property=&quot;Background&quot; Value=&quot;Green&quot;/&gt;
+            &lt;Setter Property=&quot;FontSize&quot; Value=&quot;20&quot;/&gt;
+            &lt;Setter Property=&quot;Height&quot; Value=&quot;50&quot;/&gt;
+            &lt;Setter Property=&quot;Width&quot; Value=&quot;500&quot;/&gt;
+        &lt;/Style&gt;
+    &lt;/Window.Resources&gt;
+    ...
+&lt;/Window&gt;
+</code></pre>
+<p>使用则可以通过<code>Style = &quot;{StaticResource Style1}&quot;</code>来指定控件Style<br>除了StaticResource还有DynamicResource，也就是可以<VT>自动进行切换</VT>的形式<br>还有一种<strong>默认应用+额外的写法</strong>：</p>
+<pre><code class="language-xaml">&lt;Window&gt;
+    &lt;Window.Resources&gt;
+        &lt;!--默认部分--&gt;
+        &lt;Style TargetType=&quot;Button&quot;&gt;
+            &lt;Setter Property=&quot;Background&quot; Value=&quot;Green&quot;/&gt;
+        &lt;/Style&gt;
+        &lt;!--额外部分--&gt;
+        &lt;Style x:Key=&quot;Style1&quot; TargetType=&quot;Button&quot; BasedOn=&quot;{StaticResource {x:Type Button}}&quot;&gt;
+            &lt;Setter Property=&quot;Background&quot; Value=&quot;Red&quot;/&gt;
+            &lt;Setter Property=&quot;FontSize&quot; Value=&quot;20&quot;/&gt;
+            &lt;Setter Property=&quot;Height&quot; Value=&quot;50&quot;/&gt;
+            &lt;Setter Property=&quot;Width&quot; Value=&quot;500&quot;/&gt;
+        &lt;/Style&gt;
+    &lt;/Window.Resources&gt;
+    ...
+&lt;/Window&gt;
+</code></pre>
+<p>上述2种都是在该xaml中进行创建的，显然样式只能应用于当前xaml窗口，而且会与布局设置混在一起<br>可以通过<B><GN>资源字典</GN></B>的方式进行创建，<strong>对项目右键添加</strong>即可，内容大致如下：</p>
+<pre><code class="language-xaml">&lt;ResourceDictionary xmlns=&quot;http://schemas.microsoft.com/winfx/2006/xaml/presentation&quot;
+                    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;&gt;
+    &lt;Style TargetType=&quot;Button&quot;&gt;
+        &lt;Setter Property=&quot;Background&quot; Value=&quot;Green&quot;/&gt;
+    &lt;/Style&gt;
+&lt;/ResourceDictionary&gt;
+</code></pre>
+<p>其实很简单，对于使用，则需要<strong>在核心文件App.xaml中进行全局添加</strong>：</p>
+<pre><code class="language-xaml">&lt;Application x:Class=&quot;Wpf_Study.App&quot;
+             xmlns=&quot;http://schemas.microsoft.com/winfx/2006/xaml/presentation&quot;
+             xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+             xmlns:local=&quot;clr-namespace:Wpf_Study&quot;
+             StartupUri=&quot;MainWindow.xaml&quot;&gt;
+    &lt;Application.Resources&gt;
+        &lt;ResourceDictionary&gt;
+            &lt;ResourceDictionary.MergedDictionaries&gt;
+                &lt;ResourceDictionary Source=&quot;/Style.xaml&quot;/&gt;
+            &lt;/ResourceDictionary.MergedDictionaries&gt;
+        &lt;/ResourceDictionary&gt;
+    &lt;/Application.Resources&gt;
+&lt;/Application&gt;
+</code></pre>
+<p>添加后即可在界面中看到效果，对于StaticResource也可直接使用</p>
+<BR>
+
+<p>对于控件来说，还具有<B><GN>模板</GN></B>这种设置，大致如下：</p>
+<pre><code class="language-xaml">&lt;Button Width=&quot;300&quot; Height=&quot;100&quot; Content=&quot;自定义按钮&quot; Background=&quot;#0078d4&quot; FontSize=&quot;50&quot; Foreground=&quot;White&quot;&gt;
+    &lt;Button.Template&gt;
+        &lt;ControlTemplate TargetType=&quot;{x:Type Button}&quot;&gt;
+            &lt;Border BorderBrush=&quot;Black&quot; BorderThickness=&quot;4&quot; CornerRadius=&quot;20&quot;&gt;
+                &lt;!--关键：继承(简单理解的话)--&gt;
+                &lt;ContentPresenter HorizontalAlignment=&quot;Center&quot; VerticalAlignment=&quot;Center&quot;/&gt;
+            &lt;/Border&gt;
+        &lt;/ControlTemplate&gt;
+    &lt;/Button.Template&gt;
+&lt;/Button&gt;
+</code></pre>
+<p>但是更好的写法应该是这样：</p>
+<pre><code class="language-xaml">&lt;Button Width=&quot;300&quot; Height=&quot;100&quot; Content=&quot;自定义按钮&quot; Background=&quot;#0078d4&quot; FontSize=&quot;50&quot; Foreground=&quot;White&quot; BorderBrush=&quot;Black&quot; BorderThickness=&quot;4&quot;&gt;
+    &lt;Button.Template&gt;
+        &lt;ControlTemplate TargetType=&quot;{x:Type Button}&quot;&gt;
+            &lt;Border x:Name=&quot;Border&quot; Background=&quot;{TemplateBinding Background}&quot; BorderBrush=&quot;{TemplateBinding BorderBrush}&quot; BorderThickness=&quot;{TemplateBinding BorderThickness}&quot; CornerRadius=&quot;20&quot;&gt;
+                &lt;TextBlock x:Name=&quot;Text&quot; Text=&quot;{TemplateBinding Content}&quot; HorizontalAlignment=&quot;Center&quot; VerticalAlignment=&quot;Center&quot;/&gt;
+            &lt;/Border&gt;
+            
+            &lt;ControlTemplate.Triggers&gt;
+                &lt;Trigger Property=&quot;IsMouseOver&quot; Value=&quot;True&quot;&gt;
+                    &lt;Setter TargetName=&quot;Border&quot; Property=&quot;Background&quot; Value=&quot;Black&quot;/&gt;
+                    &lt;Setter TargetName=&quot;Text&quot; Property=&quot;FontSize&quot; Value=&quot;10&quot;/&gt;
+                &lt;/Trigger&gt;
+                &lt;Trigger Property=&quot;IsPressed&quot; Value=&quot;True&quot;&gt;
+                    &lt;Setter TargetName=&quot;Border&quot; Property=&quot;Background&quot; Value=&quot;White&quot;/&gt;
+                &lt;/Trigger&gt;
+            &lt;/ControlTemplate.Triggers&gt;
+        &lt;/ControlTemplate&gt;
+    &lt;/Button.Template&gt;
+&lt;/Button&gt;
+</code></pre>
+<p>可以看到这里用了<code>{TemplateBinding Background}</code>以进行对Button属性的对应，其中CornerRadius无法设置，这是因为Button中并无该属性<br>同时<code>&lt;ControlTemplate.Triggers&gt;</code>进行了按钮事件的显示设置，在对应情况发生时则对相应控件进行设置</p>
+<p><B><GN>事件</GN></B>是控件中相当重要的内容，其实相当简单：<br>比如说Button的点击事件，添加<code>Click=</code>即可，选择创建则会在xaml.cs文件中生成相应的事件，编写C#代码即可，访问控件只需添加<code>x:Name</code>即可访问相应控件<br>也许我们会不清楚<strong>事件有哪些</strong>，比较好的查看方式是点击相应控件查看其属性：<br><img src="Pic/wpf4.png" alt="" class="mnote-img mnote-img-small" data-mnote-image="1" data-kind="small" data-width="293" data-height="134"><br>同时输入即创建，也很方便</p>
+<p><B><GN>绑定</GN></B>是更重要的一项内容，绑定可以分为单向绑定以及双向绑定，先看一下<strong>单向绑定</strong>：<br><code>&lt;TextBox Text=&quot;{Binding UserName}&quot; x:Name=&quot;txtUserName&quot; Grid.Row=&quot;0&quot; Grid.Column=&quot;1&quot; VerticalAlignment=&quot;Center&quot; Margin=&quot;2&quot;/&gt;</code><br><code>&lt;TextBox Text=&quot;{Binding Password}&quot; x:Name=&quot;txtPassword&quot; Grid.Row=&quot;1&quot; Grid.Column=&quot;1&quot; VerticalAlignment=&quot;Center&quot; Margin=&quot;2&quot;/&gt;</code></p>
+<pre><code class="language-csharp">public partial class MainWindow : Window
+{
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        this.DataContext = this;
+    }
+
+    public string UserName { get; set; }
+    public string Password { get; set; }
+
+    private void Button_Click(object sender, RoutedEventArgs e)
+    {
+        if (UserName == &quot;xxx&quot; &amp;&amp; Password == &quot;xxx&quot;)
+        {
+            // ...
+        }
+        else
+        {
+            MessageBox.Show(&quot;输入的用户名或密码不正确&quot;);
+            // 无用，因为没有进行双向绑定
+            // UserName = &quot;&quot;;
+            // Password = &quot;&quot;;
+        }
+    }
+}
+</code></pre>
+<p><strong>注意点：<VT><code>this.DataContext = this;</code>必须设置</VT></strong><br>以上只是单项绑定，方向为xaml-&gt;C#，修改控件则会传递到C#属性中<br>但是需要<strong>双向绑定</strong>才能将数据传递回视图：</p>
+<pre><code class="language-csharp">public partial class MainWindow : Window, INotifyPropertyChanged
+{
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        this.DataContext = this;
+    }
+
+    private string _UserName;
+    public string UserName 
+    {
+        get
+        {
+            return _UserName;
+        }
+        set 
+        {
+            _UserName = value;
+            RaisePropertyChanged(&quot;UserName&quot;);
+        }
+    }
+
+    private string _Password;
+    public string Password
+    {
+        get
+        {
+            return _Password;
+        }
+        set
+        {
+            _Password = value;
+            RaisePropertyChanged(&quot;Password&quot;);
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void RaisePropertyChanged(string propertyName)
+    {
+        PropertyChangedEventHandler? handler = PropertyChanged;
+        if(handler != null)
+            handler(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private void Button_Click(object sender, RoutedEventArgs e)
+    {
+        if (UserName == &quot;wpf&quot; &amp;&amp; Password == &quot;666&quot;)
+        {
+            Index index = new Index();
+            index.Show();
+
+            this.Close();
+        }
+        else
+        {
+            MessageBox.Show(&quot;输入的用户名或密码不正确&quot;);
+            UserName = &quot;&quot;;
+            Password = &quot;&quot;;
+        }
+    }
+}
+</code></pre>
+<p>这其实是一种固定写法，记住即可</p>
+<p><B><GN>MVVM</GN></B>也是编写WPF极常用的概念<br>用前面的例子简单应用一下<strong>Model</strong>：</p>
+<pre><code class="language-csharp">public partial class MainWindow : Window
+{
+    LoginModel loginModel;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        loginModel = new LoginModel();
+
+        this.DataContext = loginModel;
+    }
+
+    private void Button_Click(object sender, RoutedEventArgs e)
+    {
+        if (loginModel.UserName == &quot;wpf&quot; &amp;&amp; loginModel.Password == &quot;666&quot;)
+        {
+            Index index = new Index();
+            index.Show();
+
+            this.Close();
+        }
+        else
+        {
+            MessageBox.Show(&quot;输入的用户名或密码不正确&quot;);
+            loginModel.UserName = &quot;&quot;;
+            loginModel.Password = &quot;&quot;;
+        }
+    }
+}
+
+public class LoginModel : INotifyPropertyChanged
+{
+    private string? _UserName;
+    public string? UserName
+    {
+        get
+        {
+            return _UserName;
+        }
+        set
+        {
+            _UserName = value;
+            RaisePropertyChanged(&quot;UserName&quot;);
+        }
+    }
+
+    private string? _Password;
+    public string? Password
+    {
+        get
+        {
+            return _Password;
+        }
+        set
+        {
+            _Password = value;
+            RaisePropertyChanged(&quot;Password&quot;);
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void RaisePropertyChanged(string propertyName)
+    {
+        PropertyChangedEventHandler? handler = PropertyChanged;
+        if (handler != null)
+            handler(this, new PropertyChangedEventArgs(propertyName));
+    }
+}
+</code></pre>
+<p>这里其实我们能够理<B><code>DataContext</code>是什么含义</B>：<br><strong><VT><GN>DataContext</GN>其实就是数据上下文，也就是数据从那个实例中获取，原来之所以是this是因为确实直接在MainWindow中声明的属性，而现在被移至LoginModel后，DataContext也就相应的变为了LoginModel实例</VT></strong></p>
+<p>以上并非真正意义上的Model，Model仅模型，也就是数据本体，但是这里承担了过多的内容并不符合<br>这里扩展成<strong>Model+ViewModel</strong>以此介绍一下<B><GN>命令绑定</GN></B>：</p>
+<pre><code class="language-csharp">public partial class MainWindow : Window
+{
+    private LoginViewModel loginViewModel;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        loginViewModel = new LoginViewModel(this);
+        this.DataContext = loginViewModel;
+    }
+}
+</code></pre>
+<p>可以看到Window简洁了很多，仅有VM并作为上下文</p>
+<p>Model没什么好说的，仅数据：</p>
+<pre><code class="language-csharp">class LoginModel
+{
+    private string? _UserName;
+    public string? UserName
+    {
+        get
+        {
+            return _UserName;
+        }
+        set
+        {
+            _UserName = value;
+        }
+    }
+
+    private string? _Password;
+    public string? Password
+    {
+        get
+        {
+            return _Password;
+        }
+        set
+        {
+            _Password = value;
+        }
+    }
+}
+</code></pre>
+<p>ViewModel会复杂很多：</p>
+<pre><code class="language-csharp">class LoginViewModel : INotifyPropertyChanged
+{
+    private MainWindow _mainWindow;
+
+    public LoginViewModel(MainWindow main)
+    {
+        _mainWindow = main;
+        _loginModel = new LoginModel();
+    }
+
+    private LoginModel _loginModel;
+
+    public string? UserName
+    {
+        get { return _loginModel.UserName; }
+        set 
+        {
+            _loginModel.UserName = value;
+            RaisePropertyChanged(&quot;UserName&quot;);
+        }
+    }
+
+    public string? Password
+    {
+        get { return _loginModel.Password; }
+        set
+        {
+            _loginModel.Password = value;
+            RaisePropertyChanged(&quot;Password&quot;);
+        }
+    }
+
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void RaisePropertyChanged(string propertyName)
+    {
+        PropertyChangedEventHandler? handler = PropertyChanged;
+        if (handler != null)
+            handler(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public void OnClick()
+    {
+        if (UserName == &quot;wpf&quot; &amp;&amp; Password == &quot;666&quot;)
+        {
+            Index index = new Index();
+            index.Show();
+
+            _mainWindow.Close();
+        }
+        else
+        {
+            MessageBox.Show(&quot;输入的用户名或密码不正确&quot;);
+            UserName = &quot;&quot;;
+            Password = &quot;&quot;;
+        }
+    }
+
+    private bool CanLoginExecute()
+    {
+        return true;
+    }
+
+    public ICommand LoginAction
+    {
+        get
+        {
+            return new RelayCommand(OnClick, CanLoginExecute);
+        }
+    }
+}
+</code></pre>
+<p>在这里ViewModel将承担更多的职责，绑定/触发/业务逻辑都是由它来进行<br><strong>命令绑定</strong>就是由<B><GN>ICommand</GN></B>进行的：</p>
+<pre><code class="language-csharp">class RelayCommand : ICommand
+{
+    readonly Func&lt;bool&gt; _canExecute;
+    readonly Action _execute;
+
+    public RelayCommand(Action execute, Func&lt;bool&gt; canExecute)
+    {
+        _execute = execute;
+        _canExecute = canExecute;
+    }
+
+
+    public bool CanExecute(object? parameter)
+    {
+        if (_canExecute == null)
+        {
+            return true;
+        }
+        return _canExecute();
+    }
+
+    public void Execute(object? parameter)
+    {
+        _execute();
+    }
+
+    public event EventHandler? CanExecuteChanged
+    {
+        add 
+        {
+            if (_canExecute != null)
+            {
+                CommandManager.RequerySuggested += value;
+            }
+        }
+        remove
+        {
+            if (_canExecute != null)
+            {
+                CommandManager.RequerySuggested -= value;
+            }
+        }
+    }
+}
+</code></pre>
+<p>总的来说也是一种<strong>固定写法</strong></p>
+<p><strong>关键的是xaml：</strong><br><strong><VT>在xaml中需要使用Command属性替代Click属性</VT></strong><br><code>&lt;Button Command=&quot;{Binding LoginAction}&quot; Grid.ColumnSpan=&quot;2&quot; Content=&quot;登录&quot; Grid.Row=&quot;3&quot; Grid.Column=&quot;0&quot;/&gt;</code></p>
+<BR>
+
+<p><strong>自定义控件</strong><br>有时我们会需要自定义控件，方法很简单：<br>创建一个类，将它继承于原控件(如Button)，在使用时通过<code>&lt;local:类名 /&gt;</code>即可使用<br>而这local正是一开始提到的命名空间：<br><code>xmlns:local=&quot;clr-namespace:Wpf_Study&quot;</code></p>
+<p>这里用Button覆写来举例：</p>
+<pre><code class="language-csharp">class CustomButton : Button
+{
+    public CornerRadius ButtonCornerRadius
+    {
+        get { return (CornerRadius)GetValue(ButtonCornerRadiusProperty); }
+        set { SetValue(ButtonCornerRadiusProperty, value); }
+    }
+
+    // Using a DependencyProperty as the backing store for MyProperty.  This enables animation, styling, binding, etc...
+    public static readonly DependencyProperty ButtonCornerRadiusProperty =
+        DependencyProperty.Register(&quot;ButtonCornerRadius&quot;, typeof(CornerRadius), typeof(CustomButton));
+
+    public Brush BackgroundHover
+    {
+        get { return (Brush)GetValue(BackgroundHoverProperty); }
+        set { SetValue(BackgroundHoverProperty, value); }
+    }
+
+    // Using a DependencyProperty as the backing store for MyProperty.  This enables animation, styling, binding, etc...
+    public static readonly DependencyProperty BackgroundHoverProperty =
+        DependencyProperty.Register(&quot;BackgroundHover&quot;, typeof(Brush), typeof(CustomButton));
+
+    public Brush BackgroundPressed
+    {
+        get { return (Brush)GetValue(BackgroundPressedProperty); }
+        set { SetValue(BackgroundPressedProperty, value); }
+    }
+
+    // Using a DependencyProperty as the backing store for MyProperty.  This enables animation, styling, binding, etc...
+    public static readonly DependencyProperty BackgroundPressedProperty =
+        DependencyProperty.Register(&quot;BackgroundPressed&quot;, typeof(Brush), typeof(CustomButton));
+}
+</code></pre>
+<p><strong>可以发现：</strong><br><strong><VT>对于C#内置没有提供的绑定内容，可通过创建<GN>DependencyProperty</GN>来完成</VT></strong><br>可通过<code>propdp</code>+tab快速构建</p>
+<pre><code class="language-xaml">&lt;ResourceDictionary xmlns=&quot;http://schemas.microsoft.com/winfx/2006/xaml/presentation&quot;
+                    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+                    xmlns:local=&quot;clr-namespace:Wpf_Proj1&quot;&gt;
+    &lt;Style TargetType=&quot;{x:Type local:CustomButton}&quot;&gt;
+        &lt;Setter Property=&quot;Template&quot;&gt;
+            &lt;Setter.Value&gt;
+                &lt;ControlTemplate TargetType=&quot;{x:Type local:CustomButton}&quot;&gt;
+                    &lt;Border x:Name=&quot;buttonBorder&quot; Background=&quot;{TemplateBinding Background}&quot; CornerRadius=&quot;{TemplateBinding ButtonCornerRadius}&quot;&gt;
+                        &lt;TextBlock Text=&quot;{TemplateBinding Content}&quot; 
+                                   HorizontalAlignment=&quot;{TemplateBinding HorizontalContentAlignment}&quot;
+                                   VerticalAlignment=&quot;{TemplateBinding VerticalContentAlignment}&quot;/&gt;
+                    &lt;/Border&gt;
+
+                    &lt;ControlTemplate.Triggers&gt;
+                        &lt;Trigger Property=&quot;IsMouseOver&quot; Value=&quot;True&quot;&gt;
+                            &lt;Setter TargetName=&quot;buttonBorder&quot; Property=&quot;Background&quot; Value=&quot;{Binding BackgroundHover,RelativeSource={RelativeSource TemplatedParent}}&quot;/&gt;
+                        &lt;/Trigger&gt;
+
+                        &lt;Trigger Property=&quot;IsPressed&quot; Value=&quot;True&quot;&gt;
+                            &lt;Setter TargetName=&quot;buttonBorder&quot; Property=&quot;Background&quot; Value=&quot;{Binding BackgroundPressed,RelativeSource={RelativeSource TemplatedParent}}&quot;/&gt;
+                        &lt;/Trigger&gt;
+                    &lt;/ControlTemplate.Triggers&gt;
+                &lt;/ControlTemplate&gt;
+            &lt;/Setter.Value&gt;
+        &lt;/Setter&gt;
+    &lt;/Style&gt;
+&lt;/ResourceDictionary&gt;
+</code></pre>
+<p>内容和前面介绍的类似，但是有些需要注意：</p>
+<ul>
+<li>需自行添加<code>xmlns:local=&quot;clr-namespace:Wpf_Proj1&quot;</code>，别名是什么无所谓</li>
+<li>由于是自定义类型，所以必须使用<code>TargetType=&quot;{x:Type local:CustomButton}&quot;</code></li>
+<li><code>CornerRadius=&quot;{TemplateBinding ButtonCornerRadius}&quot;</code>就是类中dp进行的绑定<ul>
+<li>在Trigger中，上述写法可以说等价于<code>Value=&quot;{Binding BackgroundHover,RelativeSource={RelativeSource TemplatedParent}}&quot;</code>，但必须这么写</li>
+</ul>
+</li>
+<li>记得在App.xaml中添加该style</li>
+</ul>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

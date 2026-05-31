@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PureMVC分析</title>
+  <link rel="stylesheet" href="../../../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<center><b><font size=10>PureMVC分析</font></b></center>
+
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E7%AE%80%E8%BF%B0">简述</a></li>
+<li><a href="#%E9%80%BB%E8%BE%91%E6%A2%B3%E7%90%86">逻辑梳理</a><ul>
+<li><a href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90">源码分析</a><ul>
+<li><a href="#facade">Facade</a></li>
+<li><a href="#notifier">Notifier</a></li>
+<li><a href="#controller%E4%B8%8Ecommand">Controller与Command</a><ul>
+<li><a href="#command%E6%98%AF%E4%BB%80%E4%B9%88">Command是什么</a></li>
+</ul>
+</li>
+<li><a href="#model%E4%B8%8Eproxy">Model与Proxy</a><ul>
+<li><a href="#proxy%E6%98%AF%E4%BB%80%E4%B9%88">Proxy是什么</a></li>
+</ul>
+</li>
+<li><a href="#view%E4%B8%8Emediator">View与Mediator</a><ul>
+<li><a href="#mediator%E6%98%AF%E4%BB%80%E4%B9%88">Mediator是什么</a></li>
+<li><a href="#observer%E4%B8%8Enotification">Observer与Notification</a><ul>
+<li><a href="#notification%E6%98%AF%E4%BB%80%E4%B9%88">Notification是什么</a></li>
+<li><a href="#observer%E6%98%AF%E4%BB%80%E4%B9%88">Observer是什么</a></li>
+</ul>
+</li>
+<li><a href="#%E5%85%B3%E7%B3%BBviewmediatorobservernotification">关系(View/Mediator/Observer/Notification)</a></li>
+</ul>
+</li>
+<li><a href="#%E6%95%B4%E4%BD%93%E6%B5%81%E7%A8%8B">整体流程</a></li>
+</ul>
+</li>
+<li><a href="#%E6%96%87%E6%A1%A3%E5%88%86%E6%9E%90">文档分析</a><ul>
+<li><a href="#puremvc%E7%BB%93%E6%9E%84">PureMVC结构</a></li>
+<li><a href="#facade-1">Facade</a></li>
+<li><a href="#%E5%85%B6%E5%AE%83">其它</a><ul>
+<li><a href="#notification">Notification</a></li>
+<li><a href="#command">Command</a></li>
+<li><a href="#mediator">Mediator</a></li>
+<li><a href="#proxy">Proxy</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<h1 id="简述">简述</h1>
+<p>从PureMVC这个名字上来看，我们就能知道：<B><VT>PureMVC是基于MVC的</VT></B><br>以下是官方的一张图，个人认为是最好理解的一种方式了：</p>
+<img src="Pic/PureMVC.png" alt="" class="mnote-img mnote-img-normal" data-mnote-image="1" data-kind="normal" data-width="1163" data-height="812">
+
+<h1 id="逻辑梳理">逻辑梳理</h1>
+<p>由图中我们可以发现，原本的MVC被各类设计模式所包装，即：</p>
+<ul>
+<li><strong>Model</strong>使用了<B><GN>代理模式</GN></B></li>
+<li><strong>View</strong>使用了<B><GN>中介者模式</GN></B></li>
+<li><strong>Controller</strong>使用了<B><GN>命令模式</GN></B></li>
+</ul>
+<p>最终使用<B><GN>门面模式</GN></B>将三者汇总，指定唯一入口进行流程(所以也是一种<B><GN>&quot;单例模式&quot;</GN></B>)</p>
+<h2 id="源码分析">源码分析</h2>
+<p>最好的梳理方式还是看源码，可以看到一共就是4大板块---M/V/C/Facade</p>
+<h3 id="facade">Facade</h3>
+<p>从<B><GN>门面Facade</GN></B>入手是最为合适的，因为在这里将汇聚MVC三者<br><strong>实际调用</strong>可能如下所示：</p>
+<pre><code class="language-csharp">public class PureMVC_Main : MonoBehaviour
+{
+    private void Start()
+    {
+        var hpFacade = Facade.GetInstance(() =&gt; new HPFacade()) as HPFacade;
+        hpFacade.Reset();
+    }
+}
+</code></pre>
+<pre><code class="language-csharp">public class HPFacade : Facade
+{
+    public HPFacade()
+    {
+        RegisterCommand(&quot;Reg_TakeDamageCommand&quot;, () =&gt; { return new TakeDamageCommand(); });
+        RegisterCommand(&quot;Reg_HealCommand&quot;, () =&gt; { return new HealCommand(); });
+        RegisterCommand(&quot;Reg_ResetCommand&quot;, () =&gt; { return new ResetCommand(); });
+
+        RegisterMediator(new HPMediator());
+
+        RegisterProxy(new HPDataProxy());
+    }
+
+    public void Reset()
+    {
+        SendNotification(&quot;Reg_ResetCommand&quot;);
+    }
+}
+</code></pre>
+<p>这就是<B>门面的核心：<VT>注册M(Proxy)/V(Mediator)/C(Command)</VT></B></p>
+<p>从源码中我们知道其<strong>执行流程</strong>：</p>
+<ul>
+<li>通过单例方法<code>GetInstance()</code>创建IFacade实例<ul>
+<li>构造函数本质上只干了一件事就是<code>InitializeFacade()</code>，即<code>InitializeModel()</code>/<code>InitializeController()</code>/<code>InitializeView()</code><ul>
+<li>而这些Init方法又和Facade一样，通过<code>GetInstance()</code>创建实例，仅此而已(同样会执行构造函数)　　<VT>Tip：Controller甚至又套了一层View</VT></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>当然，之后还要进行上述我们创建的实际业务逻辑</li>
+</ul>
+<BR>
+
+<pre><code class="language-csharp">public class Facade : IFacade
+{
+    public Facade()
+    {
+        if (instance != null) throw new Exception(SingletonMsg);
+        instance = this;
+        InitializeFacade();
+    }
+
+    protected virtual void InitializeFacade()
+    {
+        InitializeModel();
+        InitializeController();
+        InitializeView();
+    }
+    protected virtual void InitializeModel()
+    {
+        model = Model.GetInstance(() =&gt; new Model());
+    }
+    protected virtual void InitializeController()
+    {
+        controller = Controller.GetInstance(() =&gt; new Controller());
+    }
+    protected virtual void InitializeView()
+    {
+        view = View.GetInstance(() =&gt; new View());
+    }
+}
+</code></pre>
+<p><B><BL>问题：GetInstance()为什么是这样的</BL></B><br><BL>根据<code>GetInstance()</code>源码，可以发现工厂函数是在instance为null时使用的，所以这里就是一种充当创建与获取的方式</BL></p>
+<p>除此以外，源码中还提供了<strong>必须的功能函数</strong>，比如上述业务代码用到的<code>RegisterXXX()</code><br><strong>具体如下：</strong></p>
+<ul>
+<li><strong>Command</strong><ul>
+<li>RegisterCommand()</li>
+<li>RemoveCommand()</li>
+<li>HasCommand()</li>
+</ul>
+</li>
+<li><strong>Proxy</strong><ul>
+<li>RegisterProxy()</li>
+<li>RetrieveProxy()</li>
+<li>RemoveProxy()</li>
+<li>HasProxy()</li>
+</ul>
+</li>
+<li><strong>Mediator</strong><ul>
+<li>RegisterMediator()</li>
+<li>RetrieveMediator()</li>
+<li>RemoveMediator()</li>
+<li>HasMediator()</li>
+</ul>
+</li>
+<li><strong>通知</strong><ul>
+<li>SendNotification()</li>
+<li>NotifyObservers()</li>
+</ul>
+</li>
+</ul>
+<p>可以看到就是非常清晰的4类函数：M/V/C基本操作/通知</p>
+<h3 id="notifier">Notifier</h3>
+<p>如果我们查看各个类的声明，会发现<strong>有很多类继承自Notifier</strong>，有：</p>
+<ul>
+<li>SimpleCommand/MacroCommand</li>
+<li>Mediator</li>
+<li>Proxy</li>
+</ul>
+<BR>
+
+<pre><code class="language-csharp">public class Notifier : INotifier
+{
+    public virtual void SendNotification(string notificationName, object body = null, string type = null)
+    {
+        Facade.SendNotification(notificationName, body, type);
+    }
+
+    protected IFacade Facade
+    {
+        get
+        {
+            return Patterns.Facade.Facade.GetInstance(() =&gt; new Facade.Facade());
+        }
+    }
+}
+</code></pre>
+<p>通过以上代码可以得知：<B><VT>Notifier提供了<code>SendNotification()</code>，便于我们在各处直接调用<code>SendNotification()</code>无需通过<code>Facade.SendNotification()</code>调用(即隐藏前缀)</VT></B></p>
+<h3 id="controller与command">Controller与Command</h3>
+<blockquote>
+<p>Controller 保存所有 Command 的映射。Command 类是无状态的，只在需要时才被创建<br>Command 可以获取 Proxy 对象并与之交互，发送 Notification，执行其他<br>的Command。经常用于复杂的或系统范围的操作，如应用程序的“启动”和<br>“关闭”。应用程序的业务逻辑应该在这里实现。</p>
+</blockquote>
+<p>在传统MVC中，Controller是联系Model与View的桥梁，在PureMVC中肯定也是如此<br>Controller即<B><GN>命令模式</GN></B>：<br>命令模式本身很简单，它就是一个<strong>Command</strong>，override一下<code>Execute()</code>即可</p>
+<p>其类函数就是Facade收集的Command操作：　<VT>Facade只是作为门面重新封装了一下</VT></p>
+<ul>
+<li>ExecuteCommand()　<VT>Facade没有，即框架内部使用</VT></li>
+<li>RegisterCommand()</li>
+<li>RemoveCommand()</li>
+<li>HasCommand()</li>
+</ul>
+<p><strong>核心</strong>是<B><GN>注册RegisterCommand()</GN></B>：</p>
+<pre><code class="language-csharp">public virtual void RegisterCommand(string notificationName, Func&lt;ICommand&gt; factory)
+{
+    //所以说：观察者只能注册一次，而命令可以重新更换
+
+    //如果命令没有注册过，则让view注册一下观察者
+    if (commandMap.TryGetValue(notificationName, out _) == false)
+    {
+        view.RegisterObserver(notificationName, new Observer(ExecuteCommand, this));
+    }
+    //存储工厂函数
+    commandMap[notificationName] = factory;
+}
+
+public virtual void ExecuteCommand(INotification notification)
+{
+    if (commandMap.TryGetValue(notification.Name, out var factory))
+    {
+        var commandInstance = factory();
+        commandInstance.Execute(notification);
+    }
+}
+</code></pre>
+<p>可以看到注册其实是提供了一个工厂函数，更重要的是<B><VT>将其注册进view中作为观察者存在</VT></B></p>
+<h4 id="command是什么">Command是什么</h4>
+<pre><code class="language-csharp">public class SimpleCommand : Notifier, ICommand
+{
+    public virtual void Execute(INotification notification)
+    {
+    }
+}
+
+public class MacroCommand : Notifier, ICommand
+{
+    public MacroCommand()
+    {
+        subcommands = new List&lt;Func&lt;ICommand&gt;&gt;();
+        InitializeMacroCommand();
+    }
+
+    protected virtual void InitializeMacroCommand()
+    {
+    }
+
+    protected void AddSubCommand(Func&lt;ICommand&gt; factory)
+    {
+        subcommands.Add(factory);
+    }
+
+    public virtual void Execute(INotification notification)
+    {
+        while(subcommands.Count &gt; 0)
+        {
+            var factory = subcommands[0];
+            var commandInstance = factory();
+            commandInstance.Execute(notification);
+            subcommands.RemoveAt(0);
+        }
+    }
+
+    public readonly IList&lt;Func&lt;ICommand&gt;&gt; subcommands;
+}
+</code></pre>
+<p>通过以上代码可以得知：<B><VT>SimpleCommand是一个单纯的Command，而MacroCommand是多个Command的组合</VT></B></p>
+<h3 id="model与proxy">Model与Proxy</h3>
+<blockquote>
+<p>Model 保存对 Proxy 对象的引用，Proxy 负责操作数据模型，与远程服务通信存取数据。<br>这样保证了Model层的可移植性。</p>
+</blockquote>
+<p>Proxy即<B><GN>代理模式</GN></B>，简单来说就是<B><VT>Model的一个&quot;子项&quot;</VT></B><br>同样是Facade收集的Proxy操作：</p>
+<ul>
+<li>RegisterProxy()</li>
+<li>RetrieveProxy()</li>
+<li>RemoveProxy()</li>
+<li>HasProxy()</li>
+</ul>
+<p>核心是<B><GN>注册RegisterProxy()</GN></B>与<B><GN>取回(获取)RetrieveProxy()</GN></B>：</p>
+<pre><code class="language-csharp">public virtual void RegisterProxy(IProxy proxy)
+{
+    //将参数proxy存入map中，并回调
+    proxyMap[proxy.ProxyName] = proxy;
+    proxy.OnRegister();
+}
+
+public virtual IProxy RetrieveProxy(string proxyName)
+{
+    //取出名为proxyName的proxy
+    return proxyMap.TryGetValue(proxyName, out var proxy) ? proxy : null;
+}
+</code></pre>
+<p>可以发现Model异常简单，可以说就是一个<B><VT>记录了多个proxy的集合</VT></B><br>所以我们可以认为：<B><VT>Proxy就是子Model</VT></B></p>
+<h4 id="proxy是什么">Proxy是什么</h4>
+<pre><code class="language-csharp">public class Proxy: Notifier, IProxy
+{
+    public const string NAME = &quot;Proxy&quot;;
+
+    public Proxy(string proxyName, object data = null)
+    {
+        ProxyName = proxyName ?? NAME;
+        if (data != null) Data = data;
+    }
+
+    public string ProxyName { get; protected set; }
+    public object Data { get; set; }
+}
+</code></pre>
+<p>通过以上代码可以得知：<B><VT>Proxy只是一个名为ProxyName的Data</VT></B></p>
+<h3 id="view与mediator">View与Mediator</h3>
+<blockquote>
+<p>View 保存对 Mediator 对象的引用 。由 Mediator 对象来操作具体的视图组<br>件（View Component，例如 Flex 的 DataGrid 组件），包括：添加事件监<br>听器 ，发送或接收Notification ，直接改变视图组件的状态。<br>这样做实现了把视图和控制它的逻辑分离开来。</p>
+</blockquote>
+<p>Mediator即<B><GN>中介者模式</GN></B>，在这里<B><VT>观察者为Mediator/Command，被观察者为Proxy</VT></B><br>与M/C不同，V的话处理是Facade收集的Mediator操作，还具有Observer操作：</p>
+<ul>
+<li>RegisterObserver()</li>
+<li>NotifyObservers()</li>
+<li>RemoveObserver()</li>
+<li>RegisterMediator()</li>
+<li>RetrieveMediator()</li>
+<li>RemoveMediator()</li>
+<li>HasMediator()</li>
+</ul>
+<p>那么先来看一下<strong>Mediator</strong>，核心当然是<B><GN>RegisterMediator()</GN></B>与<B><GN>取回(获取)RetrieveMediator()</GN></B>：</p>
+<pre><code class="language-csharp">public virtual void RegisterMediator(IMediator mediator)
+{
+    //尝试存入mediator
+    if(mediatorMap.TryAdd(mediator.MediatorName, mediator))
+    {
+        var interests = mediator.ListNotificationInterests();
+
+        if (interests.Length &gt; 0)
+        {
+            //创建观察者并订阅兴趣事件(注册)
+            IObserver observer = new Observer(mediator.HandleNotification, mediator);
+            foreach (var interest in interests)
+            {
+                RegisterObserver(interest, observer);
+            }
+        }
+        mediator.OnRegister();
+    }
+}
+
+public virtual IMediator RetrieveMediator(string mediatorName)
+{
+    //取出名为mediatorName的mediator
+    return mediatorMap.TryGetValue(mediatorName, out var mediator) ? mediator : null;
+}
+</code></pre>
+<p><strong>可以发现：<VT>Mediator其实是在创建Observer</VT></strong></p>
+<h4 id="mediator是什么">Mediator是什么</h4>
+<pre><code class="language-csharp">public class Mediator : Notifier, IMediator
+{
+    public virtual string[] ListNotificationInterests()
+    {
+        return new string[0];
+    }
+    public virtual void HandleNotification(INotification notification)
+    {
+    }
+}
+</code></pre>
+<p>通过以上代码可以得知：<B><VT>Mediator中有2个重要函数：<code>ListNotificationInterests()</code>与<code>HandleNotification()</code></VT></B>，需要我们自行实现</p>
+<ul>
+<li><code>ListNotificationInterests()</code>---返回值应该为一个string列表，即<strong>Command名</strong></li>
+<li><code>HandleNotification()</code>---是一个操作，即<strong>对于notification应该进行的操作</strong></li>
+</ul>
+<h4 id="observer与notification">Observer与Notification</h4>
+<blockquote>
+<p>PureMVC 的通信并不采用 Flash 的 EventDispatcher/Event，因为PureMVC 可能运行在没有 Flash Event 和 EventDispatcher 类的环境中，它的通信是使用观察者模式以一种松耦合的方式来实现的。<br>你可以不用关心PureMVC的Observer/Notification 机制是怎么实现的，它已经在框架内部实现了。你只需要使用一个非常简单的方法从 Proxy, Mediator, Command 和 Facade 发送 Notification，甚至不需要创建一个Notification 实例。</p>
+</blockquote>
+<p>根据Mediator部分源码的观察，会发现Mediator其实是个&quot;壳子&quot;，核心是其中注册的Observer<br>先来看一下其重要函数<B><GN>RegisterObserver()</GN></B>与<B><GN>取回(获取)NotifyObservers()</GN></B>：</p>
+<pre><code class="language-csharp">public virtual void RegisterObserver(string notificationName, IObserver observer)
+{
+    //添加兴趣事件
+    if (observerMap.TryGetValue(notificationName, out var observers))
+    {
+        observers.Add(observer);
+    }
+    //创建
+    else
+    {
+        observerMap.TryAdd(notificationName, new List&lt;IObserver&gt; { observer });
+    }
+}
+
+public virtual void NotifyObservers(INotification notification)
+{
+    if (observerMap.TryGetValue(notification.Name, out var observersRef))
+    {
+        var observers = new List&lt;IObserver&gt;(observersRef);
+
+        //对每一个观察者通知
+        foreach (var observer in observers)
+        {
+            observer.NotifyObserver(notification);
+        }
+    }
+}
+</code></pre>
+<p>可以看到observerMap可能和我们想的不太一样：key-<code>string</code> value-<code>IList&lt;IObserver&gt;&gt;</code><br>我们可能由于注册的方式(为Observer添加所有兴趣事件)误解为Observer名对应着其事件，<br>但事实恰恰相反，具体来说是：<strong>为通知绑定其观察者</strong><br>仔细想的话是<strong>合理的</strong>：<B><VT>发生某种情况，应该通知所有感兴趣的观察者</VT></B></p>
+<h5 id="notification是什么">Notification是什么</h5>
+<pre><code class="language-csharp">public class Notification: INotification
+{
+    public Notification(string name, object body = null, string type = null)
+    {
+        Name = name;
+        Body = body;
+        Type = type;
+    }
+}
+
+// Facade
+public virtual void SendNotification(string notificationName, object body = null, string type = null)
+{
+    NotifyObservers(new Notification(notificationName, body, type));
+}
+</code></pre>
+<p>通过以上代码可以得知：<B><VT>Notification只是一个name</VT></B></p>
+<h5 id="observer是什么">Observer是什么</h5>
+<pre><code class="language-csharp">public class Observer: IObserver
+{
+    public Observer(Action&lt;INotification&gt; notifyMethod, object notifyContext)
+    {
+        NotifyMethod = notifyMethod;
+        NotifyContext = notifyContext;
+    }
+
+    public virtual void NotifyObserver(INotification notification)
+    {
+        NotifyMethod(notification);
+    }
+}
+</code></pre>
+<p>通过以上代码可以得知：<B><VT>Observer核心是一个构造函数中传入的通知函数，可以通过<code>NotifyObserver()</code>触发</VT></B></p>
+<h4 id="关系viewmediatorobservernotification">关系(View/Mediator/Observer/Notification)</h4>
+<p>通过View/Mediator/Observer/Notification的简单解读，我们能大致说出它们的<strong>关系</strong>：</p>
+<ul>
+<li><strong>View</strong>主要是一个存储Mediator的地方(还有一个observerMap)，并提供Mediator与Observer相关的操作函数</li>
+<li><strong>Mediator</strong>为&quot;中转站&quot;，创建Mediator本质上是创建Observer，主要通过<code>ListNotificationInterests</code>与<code>HandleNotification()</code>建立了与Notification的联系</li>
+<li><strong>Observer</strong>即观察者，会根据Notification通知到所有相关的Observer</li>
+<li><strong>Notification</strong>即通知，仅仅是一个名字</li>
+</ul>
+<h3 id="整体流程">整体流程</h3>
+<p>PureMVC的各个模块已经大致介绍完毕，我们已经基本了解了流程<br>那么在这里<strong>按流程看看具体的操作</strong>：</p>
+<ul>
+<li>起始点必然是从<strong>Facade</strong>，也就是门面开始：<ul>
+<li>Facade构造函数自身进行了初始化操作，即存储MVC单例</li>
+<li>由于<strong>依赖关系</strong>的原因，<B><VT>我们应该以Command/Proxy/Mediator的顺序进行注册</VT></B></li>
+</ul>
+</li>
+<li>首先是<strong>Command注册</strong>：<ul>
+<li>Command是附属于Controller的，其中commandMap会存储所有的ICommand</li>
+<li><B><GN>RegisterCommand()</GN></B>为注册方法，核心为<B><VT>往commandMap存储了一组键值对</VT></B><br><B><YL>举例：</YL></B><code>RegisterCommand(&quot;Reg_TakeDamageCommand&quot;, () =&gt; { return new TakeDamageCommand(); });</code><ul>
+<li>该函数中会通过<B>View.RegisterObserver()</B>创建通知对应的Observer<br><strong>函数为：</strong><code>view.RegisterObserver(notificationName, new Observer(ExecuteCommand, this));</code><br>与Controller.RegisterCommand()类似，这里是<B><VT>通过observerMap进行存储</VT></B><DRD>(注意：键值对是&quot;通过通知名找已订阅观察者&quot;)</DRD><ul>
+<li>首先需要创建Observer，构造函数传入了2个参数：<ul>
+<li>通知函数ExecuteCommand---执行的话流程为从commandMap获取ICommand工厂，创建ICommand实例，执行操作(Execute接口)</li>
+<li>上下文，即自身Controller</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>然后是<strong>Proxy注册</strong>：<ul>
+<li>Proxy是附属于Model的，其中proxyMap会存储所有的IProxy</li>
+<li><B><GN>RegisterProxy()</GN></B>为注册方法，本质上就是<B><VT>往proxyMap存储了一组键值对</VT></B><br><B><YL>举例：</YL></B><code>RegisterProxy(new HPDataProxy());</code></li>
+</ul>
+</li>
+<li>最后是<strong>Mediator注册</strong>：<ul>
+<li>Mediator是附属于View的，其中mediatorMap会存储所有的IMediator</li>
+<li><B><GN>RegisterMediator()</GN></B>为注册方法，核心为<B><VT>往mediatorMap存储了一组键值对</VT></B><br><B><YL>举例：</YL></B><code>RegisterMediator(new HPMediator());</code><br>存储后需要建立与Observer/Notification的联系：<ul>
+<li>我们需要<B>为Mediator重写ListNotificationInterests()</B>以了解Mediator所感兴趣的通知</li>
+<li>对于每一个Mediator，都会创建<DRD>另一种形式</DRD>的Observer：<br><code>IObserver observer = new Observer(mediator.HandleNotification, mediator);</code><br>构造函数传入了2个参数：<ul>
+<li><strong>重写的处理函数HandleNotification()</strong>，需要根据通知的不同进行不同的视图刷新处理</li>
+<li>上下文，即Mediator</li>
+</ul>
+</li>
+<li>对于每一个兴趣通知，都需要通过<B>RegisterObserver()</B>的方式与刚刚创建的Observer关联</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<BR>
+
+<p>上述内容是比较好理解的，关键点在于：<strong>2种Observer的创建方式/整体协作方式</strong><br>通过一个<B><YL>具体实例</YL></B>分析一下：</p>
+<pre><code class="language-csharp">public class HPFacade : Facade
+{
+    public HPFacade()
+    {
+        RegisterCommand(&quot;Reg_TakeDamageCommand&quot;, () =&gt; { return new TakeDamageCommand(); });
+        RegisterCommand(&quot;Reg_HealCommand&quot;, () =&gt; { return new HealCommand(); });
+        RegisterCommand(&quot;Reg_ResetCommand&quot;, () =&gt; { return new ResetCommand(); });
+
+        RegisterProxy(new HPDataProxy());
+        RegisterMediator(new HPMediator());
+    }
+
+    public void Reset()
+    {
+        SendNotification(&quot;Reg_ResetCommand&quot;);
+    }
+}
+</code></pre>
+<ul>
+<li><strong>注册</strong><ul>
+<li>通过Command的注册，我们创建了一个Observer，调用即可执行Command<br>核心：Observer存储在View的observerMap中(通过通知名获取)，同时Command存储在Controller的commandMap中(延迟创建，后续通过工厂函数创建)</li>
+<li>通过Proxy的注册，我们会在proxyMap中存储该proxy，proxy派生类具有对应的执行函数，用于数据更新</li>
+<li>通过Mediator的注册，我们又创建了一个Observer，调用即可执行mediator派生类所实现的函数(<code>HandleNotification()</code>)，用于视图更新<br>核心：Mediator是一个观察者，会将其与observerMap中的每一个兴趣事件建立联系(订阅)，而Mediator本身存储在mediatorMap中</li>
+</ul>
+</li>
+<li><strong>刷新</strong><ul>
+<li><p>刷新方式为<code>SendNotification()</code>，我们的初始化刷新为：<code>SendNotification(&quot;Reg_ResetCommand&quot;);</code><br>该函数本质上是引用的<code>View.NotifyObservers()</code>，即找到所有需要通知的observer，调用对应的执行函数，这里就是ResetCommand，数据更新后又通过<code>SendNotification()</code>进行视图刷新</p>
+<BR>
+
+<pre><code class="language-csharp">//重置函数
+public void Reset()
+{
+    SendNotification(&quot;Reg_ResetCommand&quot;);
+}
+//触发的Command
+public override void Execute(INotification notification)
+{
+    HPDataProxy dataProxy = Facade.RetrieveProxy(HPDataProxy.NAME) as HPDataProxy;
+    dataProxy.ResetHP();
+}
+public void ResetHP()
+{
+    //先Max再Cur，否则因Clamp导致Cur赋值失败
+    _hpData.MaxHP = 100;
+    _hpData.CurrentHP = 100;
+
+    SendNotification(&quot;Msg_Refresh&quot;, _hpData);
+}
+//触发的视图刷新
+public override void HandleNotification(INotification notification)
+{
+    switch (notification.Name)
+    {
+        case &quot;Msg_TakeDamage&quot;:
+        case &quot;Msg_Heal&quot;:
+        case &quot;Msg_Refresh&quot;:
+            HPData hpData = notification.Body as HPData;
+            _hpText.text = $&quot;HP:{hpData.CurrentHP}/{hpData.MaxHP}&quot;;
+            break;
+    }
+}
+</code></pre>
+<p>那么对于2个按钮来说也是同理，本质上就是：<br><strong><VT>发送通知执行Command刷新数据，再发送通知执行视图刷新</VT></strong></p>
+</li>
+</ul>
+</li>
+</ul>
+<BR>
+
+<p><strong><BL>问题解答：2种Observer的创建方式</BL></strong><br><BL>2种Observer分别用于数据刷新(XXXComand)和视图刷新(HandleNotification)</BL><br>至此，脉络已经非常清晰了，核心点就是<B><VT>2种Observer的创建以及SendNotification()全流程</VT></B></p>
+<h2 id="文档分析">文档分析</h2>
+<p>在PureMVC的官网中，给出了一个文档，那么可以通过文档详细地了解一下</p>
+<h3 id="puremvc结构">PureMVC结构</h3>
+<p>在前面的分析中，我们每一组模块的引用都是来自于此，这我们其实已经了解：</p>
+<ul>
+<li>Model/Proxy</li>
+<li>View/Mediator</li>
+<li>Controller/Command</li>
+<li>Facade/Core</li>
+<li>Observer/Notification</li>
+</ul>
+<p>除此以外，还有<strong>几条Tips</strong>：</p>
+<ul>
+<li><p><strong><VT>Notification可以被用来触发Command的执行</VT></strong></p>
+<blockquote>
+<p>发出时，对应的Command（命令）就会自动地由Controller执行。Command实现复杂的交互，降低View和Model之间的耦合性。</p>
+</blockquote>
+<p>根据我们的分析的确如此：<br><code>SendNotification()</code>中有一种就是来自于存储ICommand的Observer，通过Notification即可触发<br>其中，Command是一个独立的脚本，并没有放在Model中，自然降低了VM之间的耦合</p>
+</li>
+<li><p><strong><VT>Mediator发送、声明、接收Notification</VT></strong></p>
+<blockquote>
+<p>当用View 注册 Mediator 时，Mediator 的 listNotifications 方法会被调用，以数组形式返回该Mediator对象所关心的所有Notification。<br>之后，当系统其它角色发出同名的 Notification（通知）时，关心这个通知的Mediator 都会调用handleNotification 方法并将 Notification 以参数传递到方法。</p>
+</blockquote>
+<p>Mediator即中介者，自然需要<strong>承担中介的职责</strong>，也就是：</p>
+<ul>
+<li>声明Notification(注册Mediator时需要通过<code>ListNotificationInterests()</code>确定Mediator关心的Notification)</li>
+<li>发送Notfication(中介者需要<code>SendNotification()</code>以执行Command以执行HandleNotification)</li>
+<li>接收Notification(执行<code>NotifyObserver()</code>时会有Command与HandleNotification两种情况，其中HandleNotification就属于Mediator)</li>
+</ul>
+<p>更简单来说就是上述引用所描述的那样</p>
+</li>
+<li><p><strong><VT>Proxy发送，但不接受Notification</VT></strong></p>
+<blockquote>
+<p>在很多场合下Proxy需要发送Notification（通知），比如：Proxy从远程服务接收到数据时，发送 Notification 告诉系统；或当 Proxy 的数据被更新时，发送Notification 告诉系统。<br>如果让 Proxy 也侦听 Notification（通知）会导致它和 View（视图）层、Controller（控制）层  的耦合度太高。<br>View 和Controller 必须监听 Proxy 发送的Notification，因为它们的职责是通过可视化的界面使  用户能与Proxy持有的数据交互。<br>不过对View层和Controller层的改变不应该影响到Model层。<br>例如，一个后台管理程序和一个面向用户程序可能共用一个Model类。如果只是用例不同，那么 View/Controller 通过传递不同的参数就可以共用相同的Model 类。</p>
+</blockquote>
+<p>这句话其实通过我们的流程就可以知道了：<br><code>SendNotification()</code>触发Command，Command中的函数是由Proxy提供的，然后再通过Command中的<code>SendNotification()</code>触发视图更新<br>可以发现<strong>2种通知的区别</strong>：</p>
+<ul>
+<li>Command是被封装成一个一个的，其实此时已经拆解，Proxy中一个函数会对应一个Command(通知)</li>
+<li>视图更新是集合形态的，一个Observer(Mediator)对应多个通知，需要有一种方式知道Mediator关心哪些通知，也就是<code>ListNotificationInterests()</code></li>
+</ul>
+<p>所以<B><VT>不接受，本质上其实是不需要，Command已经通过注册的方式完成了</VT></B></p>
+</li>
+</ul>
+<h3 id="facade">Facade</h3>
+<p>Facade在我们看来是非常容易理解的一个模块，但同样非常重要：</p>
+<blockquote>
+<p>Facade是Model/View/Controller三者的&quot;经纪人&quot;</p>
+</blockquote>
+<p>事实确实如此，Facade的存在非常好地协调了三者，而且把繁琐的执行操作隐藏起来，我们仅需关注MVC的子部分(Proxy/Mediator/Command)的关键内容即可</p>
+<blockquote>
+<p>一般地，实际的应用程序都有一个 Façade 子类，这个 Façade 类对象负责初始化Controller（控制器），建立Command与Notification名之间的映射，并执行一个Command注册所有的Model和View。</p>
+</blockquote>
+<p>这里提出了<strong>一个建议</strong>：<B><VT>我们需要通过Command注册Model与View</VT></B><br>这是一个非常好的建议，这<B><VT>有助于建立标准流程</VT></B><br>所以我们需要<strong>改造一下：</strong><br>使用MacroCommand创建一个StartupCommand即可：</p>
+<pre><code class="language-csharp">public class StartupCommand : MacroCommand
+{
+    protected override void InitializeMacroCommand()
+    {
+        AddSubCommand(() =&gt; new ModelPrepCommand());
+        AddSubCommand(() =&gt; new ViewPrepCommand());
+        AddSubCommand(() =&gt; new ResetHPCommand());
+    }
+}
+</code></pre>
+<h3 id="其它">其它</h3>
+<h4 id="notification">Notification</h4>
+<p>通知是一种<strong>观察者模式</strong>，可以使各层<B><VT>松耦合通信</VT></B><br>文档中提到：</p>
+<blockquote>
+<p>Notification（通知）机制并不仅仅是 Event（事件）机制的替代品，它们的工作方式有本质上的不同。但这两者相互协作可以提高视图组件的可重用性 ，甚至，如果设计得当，视图组件可以和PureMVC“脱耦”。</p>
+</blockquote>
+<p>这里提到的Event是AS语言中的机制，在PureMVC中使用<strong>Notification机制</strong>实现<br><strong><BL>问题：什么是Event</BL></strong><br><BL>Event使用了<B><GN>责任链模式</GN></B>，核心是<B>&quot;冒泡&quot;</B>：只有父子级关系的对象才会接收到事件，也就是说有一种<B>逐层递进</B>的关系<B>(紧耦合)</B></BL></p>
+<p>各个类的配合是一种<B><GN>发布/订阅模式</GN></B>：</p>
+<ul>
+<li><strong>Facade 和 Proxy 只能发送Notification</strong></li>
+<li><strong>Mediators 既可以发送也可以接收Notification</strong></li>
+<li><strong>Notification 被映射到 Command，同时Command也可以发送Notification</strong></li>
+</ul>
+<p><strong><BL>问题：&quot;类型&quot;参数</BL></strong><br><BL>观察<code>SendNotification()</code>，有时我们会传入额外参数如：<code>SendNotification(HPMediator.TAKE_DAMAGE, _hpData)</code><br>具体来说有：<code>public virtual void SendNotification(string notificationName, object body = null, string type = null)</code><br>显然：</BL></p>
+<ul>
+<li><BL>body---主体，即&quot;类型&quot;参数，用于唯一标识对象</BL></li>
+<li><BL>type(不常用)---类型，大概率是string，用于区分不同情况(如：TAKE_DAMAGE情况可以有&quot;Normal&quot;/&quot;Critical&quot;不同情况)</BL></li>
+</ul>
+<p><strong><VT>Tip：除非Notification是框架级的(如STARTUP/EXIT)可以放在Facade，其余情况的常量名应定义在发送方类中(如Mediator/Command)，或被多个模块共享时放在独立的常量类中(如GameNotifications.cs)，Facade应仅包含框架核心逻辑，不管理业务相关的通知名</VT></strong></p>
+<h4 id="command">Command</h4>
+<p>文档中提到一点：</p>
+<blockquote>
+<p>Command 对象是无状态的；只有在需要的时候（Controller 收到相应的Notification）才会被创建，并且在被执行（调用 execute 方法）之后就会被删除。所以不要在那些生命周期长的对象（long-living object）里引用Command对象。</p>
+</blockquote>
+<pre><code class="language-csharp">public virtual void RegisterCommand(string notificationName, Func&lt;ICommand&gt; factory)
+{
+    if (commandMap.TryGetValue(notificationName, out _) == false)
+    {
+        view.RegisterObserver(notificationName, new Observer(ExecuteCommand, this));
+    }
+    commandMap[notificationName] = factory;
+}
+public virtual void ExecuteCommand(INotification notification)
+{
+    if (commandMap.TryGetValue(notification.Name, out var factory))
+    {
+        var commandInstance = factory();
+        commandInstance.Execute(notification);
+    }
+}
+</code></pre>
+<p>可以看到确实如此：注册时传入的是工厂，执行时才会创建出来，而且由于没有引用，自然会消失<br>但是：<B><VT>如果我们规范使用框架，根本不会出现引用情况</VT></B></p>
+<p><strong>Command所需要做的是：</strong></p>
+<ul>
+<li><strong>注册、删除 Mediator、Proxy 和 Command，或者检查它们是否已经注册</strong></li>
+<li><strong>发送Notification通知Command或Mediator做出响应</strong></li>
+<li><strong>获取Proxy和Mediator对象并直接操作它们</strong></li>
+</ul>
+<p><strong><VT>Tip：Command与Mediator和Proxy交互，应避免Mediator与Proxy直接交互</VT></strong><br>这是当然的，Mediator和Proxy不该暴露自身，而是提供函数用于隐藏细节</p>
+<p>除此以外还有一点：</p>
+<blockquote>
+<p>比较特殊的是Application的Mediator，它是唯一的被允许知道Application 一切的类，所以我们会在Application Mediator的构造函数中创建其他的Mediator对象。</p>
+</blockquote>
+<p>这其实也意味着：<B><VT>Mediator是需要有层级的</VT></B><br><strong><YL>可能有：</YL></strong></p>
+<pre><code class="language-csharp">public class MainMediator : Mediator
+{
+    public new const string NAME = &quot;MainMediator&quot;;
+
+    public MainMediator(GameObject view) : base(NAME, view)
+    {
+        InitHPView();
+    }
+
+    private void InitHPView()
+    {
+        //通过Main找到下一层级的view
+        GameObject hpPnlGO = ((GameObject)ViewComponent).transform.Find(&quot;HPPnl&quot;).gameObject;
+        Facade.RegisterMediator(new HPMediator(hpPnlGO));
+    }
+}
+
+public class HPMediator : Mediator
+{
+    public new const string NAME = &quot;HPMediator&quot;;
+
+    public HPMediator(GameObject view) : base(NAME, view)
+    {
+        //...
+    }
+
+    public override string[] ListNotificationInterests(){/*...*/}
+    public override void HandleNotification(INotification notification){/*...*/}
+}
+</code></pre>
+<h4 id="mediator">Mediator</h4>
+<p>Mediator的<strong>事件响应处理方式</strong>如下：</p>
+<ul>
+<li><strong>检查事件类型或事件的自定义内容</strong></li>
+<li><strong>检查或修改View Component的属性（或调用提供的方法）</strong></li>
+<li><strong>检查或修改Proxy对象公布的属性（或调用提供的方法）</strong></li>
+<li><strong>发送一个或多个Notification，通知别的 Mediator 或Command作出响应（甚至有可能发送给自身）</strong></li>
+</ul>
+<p><strong>一些经验</strong>：</p>
+<ul>
+<li>如果有多个的 Mediator 对同一个事件做出响应，那么应该发送一个Notification，然后相关的Mediator做出各自的响应</li>
+<li>如果一个 Mediator 需要和其他的 Mediator 进行大量的交互，那么一个好方法是利用 Command 把交互步骤定义在一个地方</li>
+<li>不应该让一个 Mediator 直接去获取调用其他的 Mediator，在Mediator 中定义这样的操作本身就是错误的</li>
+<li>Proxy 是有状态的，当状态发生变化时发送 Notification 通知Mediator，将数据的变化反映到视图</li>
+</ul>
+<p>文档提到：</p>
+<blockquote>
+<p>还要注意的是，Mediator的职责应该要细分。如果处理的Notification很多，则意味着Mediator需要被拆分，在拆分后的子模块的Mediator里处理要比全部放在一起更好</p>
+</blockquote>
+<p>个人认为<strong>具体情况具体分析</strong>，确实职责不同就拆分</p>
+<p>文档还提到：</p>
+<blockquote>
+<p>虽然Mediator 可以任意访问 Proxy，通过 Proxy的 API读取、操作 Data Object，但是，由Command来做这些工作可以实现View和Model之间的松耦合。<br>如果一个 Mediator 要和其他 Mediator 通信，那它应该发送 Notification 来实现，<br>而不是直接引用这个Mediator来操作。<br>Mediator 对外不应该公布操作View Component的函数。而是自己接收Notification 做出响应来实现。</p>
+</blockquote>
+<p>以上是一些解耦的操作</p>
+<h4 id="proxy">Proxy</h4>
+<p>文档提到了<B><VT>Proxy应该创建子类扩展方法</VT></B>，有以下<strong>Proxy Pattern</strong>：</p>
+<ul>
+<li>Remote Proxy, 当 Proxy管理的数据存放在远程终端，通过某种服务访问</li>
+<li>Proxy and Delegate, 多个 Proxy 共享对一个服务的访问，由 Delegate 封装对服务的控制访问，确保响应正确的返回给相应的请求者</li>
+<li>Protection Proxy, 用于数据对象的访问有不同的权限时</li>
+<li>Virtual Proxy, 对创建开销很大的数据对象进行管理</li>
+<li>Smart Proxy, 首次访问时载入数据对象到内存，并计算它被引用的次数，允许锁定确保其他对象不能修改</li>
+</ul>
+<p>如有需求可以进行扩展</p>
+<p>文档还提到了<strong>Proxy与其它模块的联系</strong>：</p>
+<blockquote>
+<p>Proxy 不监听 Notification，也永远不会被通知，因为 Proxy 并不关心 View的状态。但是，Proxy提供方法和属性让其它角色更新数据。<br>Proxy应该采取的方式是发送Notification（这些Notification可能被Command或Mediator 响应）。Proxy 不关心这些 Notification 被发出后会影响到系统的什么。</p>
+</blockquote>
+<blockquote>
+<p>把Model 层和系统操作隔离开来，这样当View 层和 Controller 层被重构时就不会影响到Model层。但反过来就不是这样了：Model层的改变很难不影响到View层和Controller层。毕竟，它们存在的目的就是让用户与Model层交互的。</p>
+</blockquote>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

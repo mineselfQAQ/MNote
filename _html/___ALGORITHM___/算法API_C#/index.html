@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>算法API_C#</title>
+  <link rel="stylesheet" href="../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>算法API_C#</BBBG></center></strong></p>
+<p>在算法中时常会遇到一些情况需要转化等操作，这里记录一下相应API</p>
+<hr>
+<hr>
+<hr>
+<h1 id="问题">问题</h1>
+<p><code>&quot;hello&lt;sp&gt;&lt;sp&gt;world&quot;.Split(&#39; &#39;)</code><br>多一个空字符串，拆分原理：<br>把分割符看成一杠即可<br><code>hello | | world</code></p>
+<hr>
+<hr>
+<hr>
+<h1 id="数组">数组</h1>
+<p>注意：string具有不变性，不能直接<code>[]</code>访问</p>
+<h2 id="string">string</h2>
+<ul>
+<li>转换<ul>
+<li><code>s.ToLower()</code></li>
+<li><code>s.ToUpper()</code></li>
+<li><code>s.Trim()</code></li>
+<li><code>s.TrimStart()</code></li>
+<li><code>s.TrimEnd()</code></li>
+</ul>
+</li>
+<li>查找<ul>
+<li><code>s.Contains(&quot;ll&quot;)</code></li>
+<li><code>s.IndexOf(&quot;l&quot;)</code></li>
+<li><code>s.LastIndexOf(&quot;l&quot;)</code></li>
+<li><code>s.StartsWith(&quot;he&quot;)</code></li>
+<li><code>s.EndsWith(&quot;lo&quot;)</code></li>
+</ul>
+</li>
+<li>截取 / 拼接<ul>
+<li><code>s.Substring(1, 3)：</code>从 index=1 开始取 3 个字符 </li>
+<li><code>s.Substring(2)：</code>从 2 到结尾</li>
+<li><code>string.Concat(s1, s2)</code></li>
+<li><code>string.Join(&quot;,&quot;, arr)</code></li>
+</ul>
+</li>
+<li>替换<ul>
+<li><code>s.Replace(&quot;l&quot;, &quot;x&quot;)</code></li>
+</ul>
+</li>
+<li>拆分<ul>
+<li><code>string[] parts = s.Split(&#39; &#39;);</code></li>
+</ul>
+</li>
+</ul>
+<h2 id="char">char</h2>
+<ul>
+<li>判断<ul>
+<li><code>char.IsLetter(c)</code></li>
+<li><code>char.IsDigit(c)</code></li>
+<li><code>char.IsLetterOrDigit(c)</code></li>
+<li><code>char.IsWhiteSpace(c)</code></li>
+<li><code>char.IsUpper(c)</code></li>
+<li><code>char.IsLower(c)</code></li>
+</ul>
+</li>
+<li>转换<ul>
+<li><code>char.ToLower(c)</code></li>
+<li><code>char.ToUpper(c)</code></li>
+</ul>
+</li>
+</ul>
+<h2 id="数组">数组</h2>
+<ul>
+<li>排序<ul>
+<li><code>Array.Sort(arr)</code>：默认升序</li>
+<li><code>Array.Reverse(arr)</code></li>
+</ul>
+</li>
+<li>拷贝<ul>
+<li><code>Array.Copy(arr1, arr2, len)</code></li>
+</ul>
+</li>
+<li>查找<ul>
+<li><code>Array.IndexOf(arr, 3)</code></li>
+</ul>
+</li>
+</ul>
+<h2 id="转换">转换</h2>
+<ul>
+<li><code>char[] arr = s.ToCharArray();</code></li>
+<li><code>string newStr = new string(arr);</code></li>
+</ul>
+<BR>
+
+<ul>
+<li><code>int num = c - &#39;0&#39;;</code>：字符 → 数字</li>
+<li><code>char ch = (char)(num + &#39;0&#39;);</code>：数字转字符</li>
+</ul>
+<BR>
+
+<ul>
+<li><code>List&lt;int&gt; list = arr.ToList();</code>（<code>using System.Linq</code>）</li>
+<li><code>int[] arr = list.ToArray();</code></li>
+</ul>
+<BR>
+
+<ul>
+<li><code>string s = x.ToString();</code></li>
+<li><code>string s = Convert.ToString(x);</code></li>
+<li><code>int x = int.Parse(s);</code></li>
+<li><code>bool ok = int.TryParse(s, out int x);</code></li>
+<li><code>int x = Convert.ToInt32(&quot;123&quot;);</code></li>
+</ul>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

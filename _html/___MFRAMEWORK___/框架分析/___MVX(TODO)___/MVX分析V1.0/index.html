@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MVX分析V1.0</title>
+  <link rel="stylesheet" href="../../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<center><b><font size=10>MVX分析</font></b></center>
+
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E5%89%8D%E8%A8%80">前言</a></li>
+<li><a href="#%E7%AE%80%E8%BF%B0">简述</a></li>
+<li><a href="#%E5%88%86%E6%9E%90">分析</a><ul>
+<li><a href="#mvc">MVC</a></li>
+<li><a href="#mvp">MVP</a></li>
+<li><a href="#mvvm">MVVM</a></li>
+<li><a href="#%E5%8C%BA%E5%88%AB">区别</a></li>
+<li><a href="#%E9%97%AE%E9%A2%98bindableproperty">问题：BindableProperty</a></li>
+<li><a href="#%E9%97%AE%E9%A2%98bindablecommand">问题：BindableCommand</a></li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<BR>
+
+<p><strong><VT>Tip：MVX指的是任意一种MV变体，即MVC/MVP/MVVM中的一种</VT></strong></p>
+<h1 id="前言">前言</h1>
+<p>既然我们是用于<strong>UI</strong>，那么我们所讨论的即<B>&quot;前端&quot;</B>的<br>简单讲述一下<strong>它们的历史</strong>：</p>
+<ul>
+<li>最早以前(web1.0)，前后端并没有分离，可以想象最原始的做法就是杂糅在一起做，但是难以维护，所以推出了后端MVC<VT>(前端V，后端M/C，所以我称为前后端MVC)</VT></li>
+<li>MVC虽然分层清晰，但是可能不够灵活，也可能数据流混乱/V庞大C单薄，依旧导致维护问题，所以推出了后端MVP</li>
+<li>MVP解决了耦合问题，但这从而导致了P的臃肿，依旧存在维护问题，所以推出了MVVM(前后端通用)</li>
+<li>MVVM是一开始提出的MVC的最终演化版</li>
+</ul>
+<h1 id="简述">简述</h1>
+<p>一般来说，我们可能听到最多的就是MVC，MVVM与MVP可能较少，但是从缩写上我们就能看出，它们具有<strong>共同点：M与V</strong><br>三者都是<VT><B>UI规范</B></VT>，只是<strong>实现细节</strong>上略有不同：</p>
+<ul>
+<li><p><strong>MVC</strong></p>
+<ul>
+<li>Model：管理数据</li>
+<li>View：负责UI显示</li>
+<li>Controller：处理用户输入，更新Model，并通知View刷新</li>
+</ul>
+<p><strong>大致流程</strong>为：<VT>用户输入，此时Controller响应(更新Model，通知View)，最终View收到回调进行更新</VT></p>
+<img src="Pic/MVC1.png" alt="" class="mnote-img mnote-img-small" data-mnote-image="1" data-kind="small" data-width="391" data-height="220">
+<img src="Pic/MVC2.png" alt="" class="mnote-img mnote-img-small" data-mnote-image="1" data-kind="small" data-width="347" data-height="305">
+
+<p>可以看到MVC是一种很<B><VT>多变</VT></B>的框架，如上图所示：</p>
+<ul>
+<li>MVC可以是简单的一组单向链</li>
+<li>MVC也可以添加各个链</li>
+</ul>
+<p>但是各有各的<strong>缺点</strong>：</p>
+<ul>
+<li>单向链逻辑清晰，但是不够灵活</li>
+<li>多向链数据流混乱</li>
+<li>两者内容集中在V中，C非常单薄(基本上就是个&quot;绑定触发器&quot;)</li>
+</ul>
+</li>
+<li><p><strong>MVP</strong> <VT>(&quot;MVC2.0&quot;)</VT></p>
+<ul>
+<li>Model：同MVC，管理数据</li>
+<li>View：仅负责显示(通过接口与Presenter交互)</li>
+<li>Presenter：处理所有业务逻辑，更新Model并控制View</li>
+</ul>
+<p><strong>大致流程</strong>为：<VT>用户输入，此时Presenter进行操作处理(更新Model，调用View接口)</VT></p>
+<img src="Pic/MVP1.png" alt="" class="mnote-img mnote-img-wide" data-mnote-image="1" data-kind="wide" data-width="459" data-height="83">
+
+<p>看图就能理解，这其实是将C的职责更加明确的形式，一切都走P，M和V不能私自沟通<br>但是这也很容易发现<strong>缺点</strong>：都走P那么<strong>P</strong>自然<B><VT>很重</VT></B></p>
+</li>
+<li><p><strong>MVVM</strong> <VT>(&quot;MVC3.0&quot;)</VT></p>
+<ul>
+<li>Model：管理数据</li>
+<li>View：绑定ViewModel的数据，自动更新</li>
+<li>ViewModel：暴露数据属性和命令(绑定到View)</li>
+</ul>
+<p><strong>大致流程</strong>为：<VT>用户输入，此时ViewModel存在某绑定数据(与View)的操作，使得Model更新，View自动更新(数据驱动)</VT></p>
+<img src="Pic/MVVM1.png" alt="" class="mnote-img mnote-img-normal" data-mnote-image="1" data-kind="normal" data-width="467" data-height="366">
+
+<p>可以发现其思路与MVP是类似的，但是<strong>极其有利的一点</strong>在于：<br><strong>数据驱动</strong>可以使VM的改变自动体现在V上，简单来说就是我们可以少一步<br>所以说可以认为MVVM是<B><VT>MVP的绑定版</VT></B></p>
+</li>
+</ul>
+<BR>
+
+<p>从上述描述中，我们能看出<strong>细微的差别</strong>：</p>
+<ul>
+<li><strong>MVC</strong>比较<VT><B>纯净</B></VT></li>
+<li><strong>MVP</strong>中<VT><B>P作为MV的唯一沟通方式</B></VT></li>
+<li><strong>MVVM</strong>使用了<VT><B>数据驱动</B></VT></li>
+</ul>
+<h1 id="分析">分析</h1>
+<p>根据前面的简述，我们其实可以知道：</p>
+<ul>
+<li>三者都是UI框架，用于使结构更加清晰</li>
+<li>MVC是初版框架，后来推出了MVP以及MVVM迭代</li>
+</ul>
+<p>所以说到底我们可以认为<strong>三者是同一种框架，只是多使用了一些额外思想</strong></p>
+<p>三者的<strong>核心</strong>：<B><VT>数据 | 表现 | 中间件</VT></B><br>大致含义就是：<strong>有数据要显示在界面上，为了能够将<VT>数据表现分离</VT>，使用一个中间件进行拆分，数据中只有数据，表现中只管表现</strong></p>
+<h2 id="mvc">MVC</h2>
+<p>MVC即基础版，它有很多变体，但是万变不离其宗，<strong>核心</strong>就是：<br><strong><VT>初始化MVC，各个模块互相触发/调用/绑定，最终使按钮具有更新Model+更新View功能</VT></strong></p>
+<p>我认为<strong>最传统</strong>的一种方式是这样的：</p>
+<pre><code class="language-csharp">public class MVC2_Main : MonoBehaviour
+{
+    private void Start()
+    {
+        HPModel model = new HPModel(100);
+        HPView view = new HPView();
+
+        HPController controller = new HPController(view, model);
+        view.Init(controller);//延迟Init
+        controller.UpdateView();//初次初始化
+    }
+}
+</code></pre>
+<p>作为一个框架，<B>入口(即MVC2_Main.cs)</B>还是需要有的，然后在其中进行对MVC的初始化即可<br>更核心的即内部逻辑关系，大概有：</p>
+<ul>
+<li><code>M</code>提供数据，并提供用于更改数据的函数</li>
+<li><code>V</code>提供视图控件，如text提供更改函数，如btn进行绑定</li>
+<li><code>C</code>对<code>M</code> <code>V</code>进行封装，封装的函数会用于绑定btn或直接调用</li>
+</ul>
+<p>可以发现总的来说还是<strong>非常清晰</strong>的框架</p>
+<p><strong>传统版问题：</strong><br>对于<code>V</code>与<code>C</code>来说是<B><DRD>互相引用</DRD></B>的，而且由于是纯C#，目前使用了延迟初始化<code>V</code>来解决这一问题，相互引用必然是不好的一件事</p>
+<p><strong>变体点：</strong></p>
+<ul>
+<li><strong><code>M</code>可以添加回调事件优化<code>V</code>更新机制</strong><br><code>public event Action&lt;int&gt; OnHPChanged;</code><br>这样的话多了绑定，但是在执行函数时会自动触发<code>V</code>更新</li>
+<li><strong>添加单例</strong><br>是否添加具体要单例基于实际情况判断：<ul>
+<li><VT>存在多实例情况</VT><br>对于HPModel来说，实际上是不应该使用单例的，因为无论是敌人还是主角，只要是一个实体都需要有属于自己的HPModel<br>而对于ConfigModel，则只可能存在一份</li>
+<li><VT>需要单元测试</VT></li>
+</ul>
+</li>
+<li><strong><code>V</code>/<code>C</code>使用MonoBehaviour</strong><br><code>C</code>使用的话相当于优化掉了MVC2_Main.cs，文件更少但是相对逻辑不够清晰<br><code>V</code>使用的话控件获取有更简单的方式<br>主要的话就是具有了Unity生命周期，在某些方面自然会更简单，如：<ul>
+<li>绑定很轻松(Start绑定，OnDestroy解绑)</li>
+<li><code>C</code> <code>V</code>同时使用V可直接获取C，C也可直接获取V<br>相对的，在<code>C</code> <code>V</code>同时使用会需要挂载2个组件，而且挂载<code>C</code> <code>V</code>逻辑上没有<code>Main</code>合理</li>
+</ul>
+</li>
+</ul>
+<h2 id="mvp">MVP</h2>
+<p>MVP在MVC的基础上更新了<B>职能分配：<VT><code>P</code>作为唯一中间件建立<code>M</code> <code>V</code>之间的联系</VT></B><br>以下<code>P</code>代码即MVP的<strong>核心</strong>：</p>
+<pre><code class="language-csharp">public class HPPresenter
+{
+    private HPModel _hpModel;
+    private HPView _hpView;
+
+    public HPPresenter(HPModel model, HPView view) 
+    {
+        _hpModel = model;
+        _hpView = view;
+
+        _hpView._btnAttack.onClick.AddListener(() =&gt; 
+        { 
+            _hpModel.TakeDamage(10);
+            _hpView.UpdateHPDisplay(_hpModel.CurrentHP, _hpModel.MaxHP);
+        });
+        _hpView._btnHeal.onClick.AddListener(() =&gt; 
+        {
+            _hpModel.Heal(10);
+            _hpView.UpdateHPDisplay(_hpModel.CurrentHP, _hpModel.MaxHP);
+        });
+    }
+
+    public void UpdateView()
+    {
+        _hpView.UpdateHPDisplay(_hpModel.CurrentHP, _hpModel.MaxHP);
+    }
+}
+</code></pre>
+<p>可以看到区别有且只有<strong>将绑定转移到了<code>P</code>中</strong>，但是带来的效果是显而易见的：<br><strong>互相引用情况消失了，而且管理逻辑非常清晰</strong><br>但是带来的后果就是<code>P</code>需要负责所有内容，可以看到无论是<code>M</code>的函数还是<code>V</code>的函数，这里基本都需要重复封装或调用，<B><DRD>极其重</DRD></B></p>
+<h2 id="mvvm">MVVM</h2>
+<p>MVVM又在MVP的基础上添加了绑定，绑定有2组：</p>
+<ul>
+<li><code>M</code>与<code>VM</code>的绑定，M的数据被拷贝了一份到VM上进行操作，两者进行双向绑定</li>
+<li><code>V</code>与<code>VM</code>的绑定，其实指的就是数据驱动(数据一旦改变，进行回调以更新视图)</li>
+</ul>
+<p>与MVP一样，代码其实还是集中在VM上：</p>
+<pre><code class="language-csharp">public class HPViewModel
+{
+    private HPModel _hpModel;
+    private HPView _hpView;
+
+    public BindableProperty&lt;int&gt; CurrentHP = new BindableProperty&lt;int&gt;();
+    public BindableProperty&lt;int&gt; MaxHP = new BindableProperty&lt;int&gt;();
+
+    public HPViewModel(HPModel model, HPView view)
+    {
+        _hpModel = model;
+        _hpView = view;
+
+        //M&lt;---&gt;VM
+        _hpModel.OnHPChanged += OnHPChanged;
+        //VM&lt;---&gt;V
+        CurrentHP.OnValueChanged += UpdateView;
+
+        _hpView.OnAttackClicked += () =&gt; _hpModel.TakeDamage(10);
+        _hpView.OnHealClicked += () =&gt; _hpModel.Heal(10);
+
+        MaxHP.Value = _hpModel.MaxHP;
+        CurrentHP.Value = _hpModel.CurrentHP;
+    }
+
+    public void Exit()
+    {
+        _hpModel.OnHPChanged -= OnHPChanged;
+        CurrentHP.OnValueChanged -= UpdateView;
+    }
+
+    private void UpdateView(int hp)
+    {
+        _hpView.UpdateHPDisplay(hp, MaxHP.Value);
+    }
+
+    private void OnHPChanged(int hp)
+    {
+        CurrentHP.Value = hp;
+    }
+}
+</code></pre>
+<p>可以发现一个很大的<strong>区别</strong>就是：<VT>btn绑定中无需手动触发View更新，绑定后自动触发</VT><br>可以发现绑定的机制是<strong>非常精妙</strong>的：</p>
+<ul>
+<li>btn以更新M数据，M绑定后又可更新VM数据，从而M与VM的双向绑定</li>
+<li>VM数据一旦更新，由于VM绑定的原因又可自动更新V，从而实现VM与V的双向绑定</li>
+</ul>
+<p>所以MVVM做到了触发后<B><code>M</code>/<code>VM</code>/<code>V</code>三者同时自动更新</B>的优点</p>
+<p><strong>变体点：</strong></p>
+<ul>
+<li>btn绑定可以在<code>VM</code>中进行(上述<strong>事件</strong>方式)，也可以使用<strong>命令模式</strong>直接转移至<code>V</code>中<br>观察下方代码会发现区别极小，只是一点细节差别</li>
+</ul>
+<BR>
+
+<pre><code class="language-csharp">//方式1：在VM中注册注册回调，在V中绑定
+//VM---注册
+_hpView.OnAttackClicked += () =&gt; _hpModel.TakeDamage(10);
+_hpView.OnHealClicked += () =&gt; _hpModel.Heal(10);
+//V---绑定
+_btnAttack.onClick.AddListener(() =&gt; OnAttackClicked?.Invoke());
+_btnHeal.onClick.AddListener(()=&gt; OnHealClicked?.Invoke());
+
+//方式2：在VM中提供命令，在V中绑定
+//VM---编写命令
+AttackCommand = new BindableCommand(() =&gt; TakeDamage(10));
+HealCommand = new BindableCommand(() =&gt; Heal(10));
+//V---绑定
+_btnAttack.onClick.AddListener(() =&gt; { _hpViewModel.AttackCommand.Execute(); });
+_btnHeal.onClick.AddListener(() =&gt; { _hpViewModel.HealCommand.Execute(); });
+</code></pre>
+<h2 id="区别">区别</h2>
+<p>根据前面的分析，可以得知三者的差距不大，只是代码位置或设计模式的区别：</p>
+<ul>
+<li>三者的<strong>内容点是完全相同</strong>的：<br>有<code>M</code>有<code>V</code>，<code>C</code>/<code>P</code>/<code>VM</code>用来沟通</li>
+<li>MVC较随意，MVP中P具有严格的中间件职责，MVVM额外进行绑定</li>
+</ul>
+<h2 id="问题bindableproperty">问题：BindableProperty</h2>
+<p>在MVVM的绑定中，<strong>BindableProperty</strong>起到了非常重要的作用，代码如下：</p>
+<pre><code class="language-csharp">public class BindableProperty&lt;T&gt;
+{
+    private T _value;
+
+    public T Value
+    {
+        get =&gt; _value;
+        set
+        {
+            if (!Equals(_value, value))
+            {
+                _value = value;
+                OnValueChanged?.Invoke(value);
+            }
+        }
+    }
+
+    public Action&lt;T&gt; OnValueChanged;
+}
+</code></pre>
+<p>可以看到经典的组合：<strong>私有字段+公开属性</strong><br>该类型在此基础上<B><VT>额外添加了set事件回调</VT></B><br>该类型很重要，也是MVVM相对MVC/MVP的核心改动，我们可以注意到一个结论：</p>
+<ul>
+<li><p><strong><VT>BindableProperty字段其实是Model字段的一个拷贝</VT></strong><br>这也是<strong>双侧双向绑定</strong>的关键：</p>
+<ul>
+<li>Model字段的事件回调把<code>M</code>与<code>VM</code>联系了起来(<code>M</code>字段通知<code>VM</code>字段更新)</li>
+<li>BindableProperty字段的事件回调把<code>VM</code>与<code>V</code>联系了起来(<code>VM</code>字段通知更新<code>V</code>视图)</li>
+</ul>
+</li>
+</ul>
+<h2 id="问题bindablecommand">问题：BindableCommand</h2>
+<p>根据前面所述，命令模式是一种很好的代码位置转换的工具，代码如下：</p>
+<pre><code class="language-csharp">//Tip：同时存在泛型版本BindableCommand&lt;T&gt;(实现一致)
+public class BindableCommand : IDisposable
+{
+    private readonly Action _execute;
+    private readonly Func&lt;bool&gt; _canExecute;
+    public event Action OnCanExecuteChanged;
+
+    public BindableCommand(Action execute, Func&lt;bool&gt; canExecute = null)
+    {
+        _execute = execute;
+        _canExecute = canExecute;
+    }
+
+    public bool CanExecute() =&gt; _canExecute?.Invoke() ?? true;
+    public void Execute() =&gt; _execute?.Invoke();
+
+    /// &lt;summary&gt;
+    /// 通知UI刷新(注意：仅刷新，需在UI侧调用CanExecute()判断是否可刷新)
+    /// &lt;/summary&gt;
+    public void RaiseCanExecuteChanged() =&gt; OnCanExecuteChanged?.Invoke();
+
+    public void Dispose() =&gt; OnCanExecuteChanged = null;
+}
+</code></pre>
+<p><strong>代码逻辑</strong>十分清晰：</p>
+<ul>
+<li>需要执行命令时调用<code>Execute()</code></li>
+<li>需要更新UI时先调用<code>CanExecute()</code>判断是否可调用，然后调用<code>RaiseCanExecuteChanged()</code></li>
+</ul>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

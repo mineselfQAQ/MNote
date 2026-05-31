@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>设计模式</title>
+  <link rel="stylesheet" href="../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p>﻿# 设计模式</p>
+<hr>
+<h2 id="背景与目标">背景与目标</h2>
+<p>本笔记用于快速了解常见设计原则、23 种 GoF 设计模式的分类与名称，作为后续系统学习的索引。</p>
+<hr>
+<h2 id="概览">概览</h2>
+<p>设计模式总体来说有：</p>
+<ul>
+<li>7 大设计原则（5 大 --- SOILD）</li>
+<li>23 种设计模式</li>
+</ul>
+<hr>
+<h2 id="不常听说的原则">不常听说的原则</h2>
+<ul>
+<li>DRY 原则 --- 避免代码重复，Don&#39;t repeat yourself</li>
+<li>KISS 原则 --- 保持简单，Keep it simple, stupid</li>
+<li>YAGNI 原则 --- 不要实现当前不需要的功能，You aren&#39;t gonna need it</li>
+</ul>
+<hr>
+<h2 id="23-种设计模式">23 种设计模式</h2>
+<h3 id="创建型5">创建型（5）</h3>
+<ul>
+<li>单例模式（Singleton）</li>
+<li>工厂方法模式（Factory Method）</li>
+<li>抽象工厂模式（Abstract Factory）</li>
+<li>建造者模式（Builder）</li>
+<li>原型模式（Prototype）</li>
+</ul>
+<h3 id="结构型7">结构型（7）</h3>
+<ul>
+<li>适配器模式（Adapter）</li>
+<li>桥接模式（Bridge）</li>
+<li>组合模式（Composite）</li>
+<li>装饰器模式（Decorator）</li>
+<li>外观模式（Facade）</li>
+<li>享元模式（Flyweight）</li>
+<li>代理模式（Proxy）</li>
+</ul>
+<h3 id="行为型11">行为型（11）</h3>
+<ul>
+<li>责任链模式（Chain of Responsibility）</li>
+<li>命令模式（Command）</li>
+<li>解释器模式（Interpreter）</li>
+<li>迭代器模式（Iterator）</li>
+<li>中介者模式（Mediator）</li>
+<li>备忘录模式（Memento）</li>
+<li>观察者模式（Observer）</li>
+<li>状态模式（State）</li>
+<li>策略模式（Strategy）</li>
+<li>模板方法模式（Template Method）</li>
+<li>访问者模式（Visitor）</li>
+</ul>
+<hr>
+<h2 id="一些反模式">一些反模式</h2>
+<ul>
+<li>Spaghetti Code --- 像面条一样的代码（混乱）</li>
+<li>Golden Hammer --- 像思维定势一样使用某些方法 / 设计原则（学会就嗯用）</li>
+<li>God Class --- 像神一样，万能类（单一职责原则的反向）</li>
+<li>过早优化 --- 不关键的地方不断地优化修改（一种资源浪费）</li>
+</ul>
+<hr>
+<h2 id="一种说法">一种说法</h2>
+<ul>
+<li>对于代码格式规范，100% 严格执行，严重容不得一点沙。</li>
+<li>文件绝不能超过 800 行，超过，一定要思考怎么拆文件。工程思维，就在于拆文件的时候积累。</li>
+<li>函数对决不能超过 80 行，超过，一定要思考怎么拆函数，思考函数分组，层次。工程思维，就在于拆文件的时候积累。</li>
+<li>代码嵌套层次不能超过 4 层，超过了就得改。多想想能不能 early return。工程思维，就在于拆文件的时候积累。</li>
+<li>个人认为还应该具体情况具体分析，大概需要有一个限度，但是如果拆分没有意义那就不拆</li>
+</ul>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

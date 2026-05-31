@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>7_携程</title>
+  <link rel="stylesheet" href="../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><T>7_携程</T></center></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#lua%E6%90%BA%E7%A8%8B">Lua携程</a><ul>
+<li><a href="#%E5%87%BD%E6%95%B0%E7%AE%80%E8%BF%B0">函数简述</a></li>
+<li><a href="#%E7%89%B9%E6%80%A7">特性</a></li>
+<li><a href="#%E4%BE%8B%E5%AD%90">例子</a><ul>
+<li><a href="#%E7%94%9F%E6%88%90%E8%80%85-%E6%B6%88%E8%B4%B9%E8%80%85%E6%A8%A1%E5%BC%8F">生成者-消费者模式</a></li>
+<li><a href="#%E8%BF%AD%E4%BB%A3%E5%99%A8%E6%90%BA%E7%A8%8B%E7%89%88">迭代器携程版</a><ul>
+<li><a href="#warp">warp</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E4%BA%8B%E4%BB%B6%E9%A9%B1%E5%8A%A8">事件驱动</a><ul>
+<li><a href="#%E5%BC%82%E6%AD%A5io%E5%BA%93%E7%9A%84%E7%AE%80%E5%8D%95%E5%AE%9E%E7%8E%B0">异步IO库的简单实现</a></li>
+<li><a href="#%E4%BD%BF%E7%94%A8%E5%AE%9E%E4%BE%8B%E8%BE%93%E5%85%A5%E6%B5%81%E8%BE%93%E5%87%BA%E6%B5%81">使用实例：输入流输出流</a><ul>
+<li><a href="#%E5%90%8C%E6%AD%A5%E5%AE%9E%E7%8E%B0">同步实现</a></li>
+<li><a href="#%E5%BC%82%E6%AD%A5%E5%AE%9E%E7%8E%B0">异步实现</a></li>
+<li><a href="#%E5%90%8C%E6%AD%A5%E4%B8%8E%E5%BC%82%E6%AD%A5%E5%88%86%E6%9E%90">同步与异步分析</a></li>
+</ul>
+</li>
+<li><a href="#%E5%BC%82%E6%AD%A5%E6%A8%A1%E6%8B%9F%E5%90%8C%E6%AD%A5">异步模拟同步</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<p>携程是一个非常常见的概念，在Unity中同样具有这个概念，只是Unity是通过特殊的方法(利用迭代器的黑科技)完成，Lua是内置的而已</p>
+<h1 id="lua携程">Lua携程</h1>
+<p><strong><GN>携程</GN>---<VT>任意时刻只能运行一个协同程序</VT></strong></p>
+<p>在Lua中，携程是由<GN><B>coroutine</B></GN>库所提供的<br>在其中，最关键的就是<strong>携程状态</strong>：</p>
+<ul>
+<li>挂起suspended</li>
+<li>运行running</li>
+<li>死亡dead</li>
+<li>正常normal</li>
+</ul>
+<BR>
+
+<p>除此以外，Lua携程使用的是<strong>非对称携程</strong>：<br><strong><GN>非对称携程Asymmertric Coroutine</GN>---<VT>提供了2个函数控制携程执行(yield/resume)</VT></strong><br><strong><GN>对称携程Symmetric Coroutine</GN>---<VT>只提供一个函数用于携程切换</VT></strong></p>
+<h2 id="函数简述">函数简述</h2>
+<ul>
+<li>创建<code>coroutine.create()</code></li>
+<li>检查<code>coroutine.status()</code></li>
+<li>启动<code>coroutine.resume()</code></li>
+<li>挂起<code>coroutine.yield()</code></li>
+<li>封装<code>coroutine.wrap()</code></li>
+</ul>
+<p>可以用一个<strong>简单的例子</strong>看一下，大概干了什么：</p>
+<pre><code class="language-lua">co = coroutine.create(function() print(&quot;hi&quot;) end)
+print(co) -- thread: 0x?????
+
+print(coroutine.status(co)) -- suspended
+coroutine.resume(co) -- hi
+
+print(coroutine.status(co)) -- dead，即执行完后就死了
+</code></pre>
+<p>在携程中，核心操作和Unity的一致，为<B><code>yield()</code></B>，其大致含义可以理解为<VT><B>在此处暂停，<code>resume()</code>后恢复</B><VT>：</p>
+<pre><code class="language-lua">co = coroutine.create(function()
+    for i=1,10 do
+        print(&quot;co&quot;, i)
+        coroutine.yield()
+    end
+end)
+
+coroutine.resume(co) -- co 1，即执行到第一个yield
+print(coroutine.status(co)) -- suspended，即又挂起了
+coroutine.resume(co) -- co 2
+coroutine.resume(co) -- co 3
+...
+coroutine.resume(co) -- co 10
+coroutine.resume(co) -- 不打印，此时执行完毕
+
+print(coroutine.resume(co)) -- false 错误信息，因为已经dead了
+</code></pre>
+<h2 id="特性">特性</h2>
+<p><strong><VT>特性：<code>resume()</code>是在<GN>保护模式</GN>下运行的</VT></strong></p>
+<pre><code class="language-lua">local co = coroutine.create(function()
+    print(&quot;协程开始&quot;)
+    someNonexistentFunction() -- 该函数会报错
+    print(&quot;这行不会执行&quot;) -- 由于保护模式，这里不会执行
+end)
+
+local success, errorMsg = coroutine.resume(co) -- 会返回错误信息
+
+if not success then
+    print(&quot;协程出错了，错误信息是:&quot;, errorMsg)
+else
+    print(&quot;协程执行成功&quot;)
+end
+</code></pre>
+<p><strong><VT>特性：<code>resume()</code>与<code>yield()</code>会交换数据</VT></strong></p>
+<pre><code class="language-lua">-- resume带数据进
+co = coroutine.create(function(a,b,c)
+    print(&quot;co&quot;,a,b,c)
+end)
+coroutine.resume(co,1,2,3) -- co 1 2 3 (是print的输出)
+
+-- resume带数据进，yield返回数据
+co = coroutine.create(function(a,b)
+    coroutine.yield(a+b, a-b)
+end)
+print(coroutine.resume(co,20,10)) -- true 30 10 (是yield()的返回值)
+
+-- resume带数据进，yield返回数据
+co = coroutine.create(function()
+    print(&quot;co&quot;, coroutine.yield())
+end)
+print(coroutine.resume(co)) -- true (卡在print执行前，由resume返回了true)
+print(coroutine.resume(co,4,5)) -- co 4 5 | true (yield带入数据4与5，执行print，携程结束，由resume返回true)
+
+-- resume还可以带数据出
+co = coroutine.create(function()
+    return 6,7
+end)
+print(coroutine.resume(co)) -- true 6 7
+</code></pre>
+<p><strong><VT>特性：当携程A唤醒携程B时，A进入特殊状态normal</VT></strong><br>由于携程是可以自由切换的，即在coA运行的时候进行<code>coroutine.resume(coB)</code>，那么此时coA既不是suspended状态，也不是running状态(更不是dead状态)，而是一种<strong>normal状态</strong>，简单来说就是：<VT>携程被卡在一半不继续进行了</VT></p>
+<h2 id="例子">例子</h2>
+<h3 id="生成者-消费者模式">生成者-消费者模式</h3>
+<p>简单来说，大概会是这样：</p>
+<pre><code class="language-lua">function producer()
+    while true do
+        local x = io.read()    -- 生产的值
+        send(x)                -- 发送给消费者
+    end
+end
+
+function consumer()
+    while true do
+        local x = receive()    -- 从生产者接收值
+        io.write(x, &quot;\n&quot;)      -- 消费者的值
+    end
+end
+</code></pre>
+<p>对于这种模式，存在一个<strong>问题：谁具有主循环</strong><br>我们可以很明显地看到，两个函数都是while循环，当然，<VT>在这种情况下是无法正确运行的，在没有多线程的情况下我们必然无法同时存在2个while循环</VT><br>此时，我们有以下几种<strong>解决方案</strong>：</p>
+<ul>
+<li>拆开一个函数，将其写入另一个函数---结构变动，导致情况更复杂</li>
+<li><strong>使用携程</strong></li>
+</ul>
+<BR>
+
+<pre><code>``` lua
+-- 消费者驱动模式 consumer-driven
+function receive()
+    local status, value = coroutine.resume(producer)
+    return value
+end
+
+function send(x)
+    coroutine.yield(x)
+end
+
+producer = coroutine.create(
+function()
+    while true do
+        local x = io.read()    -- 产生新值
+        send(x)
+    end
+end)
+```
+
+``` lua
+-- 扩展：添加过滤器
+function receive(prod)
+    local status, value = coroutine.resume(prod)
+    return value
+end
+
+function send(x)
+    coroutine.yield(x)
+end
+
+function producer()
+    return coroutine.create(function()
+        while true do
+            local x = io.read()    -- 产生新值
+            send(x)
+        end
+    end)
+end
+
+-- 过滤器可以提供中介的作用，进行一些额外处理
+function filter(prod)
+    return coroutine.create(function()
+        for line = 1, math.huge do
+            local x = receive(prod)    -- 获取新值
+            x = string.format(&quot;%5d %s&quot;, line, x)
+            send(x)    -- 将新值发送给消费者
+        end
+    end)
+end
+
+function consumer(prod)
+    while true do
+        local x = receive(prod)    -- 获取新值
+        io.write(x, &quot;\n&quot;)          -- 消费新值
+    end
+end
+
+--[[
+p = producer()
+f = filter(p)
+consumer(f)
+--]]
+consumer(filter(producer()))
+```
+</code></pre>
+<p><strong>逻辑：</strong></p>
+<ul>
+<li>producer()是一个携程，filter()也是一个携程</li>
+<li>入口为consumer()，需要做的就是开始filter携程<ul>
+<li>首先line=1，receive()开启了producer携程<ul>
+<li>producer携程会读取一个值并由yield传出</li>
+</ul>
+</li>
+<li>x(filter携程中)被设置为生产值，通过yeild返回(即发送给consumer)</li>
+</ul>
+</li>
+<li>x(consumer函数中)被设置为生产值，输出该值</li>
+</ul>
+<h3 id="迭代器携程版">迭代器(携程版)</h3>
+<p>以<strong>排列组合算法</strong>为例：</p>
+<pre><code class="language-lua">function permgen(a, n)
+    n = n or #a
+    if n &lt;= 1 then
+        printResult(a)
+    else
+        for i=1,n do
+            a[n], a[i] = a[i], a[n]
+            permgen(a, n - 1)
+            a[n], a[i] = a[i], a[n]
+        end
+    end
+end
+
+function printResult(a)
+    for i=1, #a do
+        io.write(a[i], &quot; &quot;)
+    end
+    io.write(&quot;\n&quot;)
+end
+
+permgen({1,2,3,4})
+</code></pre>
+<p>该算法可以使用<strong>携程迭代器</strong>来完成：</p>
+<pre><code class="language-lua">-- 算法：输出所有的排列组合
+function permgen(a, n)
+    n = n or #a
+    if n &lt;= 1 then
+        coroutine.yield(a) -- 更改为yield
+    else
+        for i=1,n do
+            a[n], a[i] = a[i], a[n]
+            permgen(a, n - 1)
+            a[n], a[i] = a[i], a[n]
+        end
+    end
+end
+
+function printResult(a)
+    for i=1, #a do
+        io.write(a[i], &quot; &quot;)
+    end
+    io.write(&quot;\n&quot;)
+end
+
+function permutations(a)
+    local co = coroutine.create(function ()
+        permgen(a)
+    end)
+    return function ()
+        -- 迭代器无限执行
+        local code, res = coroutine.resume(co)
+        return res
+    end
+end
+
+for p in permutations{&quot;a&quot;, &quot;b&quot;, &quot;c&quot;} do
+    printResult(p)
+end
+</code></pre>
+<h4 id="warp">warp()</h4>
+<p><code>permutations()</code>非常常用，所以Lua提供了<strong>便捷方法<code>coroutine.wrap()</code>：</strong></p>
+<pre><code class="language-lua">function permutations(a)
+    return coroutine.wrap(function ()
+        permgen(a)
+    end)
+end
+</code></pre>
+<p><strong><DRD>缺点：缺乏灵活性，无法检查wrap创建的携程的状态已经运行时的错误</DRD></strong></p>
+<h2 id="事件驱动">事件驱动</h2>
+<p>事件驱动的<strong>核心逻辑</strong>为：<strong><VT>外部实体向程序的<GN>事件循环event loop</GN>或<GN>运行循环run loop</GN>生成事件</VT></strong></p>
+<h3 id="异步io库的简单实现">异步IO库的简单实现</h3>
+<p>如果想使用<strong>异步IO库</strong>，我们可能有如下代码：</p>
+<pre><code class="language-lua">lib.runloop() -- 事件循环(主循环)
+lib.readline(stream, callback)
+lib.writeline(stream, line, callback)
+lib.stop()
+</code></pre>
+<p>我们可能可以这样实现：</p>
+<pre><code class="language-lua">local cmdQueue = {} -- 挂起操作的队列
+
+local lib = {}
+
+function lib.readline(stream, callback)
+    local nextCmd = function()
+        callback(stream:read())
+    end
+    table.insert(cmdQueue, nextCmd)
+end
+
+function lib.writeline(stream, line, callback)
+    local nextCmd = function()
+        callback(stream:write(line))
+    end
+    table.insert(cmdQueue, nextCmd)
+end
+
+function lib.stop()
+    table.insert(cmdQueue, &quot;stop&quot;)
+end
+
+function lib.runloop()
+    while true do
+        local nextCmd = table.remove(cmdQueue, 1)
+        if nextCmd == &quot;stop&quot; then
+            break
+        else
+            nextCmd() -- 进行下一个操作
+        end
+    end
+end
+
+return lib
+</code></pre>
+<h3 id="使用实例输入流输出流">使用实例：输入流输出流</h3>
+<h4 id="同步实现">同步实现</h4>
+<p>对于输入字符串，输出字符串的简单情况，最简单的方式必然是<strong>同步实现</strong>：<br>即<VT><B>先读完，然后一次性输出</B></VT></p>
+<pre><code class="language-lua">local t = {}
+
+local imp = io.input() -- 输入流
+local out = io.output() -- 输出流
+
+for line in imp:lines() do
+    t[#t + 1] = line
+end
+
+for i = #t, 1, -1 do
+    out:write(t[i], &quot;\n&quot;)
+end
+</code></pre>
+<h4 id="异步实现">异步实现</h4>
+<p>可以通过我们的异步IO库进行<strong>重写</strong>：</p>
+<pre><code class="language-lua">local lib = require &quot;async-lib&quot; -- 我们的异步IO库
+
+local t = {} -- buffer
+local imp = io.input()
+local out = io.output()
+local i -- buffer索引
+
+-- 写入行的事件处理函数
+local function putline()
+    i = i - 1
+    if i == 0 then
+        lib.stop()
+    else
+        lib.writeline(out, t[i] .. &quot;\n&quot;, putline)
+    end
+end
+
+-- 读取行的事件处理函数
+local function getline(line)
+    if line then
+        t[#t + 1] = line
+        lib.readline(imp, getline)
+    else
+        i = #t + 1
+        putline()      -- 开始写入行
+    end
+end
+
+lib.readline(imp, getline) -- 读取第一行
+lib.runloop() -- 运行主循环
+</code></pre>
+<p><strong><VT>核心：一旦开始执行，则会无限创建新命令</VT></strong><br><VT>在上述情况下，先<code>readline()</code>收集了一条cmd，一旦执行<code>runloop()</code>，就会执行该输入cmd，而输入cmd中又会调用<code>lib.readline()</code>或<code>putline()</code>(也就是<code>lib.writeline()</code>)，则会无限创建新的cmd</VT></p>
+<h4 id="同步与异步分析">同步与异步分析</h4>
+<ul>
+<li>同步---简单地分为两步：读取，读取后输出</li>
+<li>异步---核心为<code>lib.runloop()</code>，即隐藏在函数中的主事件循环，在这种事件驱动模式下，IO操作通过回调函数(这里是<code>getline()</code>/<code>putline()</code>)异步处理</li>
+</ul>
+<p><strong>对比同步异步</strong>，我们会发现：<br>异步将输入输出转换为了2种命令(<code>getline()</code>/<code>putline()</code>)，即<GN><B>CPS(Continuation-Passing Style，后续传递风格)</B></GN><br><DRD><B>缺点：&quot;不能&quot;使用循环，&quot;只能&quot;使用递归</B></DRD><VT>(循环是可以的，但是根据上述情况来看，循环会导致中断)</VT></p>
+<h3 id="异步模拟同步">异步模拟同步</h3>
+<p>前面我们见到了2种方式，即同步与异步，它们各自有各自的<DRD><B>缺点</B></DRD>：</p>
+<ul>
+<li><strong>同步</strong>---堵塞式，会导致<VT>线程挂起无法处理其它操作</VT></li>
+<li><strong>异步</strong>---递归会导致<VT>多层嵌套，代码不清晰</VT></li>
+</ul>
+<p>所以可以使用<strong>异步模拟同步</strong>，获得更好的效果：</p>
+<pre><code class="language-lua">local lib = require &quot;async-lib&quot;
+
+-- 运行主函数
+function run(code)
+    -- 创建一个协程来执行用户代码
+    local co = coroutine.wrap(function()
+        code()
+        lib.stop() -- 结束时停止事件循环
+    end)
+    co() -- 启动协程
+
+    lib.runloop() -- 启动事件循环
+end
+
+-- 向流中写入一行数据
+function putline(stream, line)
+    local co = coroutine.running() -- 获取当前运行的协程
+    local callback = (function() 
+        coroutine.resume(co) 
+    end)
+    
+    -- 异步写入行，完成后调用回调恢复协程
+    lib.writeline(stream, line, callback)
+    coroutine.yield() -- 挂起当前协程
+end
+
+-- 从流中读取一行数据
+function getline(stream)
+    local co = coroutine.running() -- 获取当前运行的协程
+    local callback = (function(l) 
+        coroutine.resume(co, l) 
+    end)
+    
+    -- 异步读取行，完成后调用回调恢复协程并传递结果
+    lib.readline(stream, callback)
+    local line = coroutine.yield() -- 挂起当前协程并等待恢复时传入的值
+    return line
+end
+</code></pre>
+<pre><code class="language-lua">run(function()
+    local t = {}  -- 创建一个空表来存储读取的行
+    local inp = io.input()  -- 获取标准输入流
+    local out = io.output()  -- 获取标准输出流
+
+    -- 循环读取所有输入行
+    while true do
+        local line = getline(inp)  -- 异步读取一行
+        
+        if not line then  -- 如果读到nil（EOF），结束循环
+            break 
+        end
+        
+        t[#t + 1] = line  -- 将行添加到表中
+    end
+
+    -- 逆序输出所有行
+    for i = #t, 1, -1 do
+        putline(out, t[i] .. &quot;\n&quot;)  -- 异步写入行（添加换行符）
+    end
+end)
+</code></pre>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

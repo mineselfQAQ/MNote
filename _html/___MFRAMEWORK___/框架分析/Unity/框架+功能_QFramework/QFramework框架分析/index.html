@@ -1,0 +1,1630 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QFramework框架分析</title>
+  <link rel="stylesheet" href="../../../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>QFramework框架分析</BBBG></center></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E7%AE%80%E8%BF%B0">简述</a><ul>
+<li><a href="#%E7%AE%80%E6%98%93%E5%88%86%E6%9E%90">简易分析</a></li>
+<li><a href="#uml%E7%B1%BB%E5%9B%BE%E5%88%86%E6%9E%90">UML类图分析</a></li>
+</ul>
+</li>
+<li><a href="#%E6%A1%86%E6%9E%B6">框架</a><ul>
+<li><a href="#%E6%A1%86%E6%9E%B6%E5%AF%B9%E6%AF%94">框架对比</a></li>
+<li><a href="#%E6%A1%86%E6%9E%B6%E5%88%86%E6%9E%90">框架分析</a><ul>
+<li><a href="#%E6%8E%A5%E5%8F%A3%E8%A7%84%E5%88%99">接口(规则)</a></li>
+<li><a href="#architecture">Architecture</a><ul>
+<li><a href="#ioccontainer">IOCContainer</a></li>
+</ul>
+</li>
+<li><a href="#controller%E4%B8%8Emodel">Controller与Model</a><ul>
+<li><a href="#controller">Controller</a></li>
+<li><a href="#model">Model</a><ul>
+<li><a href="#event">Event</a><ul>
+<li><a href="#event%E5%88%86%E6%9E%90">Event分析</a></li>
+<li><a href="#event%E6%80%BB%E7%BB%93">Event总结</a></li>
+<li><a href="#model%E4%B8%AD%E7%9A%84event">Model中的Event</a></li>
+</ul>
+</li>
+<li><a href="#bindableproperty">BindableProperty</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#command">Command</a></li>
+<li><a href="#utility%E4%B8%8Esystem">Utility与System</a><ul>
+<li><a href="#utility">Utility</a></li>
+<li><a href="#system">System</a></li>
+</ul>
+</li>
+<li><a href="#query">Query</a></li>
+<li><a href="#architecture%E8%AF%A6%E8%BF%B0">Architecture详述</a><ul>
+<li><a href="#architecture%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96">Architecture的初始化</a></li>
+<li><a href="#%E7%B3%BB%E7%BB%9F%E7%BB%84%E4%BB%B6">系统组件</a></li>
+<li><a href="#%E6%89%A7%E8%A1%8C%E7%BB%84%E4%BB%B6">执行组件</a></li>
+<li><a href="#%E8%A7%84%E5%88%99%E8%AF%A6%E8%BF%B0">规则详述</a><ul>
+<li><a href="#%E7%BB%84%E4%BB%B6%E8%A7%84%E5%88%99">组件规则</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<!-- TOC -->
+
+<h1 id="简述">简述</h1>
+<p>QFramework是一个<strong>体量比较适中</strong>的框架，相比SKCell这种纯功能框架，QFramework<B><VT>指定了一定的框架规范使得项目体量变大时依旧能很好地管理</B></VT></p>
+<h2 id="简易分析">简易分析</h2>
+<p>可以先看一下QFramework在Unity的层级目录：<br><img src="Pic/QFramework.png" alt="" class="mnote-img mnote-img-small" data-mnote-image="1" data-kind="small" data-width="168" data-height="273"><br>显然结构可以分为2部分：</p>
+<ul>
+<li><strong>Framework</strong>，即<B><VT>框架部分</B></VT><br>仅1个脚本，共不到1000行代码，非常简短(因为说到底就是一些基础规范)</li>
+<li><strong>Toolkits</strong>，即<B><VT>功能部分</B></VT></li>
+</ul>
+<p>本篇将会详细分析<strong>QFramework脚本</strong>中的内容</p>
+<h2 id="uml类图分析">UML类图分析</h2>
+<p>这里尝试制作了<strong>UML类图</strong>来进行归纳总结：<br><img src="Pic/QFramework_UML.png" alt="" class="mnote-img mnote-img-large" data-mnote-image="1" data-kind="large" data-width="13776" data-height="13176"></p>
+<h1 id="框架">框架</h1>
+<p>框架是极其重要的，有好的框架无论是对个人还是团队都能提升开发效率</p>
+<h2 id="框架对比">框架对比</h2>
+<p>这里先按着QFramework的<strong>QFramework v1.0 使用指南</strong>进行对比：</p>
+<p><strong><YL>以一个计数器应用为例：</YL></strong><br><strong>不应用框架</strong>是这样的：</p>
+<pre><code class="language-csharp">// Controller
+public class CounterAppController : MonoBehaviour
+{
+    // View
+    private Button mBtnAdd;
+    private Button mBtnSub;
+    private Text mCountText;
+
+    // Model
+    private int mCount = 0;
+
+    void Start()
+    {
+        // View 组件获取
+        mBtnAdd = transform.Find(&quot;BtnAdd&quot;).GetComponent&lt;Button&gt;();
+        mBtnSub = transform.Find(&quot;BtnSub&quot;).GetComponent&lt;Button&gt;();
+        mCountText = transform.Find(&quot;CountText&quot;).GetComponent&lt;Text&gt;();
+
+        // 监听输入
+        mBtnAdd.onClick.AddListener(() =&gt;
+        {
+            // 交互逻辑
+            mCount++;
+            // 表现逻辑
+            UpdateView();        
+        });
+        mBtnSub.onClick.AddListener(() =&gt;
+        {
+            // 交互逻辑
+            mCount--;
+            // 表现逻辑
+            UpdateView();
+        });
+
+        UpdateView();
+    }
+
+    void UpdateView()
+    {
+        mCountText.text = mCount.ToString();
+    }
+}
+</code></pre>
+<p>以上代码某种意义上&quot;简单明了&quot;，仅使用了一个脚本就完成了计数器所需要的所有内容<br>看似很好，但这意味着<B><DRD>扩展就难了</DRD></B>：</p>
+<ul>
+<li>目前是3个View，1个Model，那么假如有很多呢？不仅需要声明，还需要初始化与绑定，代码量巨大，一个脚本支撑不了那么多内容</li>
+<li>目前Model具有初始值0，那么假如需要扩展(读取写入功能)，不满足需要改造，非常容易出错</li>
+<li><code>UpdateView()</code>需要手动调用</li>
+</ul>
+<BR>
+
+<p><strong>QFramework框架定义了以下内容：</strong></p>
+<ul>
+<li>Architecture，类似于PureMVC的Facade，用于注册各类内容</li>
+<li>Model，即M</li>
+<li>Controller，即C<ul>
+<li>View本质上附属于Controller，通过<code>UpdateView()</code>绑定即可</li>
+</ul>
+</li>
+<li>Command，用于解决Controller过于臃肿的问题(分担职责，内容被拆到Command里了)</li>
+<li>Event，事件用于自动绑定(MVVM)<ul>
+<li>BindableProperty，可取代事件</li>
+</ul>
+</li>
+<li>Utility，定义功能用于便捷执行</li>
+<li>System，用于集中某一种特定功能(从Command中剥离出来)</li>
+<li>Query，专用于查询</li>
+</ul>
+<BR>
+
+<p><strong>应用框架</strong>是这样的：<br>首先需要一个<strong>Architecture</strong>入口，即<strong>CounterApp</strong>:</p>
+<pre><code class="language-csharp">public class CounterApp : Architecture&lt;CounterApp&gt;
+{
+    protected override void Init()
+    {
+        // 注册 System 
+        this.RegisterSystem&lt;IAchievementSystem&gt;(new AchievementSystem()); 
+        // 注册 Model
+        this.RegisterModel&lt;ICounterAppModel&gt;(new CounterAppModel());
+        // 注册存储工具的对象
+        this.RegisterUtility&lt;IStorage&gt;(new Storage());
+    }
+
+    // 特性：Command拦截(捕获执行操作并进行额外操作)
+    protected override void ExecuteCommand(ICommand command)
+    {
+        Debug.Log(&quot;Before &quot; + command.GetType().Name + &quot;Execute&quot;);
+        base.ExecuteCommand(command);
+        Debug.Log(&quot;After &quot; + command.GetType().Name + &quot;Execute&quot;);
+    }
+
+    protected override TResult ExecuteCommand&lt;TResult&gt;(ICommand&lt;TResult&gt; command)
+    {
+        Debug.Log(&quot;Before &quot; + command.GetType().Name + &quot;Execute&quot;);
+        var result =  base.ExecuteCommand(command);
+        Debug.Log(&quot;After &quot; + command.GetType().Name + &quot;Execute&quot;);
+        return result;
+    }
+}
+</code></pre>
+<p>可以看到对于该例，注册了3个内容：System/Model/Utility<br><strong>Model</strong>是核心，即<strong>CounterAppModel</strong>：</p>
+<pre><code class="language-csharp">public class CounterAppModel : AbstractModel
+{
+    private int mCount;
+
+    public int Count
+    {
+        get =&gt; mCount;
+        set
+        {
+            if (mCount != value)
+            {
+                mCount = value;
+                this.SendEvent&lt;CountChangeEvent&gt;(value);
+            }
+        }
+    }
+
+    protected override void OnInit()
+    {
+        var storage = this.GetUtility&lt;Storage&gt;();
+
+        Count = storage.LoadInt(nameof(Count));
+
+        this.RegisterEvent&lt;CountChangeEvent&gt;(e =&gt;
+        {
+            this.GetUtility&lt;Storage&gt;().SaveInt(nameof(Count), Count);
+        });
+    }
+}
+</code></pre>
+<p>可以看到使用了<strong>Event</strong>进行注册，同时我们还需在Command中<code>SendEvent()</code>，从而<B><VT>数据变更后自动操作(保存与读取)</VT></B><br>但其实有一种更加智能的数据类<strong>BindableProperty</strong><VT>(用于替换Event)</VT>：</p>
+<pre><code class="language-csharp">public interface ICounterAppModel : IModel
+{
+    BindableProperty&lt;int&gt; Count { get; }
+}
+public class CounterAppModel : AbstractModel, ICounterAppModel
+{
+    public BindableProperty&lt;int&gt; Count { get; } = new BindableProperty&lt;int&gt;();
+
+    protected override void OnInit()
+    {
+        var storage = this.GetUtility&lt;IStorage&gt;();
+        
+        // 设置初始值（不触发事件）
+        Count.SetValueWithoutEvent(storage.LoadInt(nameof(Count)));
+
+        // 当数据变更时 存储数据
+        Count.Register(newCount =&gt;
+        {
+            storage.SaveInt(nameof(Count),newCount);
+        });
+    }
+}
+</code></pre>
+<p>上述保存存储功能由该<strong>Utility</strong>提供，即<strong>Storage</strong>：</p>
+<pre><code class="language-csharp">public interface IStorage : IUtility
+{
+    void SaveInt(string key, int value);
+    int LoadInt(string key, int defaultValue = 0);
+}
+public class Storage : IStorage
+{
+    public void SaveInt(string key, int value)
+    {
+        PlayerPrefs.SetInt(key,value);
+    }
+
+    public int LoadInt(string key, int defaultValue = 0)
+    {
+        return PlayerPrefs.GetInt(key, defaultValue);
+    }
+}
+</code></pre>
+<p><strong>Controller</strong>为另一个核心，这里的是<strong>CounterAppController</strong>：</p>
+<pre><code class="language-csharp">public class CounterAppController : MonoBehaviour, IController
+{
+    private Button mBtnAdd;
+    private Button mBtnSub;
+    private Text mCountText;
+    
+    private ICounterAppModel mModel;
+
+    void Start()
+    {
+        mModel = this.GetModel&lt;ICounterAppModel&gt;();
+        
+        mBtnAdd = transform.Find(&quot;BtnAdd&quot;).GetComponent&lt;Button&gt;();
+        mBtnSub = transform.Find(&quot;BtnSub&quot;).GetComponent&lt;Button&gt;();
+        mCountText = transform.Find(&quot;CountText&quot;).GetComponent&lt;Text&gt;();
+        
+        mBtnAdd.onClick.AddListener(() =&gt;
+        {
+            this.SendCommand&lt;IncreaseCountCommand&gt;();
+        });
+        
+        mBtnSub.onClick.AddListener(() =&gt;
+        {
+            this.SendCommand(new DecreaseCountCommand());
+        });
+
+        mModel.Count.RegisterWithInitValue(newCount =&gt;
+        {
+            UpdateView();
+        }).UnRegisterWhenGameObjectDestroyed(gameObject);
+    }
+    
+    void UpdateView()
+    {
+        mCountText.text = mModel.Count.ToString();
+    }
+
+    public IArchitecture GetArchitecture()
+    {
+        return CounterApp.Interface;
+    }
+
+    private void OnDestroy()
+    {
+        mModel = null;
+    }
+}
+</code></pre>
+<p>这里做了2件事：</p>
+<ul>
+<li>按钮绑定Command(使用<code>SendCommand()</code>发送相应命令)</li>
+<li>数据Model绑定视图变化(一旦数据更改视图自动随之更改)</li>
+</ul>
+<p><strong>Command</strong>是很简单的，就是动作的具体实现：</p>
+<pre><code class="language-csharp">public class IncreaseCountCommand : AbstractCommand 
+{
+    protected override void OnExecute()
+    {
+        var model = this.GetModel&lt;ICounterAppModel&gt;();
+        model.Count.Value++;
+    }
+}
+
+public class DecreaseCountCommand : AbstractCommand
+{
+    protected override void OnExecute()
+    {
+        this.GetModel&lt;ICounterAppModel&gt;().Count.Value--; // -+
+    }
+}
+</code></pre>
+<p>注册中还有一个<strong>System</strong>，即<strong>AchievementSystem</strong>：　　　　<VT>是Model中剥离出的条件判断</VT></p>
+<pre><code class="language-csharp">public interface IAchievementSystem : ISystem {}
+public class AchievementSystem : AbstractSystem ,IAchievementSystem
+{
+    protected override void OnInit()
+    {
+        this.GetModel&lt;ICounterAppModel&gt;() // -+
+            .Count
+            .Register(newCount =&gt;
+            {
+                if (newCount == 10)
+                {
+                    Debug.Log(&quot;触发 点击达人 成就&quot;);
+                }
+                else if (newCount == 20)
+                {
+                    Debug.Log(&quot;触发 点击专家 成就&quot;);
+                }
+                else if (newCount == -10)
+                {
+                    Debug.Log(&quot;触发 点击菜鸟 成就&quot;);
+                }
+            });
+    }
+}
+</code></pre>
+<BR>
+
+<p>这就是这套框架实现的所有，这里简单地分析一下<strong>操作流程</strong>：　　<YL>以9加1到10为例</YL></p>
+<ul>
+<li>点击+号，由于按钮已绑定onClick事件，触发IncreaseCountCommand</li>
+<li>执行<code>model.Count.Value++</code>，首先Count的值会+1<ul>
+<li>由于Count注册storage事件，会将新值通过PlayerPrefs保存下来</li>
+<li>由于Count注册成就System，会触发新值为10的成就消息</li>
+<li>由于Count注册视图更新事件，会将界面的相应视图刷新</li>
+</ul>
+</li>
+<li>由于CounterApp中的拦截操作，在执行Command的前后会输出debug信息</li>
+</ul>
+<h2 id="框架分析">框架分析</h2>
+<p>虽然QFramework教程中讲解了<strong>框架的演变</strong>，但是本质上代码没有发生改变，这里先自行分析一下</p>
+<h3 id="接口规则">接口(规则)</h3>
+<p>随意查看QFramework中的一个架构组件，比如说IController：<br><code>public interface IController : IBelongToArchitecture, ICanSendCommand, ICanGetSystem, ICanGetModel, ICanRegisterEvent, ICanSendQuery, ICanGetUtility</code><br>QFramework中充斥着<strong>大量接口</strong>，<B><VT>用于指定规范</VT></B><br>就比如说<B><YL>上述的IController：由于需要实现这些接口，所以我们可以认为：实现了IController接口的某Controller就需要符合具体接口规范</YL></B><br>随意查看某一具体接口：<br><code>public interface ICanSendCommand : IBelongToArchitecture {}</code><br>可以发现：<B><VT>接口仅为接口，我们只需要知道&quot;某内容是具有某接口特性的&quot;即可</VT></B></p>
+<p><strong>具体在后续使用到继续分析</strong></p>
+<h3 id="architecture">Architecture</h3>
+<p>在QFramework中，<B><VT>Architecture是整个程序的源</VT></B><br>简单来说：<B><VT>Architecture中收集了所有架构组件的操作(如<code>GetModel()</code>)并自动初始化了注册的组件</VT></B></p>
+<pre><code class="language-csharp">public interface IArchitecture
+{
+    // 一系列操作接口
+}
+
+public abstract class Architecture&lt;T&gt; : IArchitecture where T : Architecture&lt;T&gt;, new()
+{
+    private bool mInited = false;
+
+    public static Action&lt;T&gt; OnRegisterPatch = architecture =&gt; { };
+
+    protected static T mArchitecture;
+
+    public static IArchitecture Interface
+    {
+        get
+        {
+            if (mArchitecture == null) InitArchitecture();
+            return mArchitecture;
+        }
+    }
+
+
+    public static void InitArchitecture()
+    {
+        if (mArchitecture == null)
+        {
+            mArchitecture = new T();
+            mArchitecture.Init();
+
+            OnRegisterPatch?.Invoke(mArchitecture);
+
+            foreach (var model in mArchitecture.mContainer.GetInstancesByType&lt;IModel&gt;().Where(m =&gt; !m.Initialized))
+            {
+                model.Init();
+                model.Initialized = true;
+            }
+
+            foreach (var system in mArchitecture.mContainer.GetInstancesByType&lt;ISystem&gt;()
+                            .Where(m =&gt; !m.Initialized))
+            {
+                system.Init();
+                system.Initialized = true;
+            }
+
+            mArchitecture.mInited = true;
+        }
+    }
+
+    // 一系列操作接口实现
+}
+</code></pre>
+<p>这里可以注意到一种<strong>很不错的设计</strong>：<br><strong><VT><code>Architecture&lt;T&gt;</code>的声明本身是一种单例写法，结合静态<code>Interface</code>，可以做到创建多个单例实现，但无论我使用哪种，当前有且仅有一个单例</VT></strong><br><YL><B>比如说</B>：有<code>A</code>/<code>B</code>两种Architecture，如果我调用<code>A.Interface</code>，那么初始化的就是A版本(当然既然初始化了A那么B就用不到了)，反之<YL></p>
+<h4 id="ioccontainer">IOCContainer</h4>
+<p>在Architecture使用到了一个概念<B><GN>IOCContainer</GN></B>，用于<B><VT>控制反转(Inversion of Control)</VT></B></p>
+<p>IOC其实我们会很熟悉，<B><VT>IOC是一种实现<GN>DI</GN>的手段</VT></B><br>有了IOC，我们能将强耦合剥离出来，通过<strong>注册到IOCContainer，从IOCContainer中取出</strong>，从而<B><VT>降低耦合</VT></B><br><strong><VT>Tip：接口本身就是一种IOC，使用IOCContainer是在此基础上的扩展</VT></strong></p>
+<p>IOCContainer的本身非常简单，内部存储了一个字典：<br><code>private Dictionary&lt;Type, object&gt; mInstances = new Dictionary&lt;Type, object&gt;();</code><br>由此可见：<B><VT>IOCContainer是一个存储了类型的具体类型的容器</VT></B><br>这种解释可能不是特别清楚，可以结合以下两者理解：</p>
+<pre><code class="language-csharp">// &lt;IOCContainer&gt;的注册方法
+public void Register&lt;T&gt;(T instance)
+{
+    var key = typeof(T);
+
+    if (mInstances.ContainsKey(key))
+    {
+        mInstances[key] = instance;
+    }
+    else
+    {
+        mInstances.Add(key, instance);
+    }
+}
+
+// &lt;Architecture&gt;提供的Model注册方法
+public void RegisterModel&lt;TModel&gt;(TModel model) where TModel : IModel
+{
+    model.SetArchitecture(this);
+    mContainer.Register&lt;TModel&gt;(model); // 把TModel类型的model存入IOCContainer中
+    // 也就是说：我们尝试获取TModel，实际就会获取到相应model实例，使用时不需要考虑更多
+
+    if (mInited)
+    {
+        model.Init();
+        model.Initialized = true;
+    }
+}
+</code></pre>
+<p>IOCContainer的用法也很简单，只要像上述<code>RegisterModel()</code>中一样注册过，后续通过<B><code>Get&lt;T&gt;()</code></B>即可从容器中将相应实例取出</p>
+<p>我们同时也知道了一件<strong>关键的事</strong>：<br><strong><VT>对于该IOCContainer的实现来说，一种TModel对应一个Tmodel的实例，重新注册则会替换</VT></strong><br>显然这<B><DRD>不能处理复杂情况(比如说需要注册同接口的几种实例)</DRD></B>，如需扩展，可以使用一些<strong>针对DI的框架</strong>，比如说：</p>
+<ul>
+<li>Microsoft.Extensions.DependencyInjection(C#)</li>
+<li>Zenject(Unity)</li>
+</ul>
+<h3 id="controller与model">Controller与Model</h3>
+<p>通过前面的例子分析，我们也能很清楚地了解到：<strong><VT>MVC是框架的根</VT></strong><br>QFramework其实和PureMVC是类似的：<br><strong>PureMVC</strong>本质上是一个MVC：</p>
+<ul>
+<li>使用门面模式Facade进行管理这是框架上的优化</li>
+<li>MVC内部演变为Proxy/Mediator/Command，这同样是优化</li>
+<li>等等</li>
+</ul>
+<p>所以对于QFramework来说，首先需要考虑的还是MVC，但是有所不同：<strong><VT>V被归入C中了</VT></strong><br>这其实是一件<strong>有利有弊</strong>的事情：</p>
+<ul>
+<li><GN>Controller可以非常容易地访问View，也就是说初始化/按钮绑定/更新视图都可以在一处完成，<B>非常方便，同时无需通信减少开销</B></GN></li>
+<li><DRD>Controller的代码量会变大，容易搞不清楚</DRD></li>
+<li><DRD>违反单一职责原则</DRD></li>
+</ul>
+<p>所以说这其实是一种<B><VT>用框架规范性换开发效率</VT></B>的方法</p>
+<p>回过头来，还是专注于QFramework的实现：<br>在QFramework中，<B><VT>Controller是整个UIPanel的源</VT></B></p>
+<h4 id="controller">Controller</h4>
+<p>Controller并没有实现抽象类，仅有一个<strong>接口<GN>IController</GN></strong>：<br><code>public interface IController : IBelongToArchitecture, ICanSendCommand, ICanGetSystem, ICanGetModel, ICanRegisterEvent, ICanSendQuery, ICanGetUtility {}</code><br>这也代表了一个<strong>Controller可以做的操作</strong>(如可以获取Model组件...)</p>
+<h4 id="model">Model</h4>
+<p>同样的，Model也具有<strong>接口<GN>IModel</GN></strong>：<br><code>public interface IModel : IBelongToArchitecture, ICanSetArchitecture, ICanGetUtility, ICanSendEvent, ICanInit {}</code></p>
+<p>对于Model来说，更重要的是实现的<strong>抽象类<GN>AbstractModel</GN></strong>：</p>
+<pre><code class="language-csharp">public abstract class AbstractModel : IModel
+{
+    private IArchitecture mArchitecturel;
+
+    IArchitecture IBelongToArchitecture.GetArchitecture() =&gt; mArchitecturel;
+
+    void ICanSetArchitecture.SetArchitecture(IArchitecture architecture) =&gt; mArchitecturel = architecture;
+
+    public bool Initialized { get; set; }
+    void ICanInit.Init() =&gt; OnInit();
+    public void Deinit() =&gt; OnDeinit();
+
+    protected virtual void OnDeinit()
+    {
+    }
+
+    protected abstract void OnInit();
+}
+</code></pre>
+<p>我们知道了几件事：</p>
+<ul>
+<li>由于IModel实现了IBelongToArchitecture接口，所以可以获取IArchitecture</li>
+<li>由于IModel实现了ICanInit接口，所以具有<code>Init()</code>/<code>Deinit()</code>操作</li>
+</ul>
+<p>这里<strong>值得注意</strong>的是：</p>
+<ul>
+<li>这里使用了<B><GN>显式接口实现</GN></B>，会<B><VT>强制接口访问</VT></B>：<ul>
+<li>如果想<code>GetArchitecture()</code>，必须转换为IBelongToArchitecture调用</li>
+<li>如果想<code>SetArchitecture()</code>，必须转换为ICanSetArchitecture调用</li>
+<li>如果想<code>Init()</code>，必须转换为ICanInit调用<VT>(<code>Deinit()</code>不用，因为不是显式接口)</VT></li>
+</ul>
+</li>
+</ul>
+<p>本质上<strong>框架的目的</strong>是：<strong><VT>内部自行调用，避免用户了解细节</VT></strong><br>这里举一个<B><YL>例子</YL></B>帮助理解：</p>
+<pre><code class="language-csharp">public static class CanGetModelExtension
+{
+    public static T GetModel&lt;T&gt;(this ICanGetModel self) where T : class, IModel =&gt;
+        self.GetArchitecture().GetModel&lt;T&gt;();
+}
+</code></pre>
+<p><YL>可以看到，在QFramework内部，常常提供了一些接口方法用于调用<br>对于此例，在实际使用时，我们只会感觉到：<B>因为实现了ICanGetModel接口，所以我能通过<code>GetModel()</code>获取相应Model</B></YL></p>
+<p><strong><BL>问题：看似好像有一系列操作，但是好像没初始化(mArchitecturel没有赋值)？</BL></strong><br><BL>确实是这样，这其实在Architecture中：</BL></p>
+<pre><code class="language-csharp">public void RegisterModel&lt;TModel&gt;(TModel model) where TModel : IModel
+{
+    model.SetArchitecture(this); // 即一定执行了Set操作，从而对mArchitecturel赋值
+    mContainer.Register&lt;TModel&gt;(model);
+
+    if (mInited)
+    {
+        model.Init();
+        model.Initialized = true;
+    }
+}
+
+public TModel GetModel&lt;TModel&gt;() where TModel : class, IModel =&gt; mContainer.Get&lt;TModel&gt;();
+</code></pre>
+<p>可以看到：</p>
+<ul>
+<li>IBelongToArchitecture接口实现完毕后，初始化执行<code>SetArchitecture()</code>，后续可自由调用<code>GetArchitecture()</code>获取</li>
+<li>将model注册仅IOCContainer后，后续可通过<code>Get&lt;T&gt;()</code>从容器中取出，执行其操作</li>
+</ul>
+<p><strong><BL>问题：model是IModel类型的，为什么能调用<code>model.Init()</code></BL></strong><br><BL>虽然在AbstractModel中只有显式接口实现，即<code>ICanInit.Init()</code>，但是IModel是个接口，ICanInit是其子接口，是可以直接调用的</BL></p>
+<h5 id="event">Event</h5>
+<h6 id="event分析">Event分析</h6>
+<p>Event用到的地方很多，经过各种包装产生了很多类，需要详细分析一下<br>首先来看一下有哪些类：</p>
+<ul>
+<li>IEasyEvent</li>
+<li>EasyEvent</li>
+<li>EasyEvents</li>
+<li>TypeEventSystem<ul>
+<li>IOnEvent</li>
+</ul>
+</li>
+<li>OrEvent</li>
+</ul>
+<p>简单来看一下<B><GN>IEasyEvent</GN></B>接口：<code>IUnRegister Register(Action onEvent);</code> <VT>就是很简单的注册</VT></p>
+<p>最基本的就是<B><GN>EasyEvent</GN></B>了，对于一个简单的事件来说操作不多：</p>
+<ul>
+<li><code>Register()</code>---注册</li>
+<li><code>RegisterWithACall()</code>---调用后注册</li>
+<li><code>UnRegister()</code>---反注册</li>
+<li><code>Trigger()</code>---调用</li>
+</ul>
+<p>代码同样非常简单，其实就是一个<B><VT>Action的封装类</VT></B>：</p>
+<pre><code class="language-csharp">public class EasyEvent : IEasyEvent
+{
+    private Action mOnEvent = () =&gt; { };
+
+    public IUnRegister Register(Action onEvent)
+    {
+        mOnEvent += onEvent;
+        return new CustomUnRegister(() =&gt; { UnRegister(onEvent); });
+    }
+
+    public IUnRegister RegisterWithACall(Action onEvent)
+    {
+        onEvent.Invoke();
+        return Register(onEvent);
+    }
+
+    public void UnRegister(Action onEvent) =&gt; mOnEvent -= onEvent;
+
+    public void Trigger() =&gt; mOnEvent?.Invoke();
+}
+</code></pre>
+<p><strong><GN>反注册</GN></strong><br>令我们不太理解的可能是其中的<strong>IUnRegister接口</strong>以及<strong>CustomUnRegister类</strong><br>之所以需要IUnRegister的原因是很明确的：<B><VT>提供一种反注册的实例方便操作</VT></B><br><strong><YL>考虑一种情况：</YL></strong><br><YL>使用<code>Register(()=&gt;{...})</code>使用Lambda进行注册，我们会发现想要<code>UnRegister()</code>的时候由于得不到注册时的Action而无法反注册，此时提供的IUnRegister就非常有用了</YL></p>
+<p><strong>IUnRegister</strong>/<strong>CustomUnRegister</strong>具体代码如下：</p>
+<pre><code class="language-csharp">public interface IUnRegister
+{
+    void UnRegister();
+}
+
+// 一种存储有Action的IUnRegister
+public struct CustomUnRegister : IUnRegister
+{
+    private Action mOnUnRegister { get; set; }
+    public CustomUnRegister(Action onUnRegister) =&gt; mOnUnRegister = onUnRegister;
+
+    public void UnRegister()
+    {
+        mOnUnRegister.Invoke();
+        mOnUnRegister = null; // 反注册完后就置空(可GC)
+    }
+}
+</code></pre>
+<p>既然提到了反注册，那么可以再来看<strong>一组便捷类</strong>，具体调用如下：</p>
+<pre><code class="language-csharp">mModel.Count.RegisterWithInitValue(newCount =&gt;
+{
+    UpdateView();
+
+}).UnRegisterWhenGameObjectDestroyed(gameObject);
+</code></pre>
+<p>可以看到通过<code>UnRegisterWhenGameObjectDestroyed()</code>实现了<B><VT>自动反注册</VT></B><br>这牵扯到以下类：</p>
+<ul>
+<li>三种反注册功能<ul>
+<li><code>UnRegisterOnDestroyTrigger</code></li>
+<li><code>UnRegisterOnDisableTrigger</code></li>
+<li><code>UnRegisterCurrentSceneUnloadedTrigger</code></li>
+</ul>
+</li>
+<li>IUnRegister扩展<ul>
+<li><code>UnRegisterExtension</code></li>
+</ul>
+</li>
+</ul>
+<p>具体如下：</p>
+<pre><code class="language-csharp">public abstract class UnRegisterTrigger : UnityEngine.MonoBehaviour
+{
+    private readonly HashSet&lt;IUnRegister&gt; mUnRegisters = new HashSet&lt;IUnRegister&gt;();
+
+    public IUnRegister AddUnRegister(IUnRegister unRegister)
+    {
+        mUnRegisters.Add(unRegister);
+        return unRegister;
+    }
+
+    public void RemoveUnRegister(IUnRegister unRegister) =&gt; mUnRegisters.Remove(unRegister);
+
+    public void UnRegister()
+    {
+        foreach (var unRegister in mUnRegisters)
+        {
+            unRegister.UnRegister();
+        }
+
+        mUnRegisters.Clear();
+    }
+}
+
+public class UnRegisterOnDestroyTrigger : UnRegisterTrigger
+{
+    private void OnDestroy()
+    {
+        UnRegister();
+    }
+}
+
+public class UnRegisterOnDisableTrigger : UnRegisterTrigger
+{
+    private void OnDisable()
+    {
+        UnRegister();
+    }
+}
+
+public class UnRegisterCurrentSceneUnloadedTrigger : UnRegisterTrigger
+{
+    private static UnRegisterCurrentSceneUnloadedTrigger mDefault;
+
+    public static UnRegisterCurrentSceneUnloadedTrigger Get
+    {
+        get
+        {
+            if (!mDefault)
+            {
+                mDefault = new GameObject(&quot;UnRegisterCurrentSceneUnloadedTrigger&quot;)
+                    .AddComponent&lt;UnRegisterCurrentSceneUnloadedTrigger&gt;();
+            }
+
+            return mDefault;
+        }
+    }
+
+    private void Awake()
+    {
+        DontDestroyOnLoad(this);
+        hideFlags = HideFlags.HideInHierarchy;
+        SceneManager.sceneUnloaded += OnSceneUnloaded;
+    }
+
+    private void OnDestroy() =&gt; SceneManager.sceneUnloaded -= OnSceneUnloaded;
+    void OnSceneUnloaded(Scene scene) =&gt; UnRegister();
+}
+#endif
+
+public static class UnRegisterExtension
+{
+#if UNITY_5_6_OR_NEWER
+
+    static T GetOrAddComponent&lt;T&gt;(GameObject gameObject) where T : Component
+    {
+        var trigger = gameObject.GetComponent&lt;T&gt;();
+
+        if (!trigger)
+        {
+            trigger = gameObject.AddComponent&lt;T&gt;();
+        }
+
+        return trigger;
+    }
+
+    public static IUnRegister UnRegisterWhenGameObjectDestroyed(this IUnRegister unRegister,
+        UnityEngine.GameObject gameObject) =&gt;
+        GetOrAddComponent&lt;UnRegisterOnDestroyTrigger&gt;(gameObject)
+            .AddUnRegister(unRegister);
+
+    public static IUnRegister UnRegisterWhenGameObjectDestroyed&lt;T&gt;(this IUnRegister self, T component)
+        where T : UnityEngine.Component =&gt;
+        self.UnRegisterWhenGameObjectDestroyed(component.gameObject);
+
+    public static IUnRegister UnRegisterWhenDisabled&lt;T&gt;(this IUnRegister self, T component)
+        where T : UnityEngine.Component =&gt;
+        self.UnRegisterWhenDisabled(component.gameObject);
+
+    public static IUnRegister UnRegisterWhenDisabled(this IUnRegister unRegister,
+        UnityEngine.GameObject gameObject) =&gt;
+        GetOrAddComponent&lt;UnRegisterOnDisableTrigger&gt;(gameObject)
+            .AddUnRegister(unRegister);
+    
+    public static IUnRegister UnRegisterWhenCurrentSceneUnloaded(this IUnRegister self) =&gt;
+        UnRegisterCurrentSceneUnloadedTrigger.Get.AddUnRegister(self);
+#endif
+</code></pre>
+<p>代码其实是比较<strong>清晰易懂</strong>的：<br><strong><VT>提供<code>OnDestroy()</code>/<code>OnDisable()</code>/场景卸载时自动反注册的功能，<br>核心是由一个组件记录下反注册内容，在Unity生命周期中自动调用</VT></strong><br>需要<strong>注意</strong>的是：<B><DRD>在不同的GameObject会创建不同的组件，注意消耗</DRD></B></p>
+<p>结合EasyEvent来看，会发现无非就是<VT>将反注册需要的event包装进Action，等待后续反注册时调用</VT></p>
+<p>EasyEvent提供了<strong>3种泛型方法</strong>：<code>EasyEvent&lt;T&gt;</code>/<code>EasyEvent&lt;T,K&gt;</code>/<code>EasyEvent&lt;T,K,S&gt;</code><br>区别其实就是Action传入参数数量而已<br>但是要<strong>注意</strong>：<B><VT>泛型形式额外具有显式接口形式的<code>IEasyEvent.Register()</code></VT></B><br>这是因为这是<B><VT>备用回退方案(无感知调用)</VT></B>：  <VT>Tip：对BindableProperty同样适用(因为有IEasyEvent+泛型)</VT></p>
+<pre><code class="language-csharp">public class EasyEvent&lt;T&gt; : IEasyEvent
+{
+    public IUnRegister Register(Action&lt;T&gt; onEvent)
+    {
+        mOnEvent += onEvent;
+        return new CustomUnRegister(() =&gt; { UnRegister(onEvent); });
+    }
+
+    // 如果没有传入T，那么调用的就是该形式了
+    IUnRegister IEasyEvent.Register(Action onEvent)
+    {
+        return Register(Action);
+        void Action(T _) =&gt; onEvent();
+    }
+}
+</code></pre>
+<p><B><GN>EasyEvents</GN></B>从名字上就能知道是EasyEvent组<br>内部实现就是<B><VT>用Dictionary存储IEasyEvent</VT></B>：</p>
+<pre><code class="language-csharp">public class EasyEvents
+{
+    // 单例，唯一入口
+    private static readonly EasyEvents mGlobalEvents = new EasyEvents();
+
+    public static T Get&lt;T&gt;() where T : IEasyEvent =&gt; mGlobalEvents.GetEvent&lt;T&gt;();
+
+    public static void Register&lt;T&gt;() where T : IEasyEvent, new() =&gt; mGlobalEvents.AddEvent&lt;T&gt;();
+
+    private readonly Dictionary&lt;Type, IEasyEvent&gt; mTypeEvents = new Dictionary&lt;Type, IEasyEvent&gt;();
+
+    public void AddEvent&lt;T&gt;() where T : IEasyEvent, new() =&gt; mTypeEvents.Add(typeof(T), new T());
+
+    public T GetEvent&lt;T&gt;() where T : IEasyEvent
+    {
+        return mTypeEvents.TryGetValue(typeof(T), out var e) ? (T)e : default;
+    }
+
+    public T GetOrAddEvent&lt;T&gt;() where T : IEasyEvent, new()
+    {
+        var eType = typeof(T);
+        if (mTypeEvents.TryGetValue(eType, out var e))
+        {
+            return (T)e;
+        }
+
+        var t = new T();
+        mTypeEvents.Add(eType, t);
+        return t;
+    }
+}
+</code></pre>
+<p>根据代码，我们会联想到：<code>Dictionary&lt;Type, IEasyEvent&gt;</code>这种形式正是<strong>IOCContainer</strong></p>
+<p><B><GN>TypeEventSystem</GN></B>是一种重要的类型，Architecture中的Event操作正是由它提供，对应的有：</p>
+<pre><code class="language-csharp">public void SendEvent&lt;TEvent&gt;() where TEvent : new() =&gt; mTypeEventSystem.Send&lt;TEvent&gt;();
+public void SendEvent&lt;TEvent&gt;(TEvent e) =&gt; mTypeEventSystem.Send&lt;TEvent&gt;(e);
+
+public IUnRegister RegisterEvent&lt;TEvent&gt;(Action&lt;TEvent&gt; onEvent) =&gt; mTypeEventSystem.Register&lt;TEvent&gt;(onEvent);
+
+public void UnRegisterEvent&lt;TEvent&gt;(Action&lt;TEvent&gt; onEvent) =&gt; mTypeEventSystem.UnRegister&lt;TEvent&gt;(onEvent);
+</code></pre>
+<p>该类同样简单，为<B><VT>EasyEvents的包装</VT></B>：</p>
+<pre><code class="language-csharp">public class TypeEventSystem
+{
+    private readonly EasyEvents mEvents = new EasyEvents();
+
+    public static readonly TypeEventSystem Global = new TypeEventSystem();
+
+    public void Send&lt;T&gt;() where T : new() =&gt; mEvents.GetEvent&lt;EasyEvent&lt;T&gt;&gt;()?.Trigger(new T());
+
+    public void Send&lt;T&gt;(T e) =&gt; mEvents.GetEvent&lt;EasyEvent&lt;T&gt;&gt;()?.Trigger(e);
+
+    public IUnRegister Register&lt;T&gt;(Action&lt;T&gt; onEvent) =&gt; mEvents.GetOrAddEvent&lt;EasyEvent&lt;T&gt;&gt;().Register(onEvent);
+
+    public void UnRegister&lt;T&gt;(Action&lt;T&gt; onEvent)
+    {
+        var e = mEvents.GetEvent&lt;EasyEvent&lt;T&gt;&gt;();
+        e?.UnRegister(onEvent);
+    }
+}
+</code></pre>
+<p>可以看到，其中有一个<strong>Global</strong>，这就是用于<B><GN>IOnEvent</GN></B>配合的静态变量：</p>
+<pre><code class="language-csharp">public interface IOnEvent&lt;T&gt;
+{
+    void OnEvent(T e);
+}
+
+public static class OnGlobalEventExtension
+{
+    public static IUnRegister RegisterEvent&lt;T&gt;(this IOnEvent&lt;T&gt; self) where T : struct =&gt;
+        TypeEventSystem.Global.Register&lt;T&gt;(self.OnEvent);
+
+    public static void UnRegisterEvent&lt;T&gt;(this IOnEvent&lt;T&gt; self) where T : struct =&gt;
+        TypeEventSystem.Global.UnRegister&lt;T&gt;(self.OnEvent);
+}
+</code></pre>
+<p>内容不多，仅提供了一个接口以及对应的注册方法，可以看出其实就是一种<B><VT>半自动化的回调注册方法</VT></B><br><strong>大致用法</strong>就是：类上加接口，在该类中实现<code>OnEvent()</code>并<code>RegisterEvent()</code>，在任意处需要调用时通过<code>TypeEventSystem.Global.Send&lt;XXX&gt;()</code>即可</p>
+<p><B><GN>OrEvent</GN></B>是一种<B><VT>链式调用的扩充(像LINQ一样)</VT></B><br><strong>用法</strong>如下：</p>
+<pre><code class="language-csharp">private BindableProperty&lt;int&gt; mPropertyA = new BindableProperty&lt;int&gt;(10);
+private BindableProperty&lt;int&gt; mPropertyB = new BindableProperty&lt;int&gt;(5);
+private EasyEvent EventA = new EasyEvent();
+
+void Start()
+{
+    // 为mPropertyA/mPropertyB/EventA都注册事件
+    mPropertyA
+        .Or(EventA)
+        .Or(mPropertyB)
+        .Register(() =&gt;
+        {
+            Debug.Log(&quot;Event Received&quot;);
+        }).UnRegisterWhenGameObjectDestroyed(gameObject);
+}
+</code></pre>
+<p>可以看到这是一个非常便捷的语法，可以同时为多个需要Register的对象进行注册操作，而无需写多次<br><strong>代码</strong>其实并不复杂：</p>
+<pre><code class="language-csharp">public interface IUnRegisterList
+{
+    List&lt;IUnRegister&gt; UnregisterList { get; }
+}
+
+public class OrEvent : IUnRegisterList
+{
+    public OrEvent Or(IEasyEvent easyEvent)
+    {
+        // 将新的easyEvent注册进mOnEvent并将存入IUnRegister存入UnregisterList
+        easyEvent.Register(Trigger).AddToUnregisterList(this);
+        return this;
+    }
+
+    private Action mOnEvent = () =&gt; { };
+
+    public IUnRegister Register(Action onEvent)
+    {
+        mOnEvent += onEvent;
+        return new CustomUnRegister(() =&gt; { UnRegister(onEvent); });
+    }
+
+    public IUnRegister RegisterWithACall(Action onEvent)
+    {
+        onEvent.Invoke();
+        return Register(onEvent);
+    }
+    
+    public void UnRegister(Action onEvent)
+    {
+        mOnEvent -= onEvent;
+        this.UnRegisterAll();
+    }
+
+    private void Trigger() =&gt; mOnEvent?.Invoke();
+
+    public List&lt;IUnRegister&gt; UnregisterList { get; } = new List&lt;IUnRegister&gt;();
+}
+
+public static class OrEventExtensions
+{
+    public static OrEvent Or(this IEasyEvent self, IEasyEvent e) =&gt; new OrEvent().Or(self).Or(e);
+}
+</code></pre>
+<p>看起来可能一时不太懂，但是只要知道了这一点就非常好理解了：<br><strong><VT>OrEvent本质上也是一个IEasyEvent，只是他&quot;将前人合并到自己&quot;了</VT></strong></p>
+<p>核心函数为<code>Or()</code>，有2种：</p>
+<ul>
+<li><code>IEasyEvent.Or()</code>(OrEventExtensions中)</li>
+<li><code>OrEvent.Or()</code>(OrEvent中)</li>
+</ul>
+<p>显然，<B><VT>第一次使用<code>.Or()</code>必然是对IEasyEvent使用的，两者合并会变为OrEvent，之后调用<code>OrEvent.Or()</code>不断扩容</VT></B><br>观察<B><VT><code>IEasyEvent.Or()</code>，本质上这还是在调用<code>OrEvent.Or()</code></VT></B>：<br><code>public static OrEvent Or(this IEasyEvent self, IEasyEvent e) =&gt; new OrEvent().Or(self).Or(e);</code></p>
+<p><strong>简单理解：</strong><br>结合两个<code>Or()</code>，说明每一个IEsayEvent都会调用一次<code>OrEvent.Or()</code>，<br>执行<code>Or()</code>则会为当前IEasyEvent添加<code>mOnEvent?.Invoke()</code>操作<B><DRD>(注意：是该IEasyEvent而非OrEvent)</DRD></B>，即<strong>触发OrEvent中的Register事件</strong>，<br>同时将IUnRegister收集到List供一并反注册<br>既然是为IEasyEvent注册的，那么<B><VT>触发方式还是和原来一致</VT></B>：</p>
+<pre><code class="language-csharp">private void Update()
+{
+    if (Input.GetMouseButtonDown(0))
+    {
+        mPropertyA.Value++;
+    }
+
+    if (Input.GetMouseButtonDown(1))
+    {
+        mPropertyB.Value++;
+    }
+
+    if (Input.GetKeyDown(KeyCode.Space))
+    {
+        EventA.Trigger();
+    }
+}
+</code></pre>
+<h6 id="event总结">Event总结</h6>
+<p>可以看到QFramework提供了很多种Event的形式，但是本质上其实就一种：<strong>EasyEvent</strong>，其余的都是在此基础上做扩展罢了<br><strong>具体如下：</strong></p>
+<ul>
+<li><strong>EasyEvent：</strong><br>事件的基础，是Action的一层封装，提供了注册Register/反注册UnRegister/触发Trigger三种操作，同时注册后提供一种反注册手段CustomUnRegister</li>
+<li><strong>EasyEvents：</strong><br>EasyEvent组，使用IOCContainer(<code>&lt;Type,IEasyEvent&gt;</code>)的形式进行事件的存储，无调用封装，仅提供添加AddEvent与获取GetEvent方法</li>
+<li><strong>TypeEventSystem：</strong><br>EasyEvents的封装，向外界提供注册Register/反注册UnRegister/发送(触发)Send三种操作</li>
+<li><strong>OrEvent：</strong><br>一种特殊的类型，用于实现链式调用，本质上是一个延迟调用器(为所有参加<code>.Or()</code>连点方法的IEasyEvent注册Trigger事件，具体内容为连点后的<code>Register()</code>内容)</li>
+</ul>
+<p><strong>所以说：<VT>TypeEventSystem其实和EasyEvent是平级的，都是处理事件的一种方法，而EasyEvents仅是一个存储类</VT></strong></p>
+<h6 id="model中的event">Model中的Event</h6>
+<p>对于Model来说，<strong>最核心</strong>的就是其<strong>数据</strong>，使用Event可以解决这个问题<br>考虑一下<strong>一般情况</strong>，假设有一个数据count，大致是这样的：</p>
+<pre><code class="language-csharp">public class CounterAppModel : AbstractModel
+{
+    private int mCount;
+
+    public int Count
+    {
+        get =&gt; mCount;
+        set
+        {
+            if (mCount != value)
+            {
+                mCount = value;
+                PlayerPrefs.SetInt(nameof(Count), mCount);
+            }
+        }
+    }
+
+    protected override void OnInit()
+    {
+        var storage = this.GetUtility&lt;Storage&gt;();
+
+        Count = storage.LoadInt(nameof(Count));
+
+        CounterApp.Interface.RegisterEvent&lt;CountChangeEvent&gt;(e =&gt;
+        {
+            this.GetUtility&lt;Storage&gt;().SaveInt(nameof(Count), Count);
+        });
+    }
+}
+
+public struct CountChangeEvent {}
+public class CountChangeCommand : AbstractCommand 
+{
+    protected override void OnExecute()
+    {
+        this.GetModel&lt;CounterAppModel&gt;().Count++;
+        this.SendEvent&lt;CountChangeEvent&gt;(); 
+    }
+}
+</code></pre>
+<p>可以看到：</p>
+<ul>
+<li>这对应的就是<code>Architecture.RegisterEvent()/SendEvent()</code>，最核心的底层当然是<code>EasyEvent.Register()/Trigger()</code></li>
+<li>我们需要注册一个事件用于CountChange发生时，即每当<code>CounterAppModel.Count++</code>时需要添加<code>SendEvent()</code>操作</li>
+</ul>
+<p>可以想到一个<strong>致命缺点</strong>：<B><DRD>我们需要手动追踪数据变更的位置并添加代码，很容易忘记<DRD></B><br>但是也可以想到一个<strong>优点</strong>：<B><GN>虽然麻烦容易忘，但是灵活性很高，一个Event可以用于多处，对于不同情况发生的事件可以更改</GN></B></p>
+<h5 id="bindableproperty">BindableProperty</h5>
+<p>Event虽然可以解决，但是最好的方式是<B><VT>使用<GN>BindableProperty</GN>作为数据类型</VT></B><br>这里看一下<strong>BindableProperty</strong>的实现：</p>
+<pre><code class="language-csharp">public class CounterAppModel : AbstractModel,ICounterAppModel
+{
+    public BindableProperty&lt;int&gt; Count { get; } = new BindableProperty&lt;int&gt;();
+
+    protected override void OnInit()
+    {
+        var storage = this.GetUtility&lt;IStorage&gt;();
+        
+        // 设置初始值（不触发事件）
+        Count.SetValueWithoutEvent(storage.LoadInt(nameof(Count)));
+
+        // 当数据变更时 存储数据
+        Count.Register(newCount =&gt;
+        {
+            storage.SaveInt(nameof(Count),newCount);
+        });
+    }
+}
+</code></pre>
+<p><strong>对比</strong>发现：BindableProperty对于数据<VT>不再需要声明字段以及属性</VT>，更重要的是<B><VT>不需要在Command中添加事件触发</VT></B></p>
+<p>其<strong>实现</strong>还是比较复杂的：<br>先从<strong>接口</strong>查看：</p>
+<pre><code class="language-csharp">public interface IBindableProperty&lt;T&gt; : IReadonlyBindableProperty&lt;T&gt;
+{
+    new T Value { get; set; }
+    void SetValueWithoutEvent(T newValue);
+}
+
+public interface IReadonlyBindableProperty&lt;T&gt; : IEasyEvent
+{
+    T Value { get; }
+
+    IUnRegister RegisterWithInitValue(Action&lt;T&gt; action);
+    void UnRegister(Action&lt;T&gt; onValueChanged);
+    IUnRegister Register(Action&lt;T&gt; onValueChanged);
+}
+
+public interface IEasyEvent
+{
+    IUnRegister Register(Action onEvent); 
+}
+</code></pre>
+<p>这说明了：</p>
+<ul>
+<li>IReadonlyBindableProperty<ul>
+<li>作为一个&quot;绑定属性&quot;，属性<code>Value</code>是必须的</li>
+<li>同时，提供注册Register与反注册UnRegister操作</li>
+</ul>
+</li>
+<li>IBindableProperty<ul>
+<li>IBindableProperty是IReadonlyBindableProperty派生，即&quot;不只读可设置&quot;</li>
+</ul>
+</li>
+</ul>
+<p><strong><BL>问题：注册是什么</BL></strong><br><BL>注册显然就是MVVM中的<B><VT>数据驱动方法</VT></B><br>详细需要查看实现类BindableProperty：</BL></p>
+<pre><code class="language-csharp">public class BindableProperty&lt;T&gt; : IBindableProperty&lt;T&gt;
+{
+    public BindableProperty(T defaultValue = default) =&gt; mValue = defaultValue;
+
+    protected T mValue;
+
+    // 比较函数，判断a和b是否相等
+    public static Func&lt;T, T, bool&gt; Comparer { get; set; } = (a, b) =&gt; a.Equals(b);
+    // 自定义Comparer逻辑
+    public BindableProperty&lt;T&gt; WithComparer(Func&lt;T, T, bool&gt; comparer)
+    {
+        Comparer = comparer;
+        return this;
+    }
+
+    public T Value
+    {
+        get =&gt; GetValue();
+        set
+        {
+            if (value == null &amp;&amp; mValue == null) return;
+            if (value != null &amp;&amp; Comparer(value, mValue)) return;
+
+            SetValue(value);
+            mOnValueChanged.Trigger(value);
+        }
+    }
+
+    // 内部设置方法(会触发mOnValueChanged)
+    protected virtual void SetValue(T newValue) =&gt; mValue = newValue;
+
+    protected virtual T GetValue() =&gt; mValue;
+
+    // 外部设置方法(不会触发mOnValueChanged)
+    public void SetValueWithoutEvent(T newValue) =&gt; mValue = newValue;
+
+    private EasyEvent&lt;T&gt; mOnValueChanged = new EasyEvent&lt;T&gt;();
+
+    // 注册
+    public IUnRegister Register(Action&lt;T&gt; onValueChanged)
+    {
+        return mOnValueChanged.Register(onValueChanged);
+    }
+    // 注册且初始调用一次
+    public IUnRegister RegisterWithInitValue(Action&lt;T&gt; onValueChanged)
+    {
+        onValueChanged(mValue);
+        return Register(onValueChanged);
+    }
+
+    // 反注册
+    public void UnRegister(Action&lt;T&gt; onValueChanged) =&gt; mOnValueChanged.UnRegister(onValueChanged);
+
+    // IEasyEvent的注册
+    // 这里是为了提供一种便捷调用形式使用户在没有感知的情况下正常使用：
+    // BindableProperty&lt;&gt;是泛型的，Register需要泛型，但是如果不需要，就会自动回退至该方法
+    IUnRegister IEasyEvent.Register(Action onEvent)
+    {
+        return Register(Action);
+        void Action(T _) =&gt; onEvent(); // 将Action&lt;T&gt;适配为Action
+    }
+
+    public override string ToString() =&gt; Value.ToString();
+}
+</code></pre>
+<p>可以看到内容很简单：无非就是在调用<code>EasyEvent&lt;T&gt;</code>的操作(前面有讲解)<br>但是要注意有<strong>2种反注册方法</strong>：</p>
+<ul>
+<li>通过<code>BindableProperty.UnRegister()</code>直接反注册</li>
+<li>通过<code>BindableProperty.Register()</code>获取的IUnRegister调用<code>UnRegister()</code>进行反注册</li>
+</ul>
+<p>根据观察，两种反注册方法<strong>各有优点</strong>：</p>
+<ul>
+<li><strong>直接反注册</strong>：<VT>不能使用Lambda，需要通过函数进行反注册</VT></li>
+<li><strong>IUnRegister反注册</strong>：<VT>需要保存IUnRegister，通过IUnRegister才能反注册</VT></li>
+</ul>
+<p>所以的话<strong>根据实际情况选择</strong>即可</p>
+<h3 id="command">Command</h3>
+<p>在UI框架中，用Command集合一组操作是非常常见的事，<VT>代码被分离到Command脚本中减轻了原代码处的职责压力</VT></p>
+<p>System<VT>与Model类似</VT>，具有接口ICommand以及抽象类AbstractCommand：<br><strong>接口ISystem：</strong></p>
+<pre><code class="language-csharp">public interface ICommand : IBelongToArchitecture, ICanSetArchitecture, ICanGetSystem, ICanGetModel, ICanGetUtility,
+    ICanSendEvent, ICanSendCommand, ICanSendQuery
+{
+    void Execute();
+}
+</code></pre>
+<p><B><VT>属于Command最关键的职责即为<code>Execute()</code></VT></B></p>
+<p>Command也实现了<strong>抽象类<GN>AbstractCommand</GN></strong>：　<VT>与其余的AbstractXXX无异</VT></p>
+<pre><code class="language-csharp">public abstract class AbstractCommand : ICommand
+{
+    private IArchitecture mArchitecture;
+
+    IArchitecture IBelongToArchitecture.GetArchitecture() =&gt; mArchitecture;
+
+    void ICanSetArchitecture.SetArchitecture(IArchitecture architecture) =&gt; mArchitecture = architecture;
+
+    void ICommand.Execute() =&gt; OnExecute();
+
+    protected abstract void OnExecute();
+}
+</code></pre>
+<p>除此以外，QFramework还提供了一组<strong>有返回值的Command</strong>：<br><code>public abstract class AbstractCommand&lt;TResult&gt; : ICommand&lt;TResult&gt;</code></p>
+<h3 id="utility与system">Utility与System</h3>
+<p>最核心的当然是Architecture，随后是Controller与Model，而<B><VT>System可以认为是从Model中剥离出来的一部分，Utility则是独立的功能</VT></B></p>
+<h4 id="utility">Utility</h4>
+<p>Utility，即<strong>功能</strong>，为了实现某些内容我们就需要相应的Utility<br>这有点类似与<B>&quot;纯功能框架&quot;</B></p>
+<p>在QFramework中，<B><VT>Utility仅是一个IUtility接口以及相应规则</VT></B></p>
+<pre><code class="language-csharp">public interface IUtility
+{
+}
+
+// Architecture中
+public void RegisterUtility&lt;TUtility&gt;(TUtility utility) where TUtility : IUtility =&gt;
+    mContainer.Register&lt;TUtility&gt;(utility);
+public TUtility GetUtility&lt;TUtility&gt;() where TUtility : class, IUtility =&gt; mContainer.Get&lt;TUtility&gt;();
+</code></pre>
+<p>可以看到，无非就是<VT>注册到mInstances，然后从中取出</VT></p>
+<h4 id="system">System</h4>
+<p><B><DRD>注意：System是用于处理某类问题的&quot;管理系统&quot;，并非是Model的子集(System可以获取Model，然后处理Model操作，但不仅仅只能这样)</DRD></B></p>
+<p>System<VT>与Model类似</VT>，具有接口IModel以及抽象类AbstractSystem：<br><strong>接口ISystem：</strong><br><code>public interface ISystem : IBelongToArchitecture, ICanSetArchitecture, ICanGetModel, ICanGetUtility, ICanRegisterEvent, ICanSendEvent, ICanGetSystem, ICanInit {}</code></p>
+<p>同样的，AbstractSystem与注册方法<code>RegisterSystem()</code>也是与Model类似的</p>
+<h3 id="query">Query</h3>
+<p>有时，我们可能<strong>想获取一些组件中的值用于某些计算得出一个数值</strong>，此时Query就提供了这种功能</p>
+<p>接口如下：</p>
+<pre><code class="language-csharp">public interface IQuery&lt;TResult&gt; : IBelongToArchitecture, ICanSetArchitecture, ICanGetModel, ICanGetSystem,
+    ICanSendQuery
+{
+    TResult Do();
+}
+</code></pre>
+<p>作为Query最重要的就是<code>Do()</code>，这类似于Command的<code>Execute()</code>，即计算</p>
+<p>在Architecture中有相应的操作<code>SendQuery()</code>：</p>
+<pre><code class="language-csharp">public TResult SendQuery&lt;TResult&gt;(IQuery&lt;TResult&gt; query) =&gt; DoQuery&lt;TResult&gt;(query);
+
+protected virtual TResult DoQuery&lt;TResult&gt;(IQuery&lt;TResult&gt; query)
+{
+    query.SetArchitecture(this);
+    return query.Do();
+}
+</code></pre>
+<p>可以发现是和Command极其类似的，同样也具有AbstractQuery</p>
+<h3 id="architecture详述">Architecture详述</h3>
+<p>根据源代码，可以知道一切内容都会在Architecture中收束(集中)<br>从其IArchitecture接口就能知道：</p>
+<pre><code class="language-csharp">public interface IArchitecture
+{
+    void RegisterSystem&lt;T&gt;(T system) where T : ISystem;
+    void RegisterModel&lt;T&gt;(T model) where T : IModel;
+    void RegisterUtility&lt;T&gt;(T utility) where T : IUtility;
+    T GetSystem&lt;T&gt;() where T : class, ISystem;
+    T GetModel&lt;T&gt;() where T : class, IModel;
+    T GetUtility&lt;T&gt;() where T : class, IUtility;
+    void SendCommand&lt;T&gt;(T command) where T : ICommand;
+    TResult SendCommand&lt;TResult&gt;(ICommand&lt;TResult&gt; command);
+    TResult SendQuery&lt;TResult&gt;(IQuery&lt;TResult&gt; query);
+    void SendEvent&lt;T&gt;() where T : new();
+    void SendEvent&lt;T&gt;(T e);
+    IUnRegister RegisterEvent&lt;T&gt;(Action&lt;T&gt; onEvent);
+    void UnRegisterEvent&lt;T&gt;(Action&lt;T&gt; onEvent);
+    void Deinit();
+}
+</code></pre>
+<p>从中我们也可以分析出<strong>一些规律</strong>：</p>
+<ul>
+<li>System/Model/Utility是作为一个&quot;系统&quot;存在的，可以注册(到IOCContainer)，也可以获取(从IOCContainer)</li>
+<li>Command/Query/Event是一种操作，需要发送(执行)</li>
+<li>Event本质上是Action，具有注册与反注册操作</li>
+</ul>
+<p>再来简单看一下<strong>声明</strong>：<br><code>public abstract class Architecture&lt;T&gt; : IArchitecture where T : Architecture&lt;T&gt;, new()</code><br>显然这是一种类似与单例的声明方法，用于把T传入内部</p>
+<h4 id="architecture的初始化">Architecture的初始化</h4>
+<p>Architecture提供了一种访问的方法Interface，第一次访问时则会初始化填充(单例)：</p>
+<pre><code class="language-csharp">public static IArchitecture Interface
+{
+    get
+    {
+        if (mArchitecture == null) InitArchitecture();
+        return mArchitecture;
+    }
+}
+
+public static void InitArchitecture()
+{
+    if (mArchitecture == null)
+    {
+        // 先Init
+        mArchitecture = new T();
+        mArchitecture.Init();
+        // 再回调(传入Arch版Init)
+        OnRegisterPatch?.Invoke(mArchitecture);
+
+        // 初始化所有model(注册过的)
+        foreach (var model in mArchitecture.mContainer.GetInstancesByType&lt;IModel&gt;().Where(m =&gt; !m.Initialized))
+        {
+            model.Init();
+            model.Initialized = true;
+        }
+        // 初始化所有system(注册过的)
+        foreach (var system in mArchitecture.mContainer.GetInstancesByType&lt;ISystem&gt;()
+                        .Where(m =&gt; !m.Initialized))
+        {
+            system.Init();
+            system.Initialized = true;
+        }
+
+        mArchitecture.mInited = true;
+    }
+}
+</code></pre>
+<p>可以看到Model/System需要初始化，而Utility是没有在初始化中的，也就是说：<B><VT>Utility仅需Register而无需初始化操作</VT></B><br>事实也确实如此，Utility的接口IUtility仅是一个空接口<br>同时，我们需要注意：<B><VT>Model/System/(Utility)都应该先自己Register，然后Architecture才会帮忙执行Init</VT></B></p>
+<h4 id="系统组件">系统组件</h4>
+<p>对于<strong>Model/System/Utility</strong>，我们会认为是一种<B>&quot;系统&quot;</B>:</p>
+<ul>
+<li>Model中存储着数据，需要将数据绑定至视图，并提供访问Model的方式</li>
+<li>System中执行着某种功能</li>
+<li>Utility是某种功能，可供其它部分获取并调用</li>
+</ul>
+<p>显然，它们都有一个<strong>共同点</strong>：<B><VT>被别人需要</VT></B><br>所以它们都<strong>提供</strong>了<strong>Register与Get方法</strong><br><B><YL>以Model为例：</YL></B></p>
+<pre><code class="language-csharp">public void RegisterModel&lt;TModel&gt;(TModel model) where TModel : IModel
+{
+    model.SetArchitecture(this); // 填充归属
+    mContainer.Register&lt;TModel&gt;(model); // 放入IOCContainer
+    // 初始化
+    if (mInited)
+    {
+        model.Init();
+        model.Initialized = true;
+    }
+}
+
+public TModel GetModel&lt;TModel&gt;() where TModel : class, IModel =&gt; mContainer.Get&lt;TModel&gt;(); // 从IOCContainer中取出
+</code></pre>
+<p><YL>结合ICanGetModel，我们即可为<strong>可访问</strong>的架构组件提供方法：<br><code>var model = this.GetModel&lt;ICounterAppModel&gt;(); // Command中</code><br>对于该例，最终会找到<code>T GetModel&lt;T&gt;(this ICanGetModel self)</code>进行调用</YL></p>
+<h4 id="执行组件">执行组件</h4>
+<p>除了以上三者，剩余的是<strong>Command/Query/Event</strong>，它们的<strong>共同点</strong>即为<B><VT>是一段需要执行的内容</VT></B>：</p>
+<pre><code class="language-csharp">// Command
+public class IncreaseCountCommand : AbstractCommand 
+{
+    protected override void OnExecute()
+    {
+        var model = this.GetModel&lt;ICounterAppModel&gt;();
+        model.Count.Value++;
+    }
+}
+// Query
+public class SchoolAllPersonCountQuery : AbstractQuery&lt;int&gt;
+{
+    protected override int OnDo()
+    {
+        return this.GetModel&lt;StudentModel&gt;().StudentNames.Count +
+                this.GetModel&lt;TeacherModel&gt;().TeacherNames.Count;
+    }
+}
+// Event
+CounterApp.Interface.RegisterEvent&lt;CountChangeEvent&gt;(e =&gt;
+{
+    this.GetUtility&lt;Storage&gt;().SaveInt(nameof(Count), Count);
+});
+</code></pre>
+<p>所以它们都<strong>提供</strong>了<strong>Send方法</strong><VT>(由于Event是&quot;嵌入的&quot;，所以需要Register与UnRegister)</VT><br>与系统组件一致，最终是通过<strong>CanSendXXX接口</strong>进行调用</p>
+<p>问题：为什么Command/Event具有</p>
+<h4 id="规则详述">规则详述</h4>
+<p>在上述分析中，我们发现<strong>接口</strong>在QFramework中起到了非常重要的作用<br>在QFramework中，这些接口就是<B><GN>规则Rule</GN></B></p>
+<p><strong>观察后可以总结为以下几类：</strong></p>
+<ul>
+<li>Architecture：<br><code>IBelongToArchitecture</code>/<code>ICanSetArchitecture</code></li>
+<li>系统组件：<br>Model/System/Utility的<code>Get</code>，同时<B><VT>提供ICanXXX的扩展方法</VT></B></li>
+<li>执行组件<br>Command/Query/Event的<code>Send</code>，同时<B><VT>提供ICanSendXXX的扩展方法</VT></B></li>
+<li>初始化与反初始化：<br><code>ICanInit</code></li>
+</ul>
+<p><strong>Architecture</strong>：<br>本质上<code>IBelongToArchitecture</code>其实可以称为<code>ICanGetArchitecture</code><br>观察后我们可以得出<strong>2种用法</strong>：</p>
+<ul>
+<li><B><VT>接口具有GetArchitecture能力</VT></B><br>如：IModel实现IBelongToArchitecture，在抽象类AbstractModel中具有显式接口实现：<code>IArchitecture IBelongToArchitecture.GetArchitecture() =&gt; mArchitecturel;</code></li>
+<li><B><VT>为接口添加扩展方法</VT></B><br>如：<code>GetModel()</code>---一种基于ICanGetModel获取Model的方式<br><code>public static T GetModel&lt;T&gt;(this ICanGetModel self) where T : class, IModel =&gt;self.GetArchitecture().GetModel&lt;T&gt;();</code></li>
+</ul>
+<p><B><BL>问题：IController为什么要自行实现，而IModel被封装在AbstractModel中的显式接口</BL></B><br><BL>显而易见的是两者的功能不同：</BL></p>
+<ul>
+<li>Model实现了接口的GetSetArchitecture/Init功能，这是接口需要的，而Controller仅有IBelongToArchitecture需要实现</li>
+<li>Model是需要注册进Architecture中的，Controller不需要</li>
+</ul>
+<p>更重要的是：</p>
+<pre><code class="language-csharp">public class CounterAppController : MonoBehaviour , IController
+{
+    void Start()
+    {
+        mModel = this.GetModel&lt;ICounterAppModel&gt;();
+        // ...
+    }
+
+    public IArchitecture GetArchitecture()
+    {
+        return CounterApp.Interface;
+    }
+}
+</code></pre>
+<pre><code class="language-csharp">// Architecture中
+public void RegisterModel&lt;TModel&gt;(TModel model) where TModel : IModel
+{
+    model.SetArchitecture(this); // 存入mArchitecturel
+    mContainer.Register&lt;TModel&gt;(model);
+
+    if (mInited)
+    {
+        model.Init();
+        model.Initialized = true;
+    }
+}
+
+public abstract class AbstractModel : IModel
+{
+    private IArchitecture mArchitecturel;
+
+    // 对于Architecture中注册过的Model来说，调用时可直接获取
+    IArchitecture IBelongToArchitecture.GetArchitecture() =&gt; mArchitecturel;
+
+    void ICanSetArchitecture.SetArchitecture(IArchitecture architecture) =&gt; mArchitecturel = architecture;
+
+    // ...
+}
+</code></pre>
+<p><strong><VT>Controller需要自行指定Architecture获取，Model可自行捕获</VT></strong></p>
+<p><strong>扩展方法：</strong></p>
+<p>可以看到<strong>ICanXXX接口</strong>在QFramework中是极其重要的<br>以ICanGetModel为例：</p>
+<pre><code class="language-csharp">public interface ICanGetModel : IBelongToArchitecture
+{
+}
+
+public static class CanGetModelExtension
+{
+    public static T GetModel&lt;T&gt;(this ICanGetModel self) where T : class, IModel =&gt;
+        self.GetArchitecture().GetModel&lt;T&gt;();
+}
+</code></pre>
+<p>首先，在前面也有所提及：<VT>一种组件具有ICanXXX接口的话，自然能调用相应功能</VT>，同时，这些功能都有一个<strong>前提：IBelongToArchitecture</strong>，可以看到，因为是<strong>从Architecture中调用相应方法的</strong><br>这里有一个<strong>重点</strong>：<br><B><VT>事实上调用的是<code>IBelongToArchitecture.GetArchitecture()</code>，所以说如果AbstractModel的实现类重写了显式接口实现，即可更改<DRD>(不应该这么做)</DRD>，而如果直接实现<code>GetArchitecture()</code>则是无用的</VT></B></p>
+<h5 id="组件规则">组件规则</h5>
+<p>在前文中，组件接口并没有详细考虑<B><BL>为什么有这些规则</BL></B>，这里来详细看一下：</p>
+<ul>
+<li><code>IController : IBelongToArchitecture, ICanSendCommand, ICanGetSystem, ICanGetModel, ICanRegisterEvent, ICanSendQuery, ICanGetUtility</code></li>
+<li><code>IModel : IBelongToArchitecture, ICanSetArchitecture, ICanGetUtility, ICanSendEvent, ICanInit</code></li>
+<li><code>ISystem : IBelongToArchitecture, ICanSetArchitecture, ICanGetModel, ICanGetUtility, ICanRegisterEvent, ICanSendEvent, ICanGetSystem, ICanInit</code></li>
+<li><code>ICommand : IBelongToArchitecture, ICanSetArchitecture, ICanGetSystem, ICanGetModel, ICanGetUtility,ICanSendEvent, ICanSendCommand, ICanSendQuery</code></li>
+<li><code>IQuery&lt;TResult&gt; : IBelongToArchitecture, ICanSetArchitecture, ICanGetModel, ICanGetSystem, ICanSendQuery</code></li>
+<li><code>IUtility(空)</code></li>
+<li>无Event</li>
+</ul>
+<p><strong>以操作分组</strong>进行分析是比较合理的</p>
+<p>首先是<strong>获取Get</strong>：<br>可获取的组件有：<strong>Model/System/Utility</strong>，也就是我们前面说的<strong>系统组件</strong><br><strong><DRD>注意：Get对应的是Register，但并没有相应规则，Register在Architecture有所实现</DRD></strong></p>
+<ul>
+<li><p><strong>Model：</strong><br><VT>需要的组件---Controller/System/Command/Query</VT><br>Model可以说是最常用的了，无论什么操作都会用到数据，所以都需要获取</p>
+<ul>
+<li><strong>Model获取Model</strong>是一件非常<B><DRD>不建议</DRD></B>的操作，这是一种<VT><B>直接引用，会造成混乱</B>(A要B/C，B要A/C，C要A/B，Model多的话会非常灾难)</VT></li>
+</ul>
+</li>
+<li><p><strong>System：</strong><br><VT>需要的组件---Controller/System/Command/Query</VT><br>System是和Model保持一致，但是原因不同：</p>
+<ul>
+<li>System可以提供任何可能的功能，所以几乎所有的组件都可以获取</li>
+<li>Model不能获取是因为Model是数据，<B><VT>System的操作是偏向业务的，职责不同</VT></B></li>
+</ul>
+</li>
+<li><p><strong>Utility：</strong><br><VT>需要的组件---Controller/Model/System/Command</VT></p>
+<ul>
+<li>Utility是比较好分析的，由于是一种功能，所以基本上肯定能用</li>
+<li>没有实现ICanGetUtility的是Query，<B><VT>Query是查询，当然不需要调用任何功能来完成</VT></B></li>
+<li><strong><BL>问题：为什么Model需要Utility</BL></strong></li>
+</ul>
+<p><BL>Model大部分情况是纯数据，但Model同样可以进行操作(有一个<code>OnInit()</code>方法)，此时可能会用到Utility</BL></p>
+</li>
+</ul>
+<BR>
+
+<p>然后是<strong>发送Send</strong>：<br>可发送的组件有：<strong>Command/Event/Query</strong>，也就是我们前面说的<strong>执行组件</strong></p>
+<ul>
+<li><p><strong>Command：</strong><br><VT>需要的组件---Controller/Command</VT><br>可以发送命令的组件不多，只有Controller与自己Command</p>
+<ul>
+<li>Command可以发送Command，即可以嵌套，这是很好理解的</li>
+<li>Controller需要Command是因为<B><VT>Command本质上其实就是为事件监听准备的</VT></B></li>
+</ul>
+<blockquote>
+<p>在UI框架中，用Command集合一组操作是非常常见的事，<VT>代码被分离到Command脚本中减轻了原代码处的职责压力</VT></p>
+</blockquote>
+</li>
+<li><p><strong>Event：</strong><br><VT>需要的组件---Controller/Model/System/Command</VT><br>可以发现Event要比Command<strong>泛用</strong>一些，除了Query都可以使用</p>
+<ul>
+<li>与Utility一致，Query不可以使用：<B><VT>Query是查询，当然不需要触发任何事件</VT></B></li>
+</ul>
+</li>
+<li><p><strong>Query：</strong><br><VT>需要的组件---Controller/Command/Query</VT><br>Query是一个用于查询结果并返回的组件，那么需要的组件一定是需要某项结果的，Model与System不行出于以下原因：</p>
+<ul>
+<li>Model是数据，不能发送查询命令是再正常不过的了</li>
+<li>System大概是为了减少复杂度，想要操作那就自己运算，不要通过Query查询获取</li>
+</ul>
+</li>
+</ul>
+<p>再然后是<strong>注册Register</strong>：<br>需要通过接口来注册的只有Event<br><VT>需要的组件---Controller/System</VT></p>
+<ul>
+<li>Controller注册事件是显而易见的，因为视图更新回调需要在Controller中完成</li>
+<li>System则有可能会包装Model操作，需要封装成事件用于调用</li>
+</ul>
+<BR>
+
+<p>除此以外还有3个接口：ICanInit/IBelongToArchitecture/ICanSetArchitecture</p>
+<ul>
+<li><strong>ICanInit</strong>是非常简单的，<VT>需要的组件---Model/System</VT><br>这与Architecture中的<code>RegisterModel()</code>/<code>RegisterSystem()</code>对应</li>
+<li><strong>IBelongToArchitecture/ICanSetArchitecture</strong>则与ICanXXX扩展方法有关：<br><strong><VT>如果需要来自Architecture的某方法的话就必须实现IBelongToArchitecture与ICanSetArchitecture两个接口</VT></strong><br>可以看到大部分组件都实现了两接口，<VT>需要的组件---System/Model/Command/Query</VT><br><strong><BL>问题：为什么Controller仅实现了IBelongToArchitecture</BL></strong></li>
+</ul>
+<p><BL>回想Controller的实现，会发现：IController并没有实现抽象类，因此我们仅需实现<code>GetArchitecture()</code>，之后在调用相应功能时可直接获取<br>反过来说，其它组件需要ICanSetArchitecture接口是因为注册时的自动化Set需要，而Controller手动传入了，所以不需要</BL></p>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

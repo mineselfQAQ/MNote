@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log模块</title>
+  <link rel="stylesheet" href="../../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>Log模块</BBBG></center></strong></p>
+<h1 id="v10">v1.0</h1>
+<h2 id="概述">概述</h2>
+<p><strong>Log设计</strong>如下：</p>
+<ul>
+<li>核心<ul>
+<li>MLog(static)：核心静态类，基础设置以及日志都在该类中</li>
+<li>LogBase(ILog)：抽象基类，每个需要Log的类都需要创建一个LogBase派生类，最重要的<code>D()</code>/<code>W()</code>/<code>E()</code>/<code>EX()</code>就在其中<ul>
+<li>InternalLog：框架内部使用</li>
+<li>UserLog：用户使用</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>其它<ul>
+<li>ExLog：<code>EX()</code>即异常输出所需的内容</li>
+</ul>
+</li>
+</ul>
+<BR>
+
+<p>一些<strong>注意事项</strong>：</p>
+<ul>
+<li>内部创建使用InternalLog，没有提供封装函数，使用<code>new Internal(nameof(xxx))</code>即可<br>用户创建提供封装函数<code>MLog.Create&lt;T&gt;()</code>，一个类仅存在一个实例</li>
+<li>默认Editor为Debug，打包后为Off，调用<code>MEntryBase.OverrideLogFilter()</code>后可强制更改</li>
+<li><code>EX()</code>并不会像throw一样抛出异常，而是仅Log，本质上其实是<code>D()</code>/<code>W()</code>/<code>E()</code>的封装</li>
+<li>Log模块的时序十分重要，非常容易发生错误，这里的方式是：<br>将<code>MLog.Bootstrap()</code>提前至<code>MFrameworkCore.Bootstrap()</code>之前(即在第一个生命周期事件OnBootstrapping事件之前)<BR>
+
+<pre><code class="language-csharp">// MEntryBase
+protected void Awake()
+{
+    _core = (MCore)CreateCore();
+    // ...
+    
+    // 启动
+    MLog.SetDefaultLogFilter(SetLogFilter());
+    MLog.Bootstrap(); // 主动提前，使OnBootstrapping事件中可进行MLog操作
+    _core.Bootstrap();
+}
+
+protected virtual MLog.LogFilter SetLogFilter()
+{
+    return MLog.BUILD_FILTER;
+}
+</code></pre>
+</li>
+</ul>
+<h2 id="使用例">使用例</h2>
+<pre><code class="language-csharp">public class MEntry : MEntryBase
+{
+    // 一个类仅有一个ILog(即使有2个也是同一对象)
+    private ILog _log = MLog.Create&lt;MEntry&gt;(MLog.LogFilter.Debug); // 可修改过滤等级
+
+    // 默认Editor为Debug，打包后为Off，调用后可强制更改
+    protected override MLog.LogFilter OverrideLogFilter()
+    {
+        return MLog.LogFilter.Debug;
+    }
+
+    protected override void OnBootstrapped(TrackerStoppedEvent e)
+    {
+        MLog.Default.D(&quot;Default输出&quot;); // Default的LogFilter会跟着设置走
+        
+        _log.D(&quot;Debug&quot;);
+        _log.W(&quot;Warning&quot;);
+        _log.E(&quot;Error&quot;);
+        _log.EX(LogException.NullReference);
+        _log.EX(LogException.NullReference, MLog.LogLevel.Error); // 修改报错等级
+    }
+}
+</code></pre>
+<img src="Pic/Log1.png" alt="" class="mnote-img mnote-img-wide" data-mnote-image="1" data-kind="wide" data-width="474" data-height="183">
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

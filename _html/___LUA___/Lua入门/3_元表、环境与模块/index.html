@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3_元表、环境与模块</title>
+  <link rel="stylesheet" href="../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><T>3_元表、环境与模块</T></center></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E5%85%83%E8%A1%A8%E5%85%83%E6%96%B9%E6%B3%95">元表/元方法</a><ul>
+<li><a href="#%E5%87%BD%E6%95%B0%E5%AE%9A%E4%B9%89">函数定义</a></li>
+<li><a href="#%E4%BE%8B%E5%AD%90%E5%B1%95%E7%A4%BA">例子展示</a><ul>
+<li><a href="#%E4%BE%8B%E5%AD%901%E9%9B%86%E5%90%88">例子1：集合</a></li>
+<li><a href="#%E4%BE%8B%E5%AD%902%E8%AE%BE%E7%BD%AE%E9%BB%98%E8%AE%A4%E5%80%BC">例子2：设置默认值</a></li>
+<li><a href="#%E4%BE%8B%E5%AD%903%E8%B7%9F%E8%B8%AA%E8%A1%A8">例子3：跟踪表</a></li>
+<li><a href="#%E4%BE%8B%E5%AD%904%E5%8F%AA%E8%AF%BB%E8%A1%A8">例子4：只读表</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E7%8E%AF%E5%A2%83">环境</a><ul>
+<li><a href="#lua%E5%81%9A%E7%9A%84%E5%B7%A5%E4%BD%9C">Lua做的工作</a></li>
+<li><a href="#_g%E8%A1%A8">_G表</a></li>
+<li><a href="#_env%E8%A1%A8">_ENV表</a></li>
+<li><a href="#%E4%B8%80%E4%BA%9B%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9">一些注意事项</a><ul>
+<li><a href="#%E5%AE%9E%E4%BE%8B%E4%BD%BF%E7%94%A8%E5%B7%A5%E5%8E%82%E5%AE%9A%E4%B9%89%E7%8E%AF%E5%A2%83">实例：使用工厂定义环境</a></li>
+<li><a href="#%E5%AE%9E%E4%BE%8B%E8%A7%A3%E5%86%B3%E6%A8%A1%E5%9D%97%E5%AF%BC%E8%87%B4%E5%85%A8%E5%B1%80%E7%A9%BA%E9%97%B4%E6%B1%A1%E6%9F%93%E9%97%AE%E9%A2%98">实例：解决模块导致全局空间污染问题</a></li>
+<li><a href="#%E5%AE%9E%E4%BE%8B%E4%BD%BF%E7%94%A8%E7%8E%AF%E5%A2%83%E5%8A%A0%E8%BD%BD%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6">实例：使用环境加载配置文件</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E6%A8%A1%E5%9D%97%E5%8C%85">模块/包</a><ul>
+<li><a href="#%E6%A8%A1%E5%9D%97%E5%9F%BA%E7%A1%80%E4%BD%BF%E7%94%A8">模块基础使用</a></li>
+<li><a href="#require%E5%87%BD%E6%95%B0">Require函数</a><ul>
+<li><a href="#%E6%A6%82%E5%BF%B5">概念</a></li>
+<li><a href="#%E9%87%8D%E8%A6%81%E6%A6%82%E5%BF%B5">重要概念</a><ul>
+<li><a href="#%E6%A8%A1%E5%9D%97%E9%87%8D%E5%91%BD%E5%90%8D">模块重命名</a></li>
+<li><a href="#%E6%90%9C%E7%B4%A2%E8%B7%AF%E5%BE%84">搜索路径</a><ul>
+<li><a href="#%E4%B8%80%E4%BA%9B%E5%87%BD%E6%95%B0%E5%AD%97%E6%AE%B5">一些函数/字段</a><ul>
+<li><a href="#packagesearchpath">package.searchpath</a></li>
+<li><a href="#packagesearchers">package.searchers</a></li>
+<li><a href="#packagepreload">package.preload</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E5%AD%90%E6%A8%A1%E5%9D%97%E5%8C%85">子模块/包</a></li>
+<li><a href="#%E6%A8%A1%E5%9D%97%E7%BC%96%E5%86%99%E4%BE%8B">模块编写例</a></li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<h1 id="元表元方法">元表/元方法</h1>
+<p>可以认为<B><VT>元表是面向对象中的受限制类，元表定义的是实例的行为，由于定义有限制，所以元表比类更受限</VT></B></p>
+<p>设置元表：<code>setmetatable(t,metaT)</code><br>获取元表：<code>getmetatable(t)</code><br><strong><VT>Tip：对于新表来说，没有元表</VT></strong></p>
+<h2 id="函数定义">函数定义</h2>
+<p><strong>有：</strong></p>
+<ul>
+<li>算术运算相关<ul>
+<li><code>__add</code>加 <code>__sub</code>减 <code>__mul</code>乘 <code>__div</code>除</li>
+<li><code>__idiv</code>floor除 <code>__unm</code>负数 <code>__mod</code>取模 <code>__pow</code>幂运算</li>
+<li><code>__band</code>按位与 <code>__bor</code>按位或 <code>__bxor</code>按位异或 <code>__bnot</code>按位取反<br> <code>__shl</code>向左移位 <code>__shr</code>向右移位</li>
+<li><code>__concat</code>连接符</li>
+</ul>
+</li>
+<li>关系运算相关<ul>
+<li><code>__eq</code>等于 <code>__lt</code>小于 <code>__le</code>小于等于</li>
+<li><B><VT>Tip：其余运算没有元方法，会被等价替换</VT></B><ul>
+<li><code>a~=b</code>转为<code>not(a==b)</code></li>
+<li><code>a&gt;b</code>转为<code>b&lt;a</code></li>
+<li><code>a&gt;=b</code>转为<code>b&lt;=a</code></li>
+</ul>
+</li>
+<li>在Lua5.3前，有<code>a&lt;=b</code>到<code>not(b&lt;a)</code>的转换以完全转换为一种关系运算符，但是这不完全正确：<br>在IEEE754标准中，<code>0/0</code>得NaN，有：<code>NaN&lt;=x</code>为假，<code>x&lt;NaN</code>为假，那么以上转换就不成立了</li>
+</ul>
+</li>
+<li>库定义相关<ul>
+<li><code>__tostring</code>---函数tostring先检查值是否有元方法<code>__tostring</code>，如果有就调用并将对象传入，并将返回值作为函数的返回值返回</li>
+<li><code>__metatable</code>---保护元表，使<code>getmetatable</code>只能返回设置的str，<code>setmetatable</code>引发报错</li>
+<li><code>__pairs</code>---<B><VT>Lua5.2引入</VT></B>，可自定义<code>pairs()</code>的行为</li>
+</ul>
+</li>
+<li>表相关<ul>
+<li><code>__index</code>---可以认为是<B><GN>get方法</GN></B>，具体来说：<ul>
+<li>如果表中有索引，直接返回</li>
+<li>如果表中无索引，则看元表：<ul>
+<li>如果没有元表，返回nil</li>
+<li>如果有元表：<ul>
+<li>如果是函数，则返回函数返回值　　<strong><VT>函数形式<code>function(t, k)</code></VT></strong></li>
+<li>如果是表，则再次判断</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><code>__newindex</code>---可以认为是<B><GN>set方法</GN></B>，具体来说：<ul>
+<li>如果是表中索引或者没有<code>__newindex</code>元方法，直接更新</li>
+<li>如果不是表中索引，则看元表：<ul>
+<li>如果是函数，则在内部使用<code>rawset()</code>进行赋值　　<strong><VT>函数形式<code>function(t, k, v)</code></VT></strong></li>
+<li>如果是表，则会在表中执行赋值<B><VT>(即使有<code>__newindex</code>元方法也不会再操作了)</VT></B></li>
+</ul>
+</li>
+<li><strong><DRD>注意：赋值必须使用rawset()，否则会再次触发元方法导致递归</DRD></strong></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="例子展示">例子展示</h2>
+<h3 id="例子1集合">例子1：集合</h3>
+<pre><code class="language-lua">Set = {}
+local mt = {}
+
+-- 集合创建
+function Set.new(l)
+  local set = {}
+  setmetatable(set, mt)
+  for _, v in ipairs(l) do set[v] = true end
+  return set
+end
+
+--- 集合操作 ---
+
+function Set.union(a, b)
+  if getmetatable(a) ~= mt or getmetatable(b) ~= mt then
+    error(&quot;xxx&quot;, 2)
+  end
+  
+  local res = Set.new{}
+  for k in pairs(a) do res[k] = true end
+  for k in pairs(b) do res[k] = true end
+  return res
+end
+
+function Set.intersection(a, b)
+  if getmetatable(a) ~= mt or getmetatable(b) ~= mt then
+    error(&quot;xxx&quot;, 2)
+  end
+  
+  local res = Set.new{}
+  for k in pairs(a) do
+    res[k] = b[k]
+  end
+  return res
+end
+
+function Set.tostring(set)
+  local l = {}
+  for e in pairs(set) do
+    l[#l + 1] = e
+  end
+  return &quot;{&quot; .. table.concat(l, &quot;, &quot;) .. &quot;}&quot;
+end
+
+-- metatable设置
+mt.__add = Set.union
+mt.__mul = Set.intersection
+mt.__tostring = Set.tostring
+
+--- 集合比较 ---
+
+-- 子集
+mt.__le = function (a, b)  
+  for k in pairs(a) do
+    if not b[k] then return false end
+  end
+  return true
+end
+-- 真子集
+mt.__lt = function (a, b)  
+  return a &lt;= b and not (b &lt;= a)
+end
+
+mt.__eq = function (a, b)
+  return a &lt;= b and b &lt;= a
+end
+
+s1 = Set.new{10,20,30,50}
+s2 = Set.new{30,1}
+s3 = s1 + s2
+print(Set.tostring(s3))
+</code></pre>
+<h3 id="例子2设置默认值">例子2：设置默认值</h3>
+<p><strong><VT>Tip：完整版在6_GC中</VT></strong></p>
+<pre><code class="language-lua">function setDefault(t, d)
+  local mt = {__index = function() return d end}
+  setmetatable(t, mt)
+end
+
+tab = {x = 10, y = 20}
+print(tab.x, tab.z) -- 10 nil
+setDefault(tab, 0)
+print(tab.x, tab.z) -- 10 0
+
+-- 改进：避免闭包与元表消耗的一种方式
+local mt = {__index = function(t) return t.___ end} -- 可以是任意名字，但是要小心重名
+function setDefault(t, d)
+  t.___ = d
+  setmetatable(t, mt)
+end
+-- 再次改进：使用空表避免重名(空表具有引用)
+local key = {}
+local mt = {__index = function(t) return t[key] end} -- 可以是任意名字，但是要小心重名
+function setDefault(t, d)
+  t[key] = d
+  setmetatable(t, mt)
+end
+</code></pre>
+<h3 id="例子3跟踪表">例子3：跟踪表</h3>
+<pre><code class="language-lua">-- 跟踪表，其实就是表里套一个表，这样就能实现其它内容了
+function track (t)
+    local proxy = {}      -- &#39;t&#39;的代理表
+    
+    -- 为代理创建元表
+    local mt = {
+      __index = function (_, k)
+        print(&quot;*access to element &quot; .. tostring(k))
+        return t[k]  -- 访问原来的表
+      end,
+      
+      __newindex = function (_, k, v)
+        print(&quot;*update of element &quot; .. tostring(k) ..
+              &quot; to &quot; .. tostring(v))
+        t[k] = v  -- 更新原来的表
+      end,
+      
+      __pairs = function ()
+        return function (_, k)  -- 迭代函数
+          local nextkey, nextvalue = next(t, k)
+          if nextkey ~= nil then  -- 避免最后一个值
+            print(&quot;*traversing element &quot; .. tostring(nextkey))
+          end
+          return nextkey, nextvalue
+        end
+      end,
+      
+      __len = function () return #t end
+    }
+    
+    setmetatable(proxy, mt)
+    
+    return proxy
+end
+
+t = {}
+t = track(t)
+t[1] = 10
+t[2] = &quot;hello&quot;
+print(t[2])
+print(#t)
+for k,v in pairs(t) do print(k, v) end
+</code></pre>
+<h3 id="例子4只读表">例子4：只读表</h3>
+<pre><code class="language-lua">-- 只读表，也就是跟踪表的一种衍生，通过__newindex限制改值的行为
+function readOnly(t)
+  local proxy = {}
+  local mt = {    -- 创建元表
+    __index = t,
+    __newindex = function(t, k, v)
+      error(&quot;attempt to update a read-only table&quot;, 2)
+    end
+  }
+  setmetatable(proxy, mt)
+  return proxy
+end
+
+-- 示例，我们可以创建一个表示星期的只读表:
+days = readOnly{&quot;Sunday&quot;, &quot;Monday&quot;, &quot;Tuesday&quot;, &quot;Wednesday&quot;,
+                &quot;Thursday&quot;, &quot;Friday&quot;, &quot;Saturday&quot;}
+print(days[1])    --&gt; Sunday
+days[2] = &quot;Noday&quot;  -- 这会抛出错误
+</code></pre>
+<h1 id="环境">环境</h1>
+<h2 id="lua做的工作">Lua做的工作</h2>
+<p>在C#中，我们能很清楚地分辨出变量类型，无非就是局部/全局，常量/非常量</p>
+<p>由于Lua是<B><GN>动态语言</GN></B>，所以<strong>无法区分常量和变量</strong>的，即<B><VT>所有量都是可变的</VT></B><br>由于Lua是<B><GN>嵌入式语言</GN></B>---被宿主应用调用chunk，所以<B><VT>全局变量由于&quot;程序&quot;的不明确而不明确</VT></B><br><B>所以：<VT>Lua通过不使用全局变量但对全局变量进行模拟的方式</VT></B>解决<br><strong><BL>问题：Lua没有全局变量？</BL></strong><br><BL>Lua的全局变量确实是通过<B>模拟</B>出来的，模拟的方式有2种：<code>_G</code>与<code>_ENV</code><br>我们所认知的局部与全局有：<br>局部---<code>local a = 10</code> 全局---<code>b = 20</code><br>关键在于：<B><VT>全局形式其实是一种语法糖</VT></B></p>
+<p>更具体来讲：<B><VT>全局变量是由Lua语言让我们产生的幻觉</VT></B></p>
+<ul>
+<li><B><VT>在5.1及之前，等价于<code>_G.b = 20</code></VT></B></li>
+<li><B><VT>在5.2及之后，等价于<code>_ENV.b = 20</code></VT></B></li>
+</ul>
+<p>如下所示：</p>
+<pre><code class="language-lua">local z = 10
+x = y + z
+-- 这等价于
+local z = 10
+_ENV.x = _ENV.y + z -- 5.2及之后
+</code></pre>
+<p>_ENV并不是全局变量<VT>(因为Lua没有全局变量)</VT>，<br>之所以能全局是因为编译器进行了以下操作：<B><VT>把所有代码段当作匿名函数，定义了_ENV上值</VT></B></p>
+<pre><code class="language-lua">local _ENV = the global environment
+return function(...)
+  local z = 10
+  _ENV.x = _ENV.y + z
+end
+</code></pre>
+<p><strong>简单总结：</strong></p>
+<ul>
+<li>编译器在编译所有代码段前，在外层创建局部变量_ENV</li>
+<li>编译器将自由名称var改为_ENV.var</li>
+<li>函数load/loadfile使用全局环境初始化代码段的第一个上值　　其实就是：<VT>在Lua5.2之后，每个函数都有特殊的上值_ENV表，默认就是<code>_ENV=_G</code></VT></li>
+</ul>
+<p><B>所以说：<VT>之所以<code>_ENV</code>和<code>_G</code>有效，其实还是因为编译器是这么规定的</VT></B></p>
+<p><B><BL>问题：<code>_ENV</code>和<code>_G</code>的关系</BL></B><br><BL>一般来说<code>_ENV</code>和<code>_G</code>会指向同一个表<br>具体来说：</BL></p>
+<ul>
+<li><BL><code>_ENV</code>只是一个局部变量，我们所认为的&quot;全局变量&quot;的访问就是在访问<code>_ENV</code><VT>(就是所谓的<code>_ENV.a=10</code>形式)</VT></BL></li>
+<li><BL><code>_G</code>是永远的全局变量</BL></li>
+</ul>
+<p><BL>简单来说，其实就是：</BL></p>
+<ul>
+<li><BL><code>_ENV</code>指向当前环境</BL></li>
+<li><BL><code>_G</code>指向全局环境</BL></li>
+</ul>
+<h2 id="_g表">_G表</h2>
+<p><B><VT>_G也是全局变量的一员</VT></B>，即<code>_G._G</code>等价于<code>_G</code>(甚至可以是无限写下去)</BL></p>
+<p><strong><VT>_G表获取的效率会高很多：</VT></strong><br>对于动态访问，可以有：<code>value = load(&quot;return&quot; .. varname)()</code>，由于创建与编译的原因，效率不高<br>我们可以通过<code>value = _G[varname]</code>获取，效率会高出一个数量级<br>那么赋值也是同理：<code>_G[varname] = value</code></p>
+<p><strong>例子：string转函数/字段(动态获取)</strong></p>
+<pre><code class="language-lua">function getfield(f)
+  local v = _G -- 从全局表开始
+  -- 按序遍历每一个字段
+  for w in string.gmatch(f, &quot;[%a_][%w_]*&quot;) do
+    v = v[w] -- 拼接
+  end
+  return v
+end
+
+function setfield(f, v)
+  local t = _G
+  for w, d in string.gmatch(f, &quot;([%a_][%w_]*)(%.)?&quot; ) do
+    if d == &quot;.&quot; then
+      t[w] = t[w] or {}
+      t = t[w]
+    else -- 最后一次
+      t[w] = v
+    end
+  end
+end
+
+-- 对于该例，情况如下：
+-- 一开始有变量v为_G
+-- 找到io，即v=_G[io]
+-- 找到read，即v=_G[io].read
+-- 然后调用即可
+local read_func = getfield(&quot;io.read&quot;)
+local input = read_func()  -- 等同于 io.read()
+print(input)
+
+setfield(&quot;t.x.y&quot;, 10)
+print(t.x.y)
+</code></pre>
+<p>在Lua中有一重要的特性：<B><VT>全局变量不需要声明就能使用</VT></B><br>这虽然方便，但极容易导致bug，通过为_G表添加元表即可进行检查：</p>
+<pre><code class="language-lua">setmetatable(_G, {
+  __newindex = function(t, n, v)
+    local w = debug.getinfo(2, &quot;S&quot;).what
+    -- 不在主程序块或C代码被禁用
+    if w ~= &quot;main&quot; and w ~= &quot;C&quot; then
+      error(&quot;attempt to write to undeclared variable &quot; .. n, 2)
+    end
+    rawset(t, n, v)
+  end,
+  
+  __index = function(_, n)
+    error(&quot;attempt to read undeclared variable &quot; .. n, 2)
+  end
+})
+
+print(a) -- 没有，不可访问
+</code></pre>
+<p>对于非C或内层新值，通过<code>rawset()</code>绕开元方法即可：</p>
+<pre><code class="language-lua">function declare(name, initval)
+    rawset(_G, name, initval or false) -- 保证不为nil
+end
+</code></pre>
+<p>此时访问也要小心，对于get不存在会error，也需要通过<code>rawget()</code>绕开元方法：</p>
+<pre><code class="language-lua">if rawget(_G, var) == nil then
+  -- &quot;var&quot;未声明
+end
+</code></pre>
+<BR>
+
+<p>在Lua中有一<VT><B>特性：全局变量的值不能为nil</B>(这是当然的，假设有<code>a=nil</code>，此时a得nil，但我不赋值a还为nil)</VT><br><B>解决方法：辅助表记录　　<VT>官方strict.lua模块已实现</VT></B></p>
+<pre><code class="language-lua">local declaredNames = {}
+
+setmetatable(_G, {
+  __newindex = function (t, n, v)
+    if not declaredNames[n] then
+      local w = debug.getinfo(2, &quot;S&quot;).what
+      if w ~= &quot;main&quot; and w ~= &quot;C&quot; then
+        error(&quot;attempt to write to undeclared variable &quot;..n, 2)
+      end
+      declaredNames[n] = true -- 放入辅助表，表示有值
+    end
+    rawset(t, n, v)
+  end,
+  
+  __index = function (_, n)
+    -- 只要进入过__newindex被放入辅助表，无论是值还是nil都代表已赋值
+    if not declaredNames[n] then
+      error(&quot;attempt to read undeclared variable &quot;..n, 2)
+    else
+      return nil
+    end
+  end,
+})
+
+-- 此时可以进行该操作了：
+x = nil
+</code></pre>
+<h2 id="_env表">_ENV表</h2>
+<p><code>_ENV</code>表和<code>_G</code>表一样，它们都只是一个<strong>普通的变量</strong></p>
+<p><strong>特殊用法：</strong><code>_ENV = nil</code><br>由于<code>_ENV</code>被清空了，那么自然<strong>不能访问全局变量</strong></p>
+<pre><code class="language-lua">local print, sin = print, math.sin
+_ENV = nil
+print(13) -- 可使用，因为print是local的
+print(sin(13)) -- 可使用，因为sin也是local的
+print(math.cos(13)) -- 不可使用，因为math.cos是全局的，已经访问不到了
+</code></pre>
+<p><strong>技巧：<VT>通过<code>_ENV</code>/<code>_G</code>可以绕开局部声明：</VT></strong></p>
+<pre><code class="language-lua">a = 13
+local a = 12
+print(a) -- 12，局部的
+print(_Env.a) -- 13，全局的
+print(_G.a) -- 13，全局的
+</code></pre>
+<p><strong><code>_ENV</code>用处：<VT>改变代码段的环境</VT></strong></p>
+<pre><code class="language-lua">_ENV = {} -- 新环境：一个新的空表
+a = 1
+print(a) -- error，此时print()已经不在当前环境中了
+
+-- 用法：
+a = 15 -- 全局变量
+_ENV = {_G = _G} -- 新环境，但是保存了_G
+a = 1
+_G.print(_ENV.a, g.a) -- 1 15
+</code></pre>
+<p><strong>我的理解：一旦调用<code>_ENV</code>后，环境从<code>_G</code>变为了<code>_ENV</code>，此时局部环境取决于<code>_ENV</code>表中的内容，比如说给一个空表<code>{}</code>那么此时就是一个纯净的环境，甚至<code>_G</code>中自动添加的print之类的函数或类都不可使用</strong></p>
+<p><strong>改变环境的另一种方法：<VT>继承</VT></strong></p>
+<pre><code class="language-lua">a = 1
+local newgt = {}
+setmetatable(newgt, {__index = _G}) -- 访问去_G表中访问
+_ENV = newgt
+
+-- print函数会去_G表中寻找
+print(a) -- 1
+a = 10
+print(a, _G.a) -- 10 1
+_G.a = 20
+print(_G.a) -- 20
+</code></pre>
+<p>由于<code>_ENV</code>其实还是一个普通的变量，所以它<B><VT>遵循定界规则</VT></B>：<br><strong><BL>问题：为什么以下会输出nil</BL></strong></p>
+<pre><code class="language-lua">_ENV = {_G = _G}
+local function foo()
+    _G.print(a)
+end
+local a = 10
+foo() -- nil
+</code></pre>
+<p><BL>首先是foo函数，这是<code>_ENV</code>下的一个函数，它会去访问<code>a</code>，<B>关键就在于这个<code>a</code>：</B>它是<code>_ENV.a</code>，我们进行的操作是声明局部a而非环境a，当然不行，<br>如果想要成功输出，<strong>方法</strong>有几个：</BL></p>
+<ul>
+<li><strong>使用环境变量</strong></li>
+</ul>
+<BR>
+
+<pre><code class="language-lua">_ENV = {_G = _G, a = 10}
+
+--或者
+a = 10 -- _ENV.a = 10(此时放在foo()上方下方都可以)
+</code></pre>
+<ul>
+<li><p><strong>提前定义</strong><br>对于这种情况，局部a已经作为当前环境的一员，即<code>_ENV.a</code>，之后进行的操作都是在更改它</p>
+<BR>
+
+<pre><code class="language-lua">local a = 0
+_ENV = {_G = _G, a = a} -- 让_ENV直接持有a
+local function foo()
+    _G.print(a)
+end
+a = 10 -- 此时的更改是生效的，因为_ENV.a被更改了
+foo()  -- 10
+</code></pre>
+</li>
+<li><p><strong>闭包</strong><br>前面之所以会输出nil，就是因为<code>_ENV</code>中没有a，但是如果能够捕获局部函数，那么同样是可以的</p>
+<BR>
+
+<pre><code class="language-lua">_ENV = {_G = _G}
+local a = 10
+local function foo()
+    _G.print(a)
+end
+foo()
+</code></pre>
+</li>
+</ul>
+<p><strong><BL>问题：环境怎么还原</BL></strong></p>
+<ul>
+<li><strong>方法1：还原<code>_G</code>表</strong></li>
+</ul>
+<pre><code class="language-lua">_ENV = {_G = _G}
+-- print(1) -- 此时不可以，因为_ENV.print是不存在的(此时存在的是_ENV._G.print)
+
+_ENV = _G -- 此时的环境就是_G表
+print(1) -- _ENV.print此时就变为了_G.print
+</code></pre>
+<ul>
+<li><strong>方法2：local环境</strong></li>
+</ul>
+<pre><code class="language-lua">a = 2
+do
+  -- 由于_ENV是local的，所以出块后就失效了
+  local _ENV = {print = print, a = 14}
+  print(a) -- 14
+end
+print(a) -- 2
+</code></pre>
+<h2 id="一些注意事项">一些注意事项</h2>
+<h3 id="实例使用工厂定义环境">实例：使用工厂定义环境</h3>
+<pre><code class="language-lua">function factory(_ENV)
+    return function() return a end
+end
+
+--私有环境f1/f2
+f1 = factory{a = 6} -- 在该环境下，只存在a=6
+f2 = factory{a = 7} -- 在该环境下，只存在a=7
+print(f1()) -- 6
+print(f2()) -- 7
+</code></pre>
+<h3 id="实例解决模块导致全局空间污染问题">实例：解决模块导致全局空间污染问题</h3>
+<p>在模块中，我们很有可能会写入如：<code>a = 10</code>的代码，如果直接加载模块的话必然会导致全局空间的污染，那么通过添加环境的方法即可解决<br><strong>方法有：</strong></p>
+<ul>
+<li><strong>方法1：添加空表作为环境</strong></li>
+</ul>
+<BR>
+
+<pre><code class="language-lua">local M = {}
+_ENV = M
+
+-- 为M.add
+function add(c1, c2)
+    return new(c1.r + c2.r, c1.i + c2.i) -- 指的是M.new
+end
+</code></pre>
+<ul>
+<li><strong>方法2：环境设nil<VT>(兼容lua5.1)</VT></strong></li>
+</ul>
+<BR>
+
+<pre><code class="language-lua">local M = {}
+
+-- 简单版，直接拿_G，后续使用_G.xxx进行全局变量访问即可
+local _G = _G
+-- 规范版，要什么拿声明
+local sqrt = math.sqrt
+local io = io
+
+_ENV = nil
+</code></pre>
+<h3 id="实例使用环境加载配置文件">实例：使用环境加载配置文件</h3>
+<p><strong>load/loadfile函数</strong>具有第四个可选参数，即<B><GN>上值环境</GN></B><br>我们可以简单地使用它：<br><code>env = {}</code><br><code>loadfile(&quot;config.lua&quot;, &quot;t&quot;, env)()</code><br>这样配置就被加载进来了，使用如：<code>env.a</code>即可调用，就是一种<strong>沙盒，<VT>可防恶意外代码破坏</VT></strong></p>
+<p>同时还存在<strong>另一种方式</strong>：</p>
+<pre><code class="language-lua">f = load(&quot;b = 10; return a&quot;)
+env = {a = 20}
+debug.setupvalue(f, 1, env) -- 设置env为f的上值(对于load函数来说，上值有且只有一个为_ENV)
+print(f()) -- 20
+print(env.b) -- 10
+</code></pre>
+<p>这种方式，很大的好处就在于<B><GN>可以重复运行多次，且环境不同</GN></B>，但是由于<B><DRD>依赖调试库，导致破坏了可见性规则</DRD></B></p>
+<p><strong>更好的方式</strong>如下所示：</p>
+<pre><code class="language-lua">local function loadwithprefix(prefix,code)
+  -- 判断合法性
+  local type_prefix = type(prefix)
+  local type_code = type(code)
+  assert(type_prefix == &quot;string&quot;,&quot;invalid prefix:&quot; .. type_prefix)
+  assert(type_code == &quot;string&quot; or type_code == &quot;function&quot;,&quot;invalidcode type:&quot; .. type_code)
+
+  -- code处理：
+  -- 对于函数直接返回，对于代码字符串第一次返回，第二次返回nil
+  local func = nil
+  if type(code) == &quot;function&quot; then
+  func = code
+  else
+    local isLoad = false
+    func = function()
+      if isLoad then return nil end
+      isLoad = true
+      return code
+    end
+  end
+
+  -- 对于loader()来说，由于code处理的原因，
+  -- 第一次会返回prefix，第二次会返回func()，第三次会返回nil
+  local isprefixload = false
+  local loader = function()
+    if isprefixload then return func() end
+    isprefixload = true
+    return prefix
+  end
+
+  -- 关键：loader函数会被不断地调用，知道返回nil
+  -- 所以说，就变成了先prefix，再code，最后nil结束的流程
+  return load(loader,&quot;prefix loader&quot;,&quot;t&quot;) 
+end
+
+--使用
+prefix = &quot;_ENV = ...;&quot;
+f = loadwithprefix(prefix, io.lines(filename, &quot;*L&quot;))
+
+env1 = {}
+f(env1) -- 由于f函数传入参数，对应的就是prefix中的可变参数赋值，即设置环境
+env2 = {}
+f(env2) -- 同上
+</code></pre>
+<h1 id="模块包">模块/包</h1>
+<p>简单来说，<strong><VT>模块就是一些代码(C或Lua)，然后加载获取表</VT></strong></p>
+<p><B><GN>模块module</GN></B>---<VT>独立代码单元，为Lua或C，提供某些功能(math/io都是)</VT><br><B><GN>包package</GN></B>---<VT>由<B>多个模块</B>组成，一般来说为库或框架</VT></p>
+<h2 id="模块基础使用">模块基础使用</h2>
+<p>要知道的是：<B><VT>所有标准库都是模块</VT></B>，加载方式为：</p>
+<pre><code class="language-lua">math = require &quot;math&quot;
+print(math.sin(3.14))
+</code></pre>
+<p><B><BL>问题：为什么平时使用没有像如上方式加载也能使用</BL></B><br><BL>因为<B><VT>独立编译器会提前加载所有标准库</VT></B></BL></p>
+<p><strong>模块</strong>事实上是一个是<strong>一个表</strong><VT>(当然可以不是一个表，任意类型都可以，但是用处就不大了)</VT><br>正因为是一个表，所以操作模块其实就是在操作表：</p>
+<pre><code class="language-lua">-- 任意命名，以下两种都可以(因为只是一个变量而已)
+local mod = require &quot;mod&quot;
+local m = require &quot;mod&quot;
+
+m.foo() -- 调用
+
+local f = m.foo -- 函数命名
+f()
+
+-- 只引入函数形式
+local f = require &quot;mod&quot;.foo -- (require(&quot;mod&quot;)).foo
+f()
+</code></pre>
+<h2 id="require函数">Require函数</h2>
+<h3 id="概念">概念</h3>
+<p>显而易见，从上述内容我们就能看出加载模块需要的就是<code>require()</code><br><strong>写法：</strong></p>
+<pre><code class="language-lua">local m = require(&quot;math&quot;) -- 直接加载
+
+-- 先获取名字再加载
+local modname = &quot;math&quot;
+local m = require(modname)
+</code></pre>
+<p><strong><DRD>注意：我们可能认为<code>require()</code>一定返回一个表，但除了返回表，可以是其他值或者引发副作用(比如说修改_G表/进行IO操作/...)</DRD></strong></p>
+<p><strong>流程：</strong></p>
+<ol>
+<li>require会在表<code>package.loaded</code>中检查模块是否已被加载<ol>
+<li>加载了则返回相应的值(那么也就不会再次运行，返回的一定是同一个值)</li>
+<li>如果没加载，会搜索具有指定模块名的Lua文件(搜索路径由<code>package.path</code>指定)<ol>
+<li>如果找到了相应的文件，会使用<code>loadfile()</code>进行加载</li>
+<li>如果找不到，会去搜索C标准库(由<code>package.cpath</code>指定)，找到用<code>package.loadlib()</code>加载(会寻找<code>luaopen_modname</code>函数)</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>requrie会带着2个参数调用(模块名/加载函数所在文件名称)<ol>
+<li>如果函数有返回值，则会返回该值并保存在<code>package.loaded</code>中(如果再次require就可以直接取了)</li>
+<li>如果没有返回值且<code>package.load[@rep{modname}]</code>为空，直接返回true(防止再次加载)</li>
+</ol>
+</li>
+</ol>
+<BR>
+
+<p><strong><VT>所以如果想要require同一个模块2次(即重新加载，可能是模块本身发生了更新)，可以通过删除再加载的方式完成：<code>package.loaded.modname = nil</code></VT></strong></p>
+<p><strong><DRD>注意：模块加载只能直接加载，并不能传入额外参数</DRD></strong><br><DRD>如：<code>local math = require(&quot;math&quot;, &quot;degree&quot;)</code>，我们可能希望在加载math库的时候选择一下&quot;策略&quot;即角度制，但是这是不行的</DRD><br><strong><BL>问题：为什么不行</BL></strong><br><BL>不行的核心原因就是因为require同时只能存在一份模块，假设我们进行了<code>local math = require(&quot;math&quot;, &quot;degree&quot;)</code>后又进行了<code>local math2 = require(&quot;math&quot;, &quot;radian&quot;)</code>，math2获得的其实还是degree版本的math</BL><br><strong>解决方案：使用显式函数设置</strong></p>
+<pre><code class="language-lua">local mod = require &quot;mod&quot;
+mod.init(0, 0)
+
+local mod = require &quot;mod&quot;.init(0, 0) -- 连写形式
+</code></pre>
+<h3 id="重要概念">重要概念</h3>
+<h4 id="模块重命名">模块重命名</h4>
+<p>有时我们需要进行模块重命名操作，可能为加载同一模块的不同版本，<br><strong>方法</strong>为：<strong>使用连字符</strong>，如：mod-v3.4的话lua会认为是luaopen_mod而不是luaopen_mod-v3.4</p>
+<h4 id="搜索路径">搜索路径</h4>
+<p>一种<strong>可能的搜索路径</strong>如下所示：<br><code>?;?.lua;c:\windows\?;/usr/local/lua/?/?.lua</code><br><code>;</code>为拆分符，假设我们调用的是<code>require sql&quot;</code>，路径有：</p>
+<ul>
+<li><code>sql</code></li>
+<li><code>sql.lua</code></li>
+<li><code>c:\windows\sql</code></li>
+<li><code>/usr/local/lua/sql/sql.lua</code></li>
+</ul>
+<BR>
+
+<p><strong>环境变量LUA_PATH_5_3与LUA_PATH用于设置<code>package.path</code></strong><br><YL>如：设置LUA_PATH_5_#为<code>mydir/?.lua;;</code>，那么最终就会是<code>mydir/?.lua</code>与默认路径<VT>(;;代表着默认路径)</VT></YL><br>同理，<strong>C库</strong>为：<strong><code>package.cpath</code>---LUA_CPATH_5_3与LUA_CPATH</strong></p>
+<h5 id="一些函数字段">一些函数/字段</h5>
+<h6 id="packagesearchpath">package.searchpath()</h6>
+<p><VT>输入模块名和路径，返回第一个存在的文件名或nil+错误信息</VT></p>
+<pre><code class="language-lua">-- package.searchpath的实现
+function search (modname, path)
+    modname = string.gsub(modname, &quot;%.&quot;, &quot;/&quot;)
+    local msg = {}
+    for c in string.gmatch(path, &quot;[^;]+&quot;) do
+        local fname = string.gsub(c, &quot;?&quot;, modname)
+        local f = io.open(fname)
+        if f then
+            f:close()
+            return fname
+        else
+            msg[#msg + 1] = string.format(&quot;\n\tno file &#39;%s&#39;&quot;, fname);
+        end
+    end
+    return nil, table.concat(msg)    -- 没找到
+end
+</code></pre>
+<h6 id="packagesearchers">package.searchers</h6>
+<p><VT><B>搜索器表</B>，当require加载模块时，会按顺序尝试表中的每个搜索器，直到找到对应的加载器</VT><br><code>package.searchers</code>可以添加<strong>任意搜索方式</strong>，<YL>如：从zip文件加载压缩模块</YL><br><strong>加载顺序</strong>为：预加载搜索器---&gt;Lua---&gt;C</p>
+<h6 id="packagepreload">package.preload</h6>
+<p><VT><B>预加载表</B>，只是简单地在表中搜索指定的名称，找到则将该函数作为相应模块的加载函数返回，否则返回nil，<B>使用这种方法只有加载才会被调用，不会造成资源浪费</B></VT></p>
+<h2 id="子模块包">子模块/包</h2>
+<p>模块是<strong>具有层次</strong>的，<YL>如：<code>mod.sub</code>就是mod的<GN><B>子模块submodule</B></GN></YL><br><GN><B>包package</B></GN>就是<VT><B>由模块组成的完整的树</B></VT></p>
+<p>假设有<code>requrie &quot;mod.sub&quot;</code>，会有2种方式加载：</p>
+<ul>
+<li><strong>作为模块名加载</strong>，<VT>require中会查询package.loaded/package.preload，此时&quot;.&quot;没有特殊含义</VT></li>
+<li><strong>作为子模块加载</strong>，<VT>&quot;.&quot;会被转换为&quot;/&quot;或&quot;&quot;</VT>，<YL>如：<br><code>./?.lua;/usr/local/lua/?.lua;/usr/local/lua/?/init.lua</code><br>调用<code>require &quot;a.b&quot;</code>会尝试打开：<ul>
+<li><code>./a/b.lua</code></li>
+<li><code>/usr/local/lua/a/b.lua</code></li>
+<li><code>/usr/local/lua/a/b/init.lua</code></li>
+</ul>
+</li>
+</ul>
+<p>可以理解：<strong><VT>其实就相当于是父子级关系，a.b其实就是a下的一个b.lua文件</VT></strong><br><strong><VT>在C扩展模块中，&quot;.&quot;会被转换为&quot;_&quot;(因为C不支持.)</VT></strong></p>
+<p><strong>一种机制：</strong><br>如果找不到子模块对应的文件，会去寻找包的名称，如果找到了C库，会去库中查找luaopen_x_x的加载函数</p>
+<p><strong><DRD>注意：同一个包中的子模块没有显式的关联，加载一个模块并不会自动加载它的任何子模块(但是可以创造这种关联)</DRD></strong></p>
+<h2 id="模块编写例">模块编写例</h2>
+<pre><code class="language-lua">-- Tip：可以注意到new和inv是local的，就和C#的private是一个含义，外界是无法访问的
+
+local M = {}      -- 模块
+
+-- 创建一个新的复数
+local function new (r, i)
+  return {r=r, i=i}
+end
+
+M.new = new       -- 把&#39;new&#39;加到模块中
+
+-- constant &#39;i&#39;
+M.i = new(0, 1)
+
+function M.add (c1, c2)
+  return new(c1.r + c2.r, c1.i + c2.i)
+end
+
+function M.sub (c1, c2)
+  return new(c1.r - c2.r, c1.i - c2.i)
+end
+
+function M.mul (c1, c2)
+  return new(c1.r*c2.r - c1.i*c2.i, c1.r*c2.i + c1.i*c2.r)
+end
+
+local function inv (c)
+  local n = c.r^2 + c.i^2
+  return new(c.r/n, -c.i/n)
+end
+
+function M.div (c1, c2)
+  return M.mul(c1, inv(c2))
+end
+
+function M.tostring (c)
+  return string.format(&quot;(%g,%g)&quot;, c.r, c.i)
+end
+
+-- 返回模块
+return M
+-- 也可以是：
+package.loaded[...] = M --require会把模块名作为第一个参数传递给函数，所以...指代的是模块名
+</code></pre>
+<BR>
+
+<pre><code class="language-lua">-- 另一种方式：全部使用local
+-- 问题：冗余，而且return在最后没有起到简略文档的作用
+local function new(r, i) return {r=r, i=i} end
+local i = complex.new(0, 1)
+...
+return{
+    new = new,
+    i = i,
+    add = add,
+    sub = sub,
+    mul = mul,
+    div = div,
+    tostring = tostring,
+}
+</code></pre>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

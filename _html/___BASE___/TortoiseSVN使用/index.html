@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TortoiseSVN使用</title>
+  <link rel="stylesheet" href="../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>TortoiseSVN使用</BBBG></center></strong></p>
+<p>最常见的2种版本管理工具应该就是Git以及TortoiseSVN<br>个人目前比较熟悉TortoiseSVN，那么就记录一下个人使用方式</p>
+<h1 id="本地情况">本地情况</h1>
+<p>既然是个人使用，那么存储在本地必然是最合适的<br>所需步骤并不多：</p>
+<ul>
+<li>创建一个文件夹</li>
+<li>在文件夹内右键TortoiseSVN-&gt;Create repository here，OK即可</li>
+</ul>
+<p>以上已经创建完毕，可通过右键TortoiseSVN-&gt;Repo-browser进行查看：<br><img src="Pic/SVN1.png" alt="" class="mnote-img mnote-img-normal" data-mnote-image="1" data-kind="normal" data-width="1037" data-height="694"></p>
+<ul>
+<li>URL中显示的路径就是创建仓库的路径</li>
+<li>通过右键Create folder即可创建子目录，这是一次commit</li>
+</ul>
+<BR>
+
+<p><strong><BL>问题：为什么Edit log message操作不被允许</BL></strong><br><BL>默认行为中，该操作是被禁止的，所以需要修改相应.bat/.tmpl(linux情况)文件<br>解决方法为：打开该仓库hooks文件夹，添加pre-revprop-change.bat：</BL></p>
+<pre><code class="language-bat">setlocal
+set REPOS=%1
+set REV=%2
+set USER=%3
+set PROPNAME=%4
+set ACTION=%5
+if not &quot;%ACTION%&quot;==&quot;M&quot; goto refuse
+if not &quot;%PROPNAME%&quot;==&quot;svn:log&quot; goto refuse
+goto OK
+:refuse
+echo Cann&#39;t set %PROPNAME%/%ACTION%, only svn:log is allowed 1&gt;&amp;2
+endlocal
+exit 1
+:OK
+endlocal
+exit 0
+</code></pre>
+<p><strong><BL>问题：添加ignore</strong><br>在Git中，通过.ignore文件即可忽略，SVN有所不同但也很简单：<br>在需要的svn项目中右键TortoiseSVN-&gt;Properties，New-&gt;Other，Property name选择svn:ignore或svn:global-ignores，填入忽略列表<br><img src="Pic/SVN2.png" alt="" class="mnote-img mnote-img-normal" data-mnote-image="1" data-kind="normal" data-width="492" data-height="432"></p>
+<p><strong>ignore与global-ignores的区别如下：</strong></p>
+<ul>
+<li>ignore：处理目录特定的忽略需求</li>
+<li>global-ignores：处理项目范围内通用的忽略模式</li>
+</ul>
+<p><strong>Apply property recursively</strong>作用：<B><VT>开启属性递归(可作用于子文件夹)</VT></B></p>
+<p><strong><VT>一般选择：ignore+开启Apply property recursively</VT></strong></p>
+<p><strong>注意：</strong><br><strong><DRD>此时如果已经提交过内容且存在文件夹，发现有修改是正常的(针对递归情况)，因为是文件夹规则发生变动</DRD></strong><br><img src="Pic/SVN3.png" alt="" class="mnote-img mnote-img-wide" data-mnote-image="1" data-kind="wide" data-width="814" data-height="107"></p>
+<p><strong>Unity忽略内容</strong></p>
+<pre><code class="language-txt">Library
+Temp
+Obj
+Build
+Builds
+Logs
+UserSettings
+.utmp
+.vs
+.gradle
+ExportedObj
+.consulo
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.DotSettings.user
+*.blend1
+*.blend1.meta
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+mono_crash.*
+*.apk
+*.aab
+*.app
+*.unitypackage
+*.unitypackage.meta
+*.log
+</code></pre>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

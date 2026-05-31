@@ -1,0 +1,3047 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lua源码解析</title>
+  <link rel="stylesheet" href="../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>lua5.3.6源码解析</BBBG></center></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9">注意事项</a></li>
+<li><a href="#%E5%85%B3%E9%94%AE%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84">关键数据结构</a><ul>
+<li><a href="#lua_state--global_state">lua_State / global_State</a></li>
+<li><a href="#lexstate--funcstate">LexState / FuncState</a><ul>
+<li><a href="#sparser">SParser</a></li>
+<li><a href="#proto">Proto</a></li>
+<li><a href="#callinfo">CallInfo</a></li>
+<li><a href="#token">Token</a><ul>
+<li><a href="#seminfo">SemInfo</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#_env">_ENV</a><ul>
+<li><a href="#%E6%B2%99%E7%AE%B1%E6%9C%BA%E5%88%B6">沙箱机制</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E5%B8%B8%E7%94%A8%E5%87%BD%E6%95%B0">常用函数</a><ul>
+<li><a href="#index2addr"><code>index2addr</code></a></li>
+</ul>
+</li>
+<li><a href="#%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84">数据结构</a><ul>
+<li><a href="#%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%9F%BA%E7%A1%80">数据结构基础</a><ul>
+<li><a href="#%E7%B1%BB%E5%9E%8B">类型</a></li>
+<li><a href="#gc">GC</a></li>
+</ul>
+</li>
+<li><a href="#%E5%AD%97%E7%AC%A6%E4%B8%B2">字符串</a><ul>
+<li><a href="#luas_newlstr"><code>luaS_newlstr</code></a><ul>
+<li><a href="#%E7%9F%AD%E5%AD%97%E7%AC%A6%E4%B8%B2">短字符串</a></li>
+<li><a href="#%E9%95%BF%E5%AD%97%E7%AC%A6%E4%B8%B2">长字符串</a></li>
+</ul>
+</li>
+<li><a href="#c-api">c API</a><ul>
+<li><a href="#luas_newliteral"><code>luaS_newliteral</code></a></li>
+<li><a href="#luas_new"><code>luaS_new</code></a></li>
+<li><a href="#luax_newstring"><code>luaX_newstring</code></a></li>
+<li><a href="#luak_stringk"><code>luaK_stringK</code></a></li>
+</ul>
+</li>
+<li><a href="#lua-api">lua API</a><ul>
+<li><a href="#lua_pushstringlua_pushlstring"><code>lua_pushstring</code>/<code>lua_pushlstring</code></a></li>
+<li><a href="#lua_tostringlua_tolstring"><code>lua_tostring</code>/<code>lua_tolstring</code></a></li>
+<li><a href="#lua_rawlen"><code>lua_rawlen</code></a></li>
+</ul>
+</li>
+<li><a href="#%E4%BD%BF%E7%94%A8%E5%AE%9E%E4%BE%8B">使用实例</a><ul>
+<li><a href="#%E8%AF%8D%E6%B3%95%E8%A7%A3%E6%9E%90%E5%99%A8">词法解析器</a></li>
+<li><a href="#%E8%AF%AD%E6%B3%95%E8%A7%A3%E6%9E%90%E5%99%A8">语法解析器</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E8%A1%A8">表</a><ul>
+<li><a href="#%E5%93%88%E5%B8%8C%E9%83%A8%E5%88%86">哈希部分</a><ul>
+<li><a href="#%E5%93%88%E5%B8%8C%E5%80%BC">哈希值</a></li>
+<li><a href="#%E5%86%B2%E7%AA%81%E9%93%BE%E9%81%8D%E5%8E%86">冲突链遍历</a></li>
+</ul>
+</li>
+<li><a href="#luah_set"><code>luaH_set</code></a><ul>
+<li><a href="#luah_get"><code>luaH_get</code></a></li>
+<li><a href="#luah_newkey"><code>luaH_newkey</code></a></li>
+<li><a href="#rehash"><code>rehash</code></a></li>
+</ul>
+</li>
+<li><a href="#%E9%81%8D%E5%8E%86">遍历</a><ul>
+<li><a href="#luah_next"><code>luaH_next</code></a></li>
+<li><a href="#lua_next"><code>lua_next</code></a></li>
+<li><a href="#luab_next"><code>luaB_next</code></a></li>
+<li><a href="#pairsipairs%E8%BF%AD%E4%BB%A3">pairs/ipairs迭代</a><ul>
+<li><a href="#luab_pairs"><code>luaB_pairs</code></a></li>
+<li><a href="#luab_ipairs"><code>luaB_ipairs</code></a></li>
+<li><a href="#vm-for%E5%BE%AA%E7%8E%AF">VM for循环</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#c-api-1">c API</a><ul>
+<li><a href="#luah_new"><code>luaH_new</code></a></li>
+<li><a href="#luav_gettable"><code>luaV_gettable</code></a></li>
+<li><a href="#luav_settable"><code>luaV_settable</code></a></li>
+</ul>
+</li>
+<li><a href="#lua-api-1">lua API</a><ul>
+<li><a href="#lua_createtable"><code>lua_createtable</code></a></li>
+<li><a href="#lua_gettable"><code>lua_gettable</code></a></li>
+<li><a href="#lua_settable"><code>lua_settable</code></a></li>
+<li><a href="#lua_rawget"><code>lua_rawget</code></a></li>
+<li><a href="#lua_rawset"><code>lua_rawset</code></a></li>
+</ul>
+</li>
+<li><a href="#%E4%BD%BF%E7%94%A8%E5%AE%9E%E4%BE%8B-1">使用实例</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E5%87%BD%E6%95%B0%E6%89%A7%E8%A1%8C">函数执行</a><ul>
+<li><a href="#%E5%87%BD%E6%95%B0%E6%89%A7%E8%A1%8C-1">函数执行</a></li>
+<li><a href="#%E5%AE%89%E5%85%A8%E6%89%A7%E8%A1%8C%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86">安全执行（异常处理）</a></li>
+</ul>
+</li>
+<li><a href="#%E7%BC%96%E8%AF%91%E4%B8%8E%E8%99%9A%E6%8B%9F%E6%9C%BA%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B">编译与虚拟机执行流程</a><ul>
+<li><a href="#%E5%90%AF%E5%8A%A8">启动</a><ul>
+<li><a href="#%E5%91%BD%E4%BB%A4%E8%A1%8C%E5%90%AF%E5%8A%A8">命令行启动</a></li>
+<li><a href="#%E5%B5%8C%E5%85%A5">嵌入</a></li>
+</ul>
+</li>
+<li><a href="#%E7%BC%96%E8%AF%91%E6%9C%9F">编译期</a><ul>
+<li><a href="#%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96">二进制反序列化</a></li>
+<li><a href="#%E6%96%87%E6%9C%AC%E7%BC%96%E8%AF%91">文本编译</a><ul>
+<li><a href="#mainfunc">mainfunc</a></li>
+<li><a href="#%E6%80%BB%E8%A7%88">总览</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E6%89%A7%E8%A1%8C%E6%9C%9F">执行期</a><ul>
+<li><a href="#%E8%99%9A%E6%8B%9F%E6%9C%BA%E6%89%A7%E8%A1%8C">虚拟机执行</a></li>
+</ul>
+</li>
+<li><a href="#%E7%A4%BA%E4%BE%8B">示例</a></li>
+</ul>
+</li>
+<li><a href="#%E9%97%AD%E5%8C%85">闭包</a><ul>
+<li><a href="#upvalue%E5%88%A4%E5%AE%9A">upvalue判定</a></li>
+<li><a href="#%E5%BC%80%E5%90%AF%E6%83%85%E5%86%B5">开启情况</a></li>
+<li><a href="#openupval"><code>openupval</code></a><ul>
+<li><a href="#luaf_findupval"><code>luaF_findupval</code></a></li>
+<li><a href="#luaf_close"><code>luaF_close</code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E5%85%83%E8%A1%A8">元表</a></li>
+<li><a href="#load">load</a><ul>
+<li><a href="#luab_load"><code>luaB_load</code></a></li>
+<li><a href="#luab_loadfile"><code>luaB_loadfile</code></a></li>
+<li><a href="#luab_dofile"><code>luaB_dofile</code></a></li>
+<li><a href="#require">require</a></li>
+</ul>
+</li>
+<li><a href="#%E5%85%83%E8%A1%A8-1">元表</a><ul>
+<li><a href="#%E5%88%9D%E5%A7%8B%E5%8C%96">初始化</a></li>
+<li><a href="#%E6%9F%A5%E8%AF%A2">查询</a></li>
+<li><a href="#%E8%B0%83%E7%94%A8">调用</a></li>
+<li><a href="#%E5%85%B6%E5%AE%83">其它</a></li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<hr>
+<hr>
+<hr>
+<h1 id="注意事项">注意事项</h1>
+<ul>
+<li>lua的c代码可以分为lua层和c层：<ul>
+<li>c层：通常为<code>lua_XXX()</code>/<code>luaL_XXX()</code></li>
+<li>lua层：每个模块都有自己的名字，如字符串相关就是<code>luaS_XXX()</code></li>
+</ul>
+</li>
+<li>lua层API源码都带有LUA_API标识，如：<br><code>LUA_API const char *lua_pushlstring (lua_State *L, const char *s, size_t len)</code></li>
+</ul>
+<hr>
+<hr>
+<hr>
+<h1 id="关键数据结构">关键数据结构</h1>
+<p>lua源码中数据结构众多，涉及面广很容易忘记，但是本质上重要的其实并不算太多</p>
+<h2 id="lua_state-global_state">lua_State / global_State</h2>
+<p>启动处：<code>lua_newstate()</code><br>lua_State：luaVM线程（执行上下文）<br>global_State：luaVM共享部分</p>
+<pre><code class="language-c">LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
+  int i;
+  lua_State *L;
+  global_State *g;
+  LG *l = cast(LG *, (*f)(ud, NULL, LUA_TTHREAD, sizeof(LG)));
+  if (l == NULL) return NULL;
+  L = &amp;l-&gt;l.l;
+  g = &amp;l-&gt;g;
+  L-&gt;next = NULL;
+  L-&gt;tt = LUA_TTHREAD;
+  g-&gt;currentwhite = bitmask(WHITE0BIT);
+  L-&gt;marked = luaC_white(g);
+  preinit_thread(L, g);
+  g-&gt;frealloc = f;
+  g-&gt;ud = ud;
+  g-&gt;mainthread = L;
+  g-&gt;seed = makeseed(L);
+  g-&gt;gcrunning = 0;  /* no GC while building state */
+  g-&gt;GCestimate = 0;
+  g-&gt;strt.size = g-&gt;strt.nuse = 0;
+  g-&gt;strt.hash = NULL;
+  setnilvalue(&amp;g-&gt;l_registry);
+  g-&gt;panic = NULL;
+  g-&gt;version = NULL;
+  g-&gt;gcstate = GCSpause;
+  g-&gt;gckind = KGC_NORMAL;
+  g-&gt;allgc = g-&gt;finobj = g-&gt;tobefnz = g-&gt;fixedgc = NULL;
+  g-&gt;sweepgc = NULL;
+  g-&gt;gray = g-&gt;grayagain = NULL;
+  g-&gt;weak = g-&gt;ephemeron = g-&gt;allweak = NULL;
+  g-&gt;twups = NULL;
+  g-&gt;totalbytes = sizeof(LG);
+  g-&gt;GCdebt = 0;
+  g-&gt;gcfinnum = 0;
+  g-&gt;gcpause = LUAI_GCPAUSE;
+  g-&gt;gcstepmul = LUAI_GCMUL;
+  for (i=0; i &lt; LUA_NUMTAGS; i++) g-&gt;mt[i] = NULL;
+  if (luaD_rawrunprotected(L, f_luaopen, NULL) != LUA_OK) {
+    /* memory allocation error: free partial state */
+    close_state(L);
+    L = NULL;
+  }
+  return L;
+}
+</code></pre>
+<p><B>重点1：<code>g-&gt;mainthread = L;</code></B><br><B><VT>lua_State被作为主线程存在</VT></B><br><B>简单理解：</B><br><code>g-&gt;mainthread</code>可以理解为<B>唯一不变的</B>，<code>lua_newstate()</code>创建出来就是唯一主线程，如需其它线程，通过<code>lua_newthread()</code>创建（携程也是）</p>
+<p><B>重点2：<code>g-&gt;seed = makeseed(L);</code></B><br><B><VT>哈希种子在初始化阶段会创建</VT></B></p>
+<pre><code class="language-c">static unsigned int makeseed (lua_State *L) {
+  char buff[4 * sizeof(size_t)];
+  unsigned int h = luai_makeseed();
+  int p = 0;
+  addbuff(buff, p, L);  /* heap variable */
+  addbuff(buff, p, &amp;h);  /* local variable */
+  addbuff(buff, p, luaO_nilobject);  /* global variable */
+  addbuff(buff, p, &amp;lua_newstate);  /* public function */
+  lua_assert(p == sizeof(buff));
+  return luaS_hash(buff, p, h);
+}
+
+#define luai_makeseed()		cast(unsigned int, time(NULL))
+</code></pre>
+<p>即：<B><VT>以时间作为基础种子，结合不同的地址，进行哈希函数</VT></B><br><B><DRD>注意：lua的seed不够安全，仅作为随机种子存在</DRD></B></p>
+<p><B>重点3：<code>lua_newstate()</code>不止创建了一个lua_State</B><br>主线程lua_State只是lua虚拟机中最重要的部分之一，具体结构如下：</p>
+<pre><code class="language-txt">LG
+├─ LX
+│  ├─ extra_[LUA_EXTRASPACE]
+│  └─ lua_State l   // 主线程
+└─ global_State g   // 整个 VM 共享状态
+</code></pre>
+<pre><code class="language-c">typedef struct LG {
+  LX l;
+  global_State g;
+} LG;
+
+typedef struct LX {
+  lu_byte extra_[LUA_EXTRASPACE];
+  lua_State l;
+} LX;
+</code></pre>
+<ul>
+<li>LG：lua_State + global_State</li>
+<li>LX：extra + lua_State，即带额外空间的lua_State</li>
+</ul>
+<p>所以：<br><B><VT>本质上<code>lua_newstate()</code>创建的是LG数据结构，其中包含了主线程lua_State以及共享global_State并预留了一块额外空间（放指针）</VT></B></p>
+<p><B><code>f_luaopen()</code></B><br><code>lua_newstate()</code>具有大量的初始化操作，两个数据结构中内容众多<br>真正的设置其实只有<code>f_luaopen()</code>：</p>
+<pre><code class="language-c">static void f_luaopen (lua_State *L, void *ud) {
+  global_State *g = G(L);
+  UNUSED(ud);
+  stack_init(L, L);  /* init stack */
+  init_registry(L, g);
+  luaS_init(L);
+  luaT_init(L);
+  luaX_init(L);
+  g-&gt;gcrunning = 1;  /* allow gc */
+  g-&gt;version = lua_version(NULL);
+  luai_userstateopen(L);
+}
+</code></pre>
+<ul>
+<li><code>stack_init()</code>：初始化stack相关<ul>
+<li>之所以传入2个相同的L，是因为在内部语义不同：<br>在<code>lua_newthread()</code>中有：<code>stack_init(L1, L);</code>，显然：<ul>
+<li>左<code>L1</code>：需初始化的对象</li>
+<li>右<code>L</code>：上下文线程（实际会调用<code>luaM_newvector()</code>进行分配stack）</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><code>init_registry()</code>：创建注册表，并设置到g-&gt;l_registry上<ul>
+<li><code>registry[LUA_RIDX_MAINTHREAD]</code>：主线程L</li>
+<li><code>registry[LUA_RIDX_GLOBALS]</code>：全局表（目前为空，<code>luaL_openlibs()</code>会注册标准库）</li>
+</ul>
+</li>
+<li><code>luaS_init()</code>：初始化字符串<ul>
+<li><code>g-&gt;memerrmsg</code>：预留错误信息，防止内存不足创建不出来</li>
+<li><code>g-&gt;strcache</code>：字符串缓存（先用<code>g-&gt;memerrmsg</code>作为哨兵占位）</li>
+</ul>
+</li>
+<li><code>luaT_init()</code>：初始化元方法名表<ul>
+<li><code>g-&gt;tmname</code>：元表名缓存</li>
+</ul>
+</li>
+<li><code>luaX_init()</code>：初始化词法保留字系统<ul>
+<li><code>_ENV</code>预创建（<code>#define LUA_ENV        &quot;_ENV&quot;</code>）</li>
+<li>保留字预创建，并设置<code>ts-&gt;extra</code>为非0值</li>
+</ul>
+</li>
+</ul>
+<h2 id="lexstate-funcstate">LexState / FuncState</h2>
+<p>从名字上来看，和lua_State / global_State是一类内容<br>作为解析流程的两个数据结构，用于<code>luaY_parser()</code></p>
+<ul>
+<li>LexState：编译上下文（读取进度/token状态）<br>核心是词法分析阶段，语法分析阶段也会借用数据，直到<code>luaY_parser()</code>结束<br><VT>LexState中会指向一个FuncState</VT></li>
+<li>FuncState：当前函数的生成上下文（编译进度/寄存器状态/局部变量跳转处理）</li>
+</ul>
+<h3 id="sparser">SParser</h3>
+<p>SParser是用于call的数据组合体（毕竟call函数里只有一个位置存放）<br>本质上是用于f_parser函数（调用者<code>luaD_protectedparser()</code>）的：</p>
+<pre><code class="language-c">struct SParser {  /* data to &#39;f_parser&#39; */
+  ZIO *z;
+  Mbuffer buff;  /* dynamic structure used by the scanner */
+  Dyndata dyd;  /* dynamic structures used by the parser */
+  const char *mode;
+  const char *name;
+};
+</code></pre>
+<ul>
+<li>ZIO：读取流，用于不断读取字节</li>
+<li>Mbuffer：缓冲，用于拼token</li>
+<li>Dyndata：动态数据<ul>
+<li>actvar：当前活跃局部变量（作用域下还活着的局部变量）</li>
+<li>gt：待解析goto列表，后续<code>::x::</code>可跳转</li>
+<li>label：可见label列表，检测重复label</li>
+</ul>
+</li>
+</ul>
+<p>这些数据基本都是直接提供给LexState/FuncState</p>
+<h3 id="proto">Proto</h3>
+<p>Proto是编译后得到的结果，后续在执行中会转换为CallInfo（由<code>luaD_precall()</code>完成）<br>Proto数据众多，核心有：</p>
+<ul>
+<li><code>TValue *k</code>：常量表</li>
+<li><code>int *code</code>：指令</li>
+<li><code>struct Proto **p</code>：子Proto</li>
+<li><code>LocVar *locvars</code>：局部变量信息</li>
+<li><code>Upvaldesc *upvalues</code>：上值信息</li>
+</ul>
+<h3 id="callinfo">CallInfo</h3>
+<p>CallInfo指的是函数调用时上下文，是虚拟机执行所需要的数据，由Proto得来由<code>luaD_precall()</code>完成）<br><B>lua_State</B>需要该类型数据：<br><code>CallInfo *ci;  /* call info for current function */</code><br><code>CallInfo base_ci;  /* CallInfo for first level (C calling Lua) */</code><br><B><VT>在编译期间，两者只是占位，直到执行</VT></B></p>
+<h3 id="token">Token</h3>
+<p>在编译途中，<B><VT>最小语法单位</VT></B>就被称之为<B><GN>token</GN></B></p>
+<pre><code class="language-c">typedef struct Token {
+  int token;
+  SemInfo seminfo;
+} Token;
+</code></pre>
+<p>简单来说就是读取过程中读到的信息</p>
+<h4 id="seminfo">SemInfo</h4>
+<p>SemInfo是作为<B><VT>Token的附加信息</VT></B>存在的</p>
+<pre><code class="language-c">typedef union {
+  lua_Number r;
+  lua_Integer i;
+  TString *ts;
+} SemInfo;  /* semantics information */
+</code></pre>
+<p>也就是说：如果token代表着一个值（TK_NUMBER/TK_STRING/TK_NAME），则会记录</p>
+<h2 id="_env">_ENV</h2>
+<p>流程如下：</p>
+<ul>
+<li><p>初始化<code>luaX_init()</code>时会进行<code>TString *e = luaS_newliteral(L, LUA_ENV);</code><br>即：创建一个不会被GC回收的<code>_ENV</code>（因为会<code>luaC_fix()</code>所以不会被回收）</p>
+</li>
+<li><p>解析<code>mainfunc()</code>时，会：<br><code>init_exp(&amp;v, VLOCAL, 0);</code><br><code>newupvalue(fs, ls-&gt;envn, &amp;v);</code><br>即：给主函数Proto添加一个upvalue，名为<code>_ENV</code></p>
+</li>
+<li><p><code>luaY_parser()</code>流程结束后，会：<br><code>luaF_initupvals(L, cl);</code><br>即：封闭upvalue并设为nil</p>
+</li>
+<li><p>在<code>luaD_protectedparser()</code>解析完成后，有：</p>
+<pre><code class="language-c">LClosure *f = clLvalue(L-&gt;top - 1);  /* get newly created function */
+if (f-&gt;nupvalues &gt;= 1) {  /* does it have an upvalue? */
+  /* get global table from registry */
+  Table *reg = hvalue(&amp;G(L)-&gt;l_registry);
+  const TValue *gt = luaH_getint(reg, LUA_RIDX_GLOBALS);
+  /* set global table as 1st upvalue of &#39;f&#39; (may be LUA_ENV) */
+  setobj(L, f-&gt;upvals[0]-&gt;v, gt);
+  luaC_upvalbarrier(L, f-&gt;upvals[0]);
+}
+</code></pre>
+<p>即：全局表<code>registry[LUA_RIDX_GLOBALS]</code>设置到主闭包第一个upvalue（<code>_ENV</code>）<br><B><DRD>注意：此时依旧没有设置具体的值，在执行期才会设置</DRD></B></p>
+</li>
+</ul>
+<p>使用方式：<br><code>luaX_setinput()</code>会记录<code>_ENV</code>到<code>LexState-&gt;envn</code>中<br>解析时会进入<code>singlevar()</code>，如果逐层寻找local/upvalue没找到，就会作为全局名使用，调用<code>luaK_indexed()</code>设置指令</p>
+<h3 id="沙箱机制">沙箱机制</h3>
+<pre><code class="language-c">local _ENV = sandbox
+function f()
+  return print
+end
+</code></pre>
+<p>由于<code>_ENV</code>被遮蔽，<code>f()</code>不再获得原始表，而是<code>sandbox.print</code></p>
+<hr>
+<hr>
+<hr>
+<h1 id="常用函数">常用函数</h1>
+<p>总有些函数是出现在各个模块之中的，这里简单介绍一下</p>
+<h2 id="index2addr">`index2addr`</h2>
+<pre><code class="language-c">static TValue *index2addr (lua_State *L, int idx) {
+  CallInfo *ci = L-&gt;ci;
+  if (idx &gt; 0) {
+    TValue *o = ci-&gt;func + idx;
+    api_check(L, idx &lt;= ci-&gt;top - (ci-&gt;func + 1), &quot;unacceptable index&quot;);
+    if (o &gt;= L-&gt;top) return NONVALIDVALUE;
+    else return o;
+  }
+  else if (!ispseudo(idx)) {  /* negative index */
+    api_check(L, idx != 0 &amp;&amp; -idx &lt;= L-&gt;top - (ci-&gt;func + 1), &quot;invalid index&quot;);
+    return L-&gt;top + idx;
+  }
+  else if (idx == LUA_REGISTRYINDEX)
+    return &amp;G(L)-&gt;l_registry;
+  else {  /* upvalues */
+    idx = LUA_REGISTRYINDEX - idx;
+    api_check(L, idx &lt;= MAXUPVAL + 1, &quot;upvalue index too large&quot;);
+    if (ttislcf(ci-&gt;func))  /* light C function? */
+      return NONVALIDVALUE;  /* it has no upvalues */
+    else {
+      CClosure *func = clCvalue(ci-&gt;func);
+      return (idx &lt;= func-&gt;nupvalues) ? &amp;func-&gt;upvalue[idx-1] : NONVALIDVALUE;
+    }
+  }
+}
+</code></pre>
+<p><code>index2addr()</code>：idx转实际TValue指针<br>简单来说有3类：</p>
+<ul>
+<li>正索引：从当前函数向后数</li>
+<li>负索引：从栈顶向下数</li>
+<li>伪索引：特殊的索引值<ul>
+<li>注册表LUA_REGISTRYINDEX</li>
+<li>upvalue索引</li>
+</ul>
+</li>
+</ul>
+<p><B><VT>Tip：<code>L-&gt;top</code>不是栈顶而是栈顶后下一个可用位置</VT></B></p>
+<h1 id="数据结构">数据结构</h1>
+<p>在lua中，数据结构具有一定的封装，最常见在源码中见到的就是TValue</p>
+<h2 id="数据结构基础">数据结构基础</h2>
+<p><B><GN>TValue</GN></B>即值，是lua最关键的一层封装：</p>
+<pre><code class="language-c">typedef struct lua_TValue {
+  TValuefields;
+} TValue;
+
+#define TValuefields	Value value_; int tt_
+
+typedef union Value {
+  GCObject *gc;    /* collectable objects */
+  void *p;         /* light userdata */
+  int b;           /* booleans */
+  lua_CFunction f; /* light C functions */
+  lua_Integer i;   /* integer numbers */
+  lua_Number n;    /* float numbers */
+} Value;
+</code></pre>
+<p>可以看到TValue由2字段组成：</p>
+<ul>
+<li><code>Value value_</code>：值本身</li>
+<li><code>int tt_</code>：type</li>
+</ul>
+<p><B><BL>问题：为什么要封装成TValue</BL></B><br><BL>因为lua是动态类型语言，变量类型随时可变，只靠Value是无法知道当前存储类型的，所以需要额外数据<code>tt_</code></BL></p>
+<ul>
+<li>判断：<code>ttisxxx()</code></li>
+</ul>
+<pre><code class="language-c">// 以整数为例
+#define rttype(o)	((o)-&gt;tt_)
+#define checktag(o,t)		(rttype(o) == (t))
+#define ttisinteger(o) checktag((o), LUA_TNUMINT)
+</code></pre>
+<ul>
+<li>写：<code>setxxxvalue()</code>/<code>chgxxxvalue()</code></li>
+</ul>
+<pre><code class="language-c">// 以整数为例
+// 更改为整数类型
+#define setivalue(obj,x) \
+  { TValue *io=(obj); val_(io).i=(x); settt_(io, LUA_TNUMINT); }
+// 更改整数类型的值
+#define chgivalue(obj,x) \
+  { TValue *io=(obj); lua_assert(ttisinteger(io)); val_(io).i=(x); }
+
+// 如TString这种GCObject没有chg
+#define setsvalue(L,obj,x) \
+  { TValue *io = (obj); TString *x_ = (x); \
+    val_(io).gc = obj2gco(x_); settt_(io, ctb(x_-&gt;tt)); \
+    checkliveness(L,io); }
+</code></pre>
+<ul>
+<li>读：<code>xxxvalue()</code></li>
+</ul>
+<pre><code class="language-c">// 以整数为例
+#define ivalue(o) check_exp(ttisinteger(o), val_(o).i)
+</code></pre>
+<ul>
+<li>复制：<code>setobj()</code></li>
+</ul>
+<pre><code class="language-c">#define setobj(L,obj1,obj2) \
+	{ TValue *io1=(obj1); *io1 = *(obj2); \
+	  (void)L; checkliveness(L,io1); }
+</code></pre>
+<p><B><VT>注意：浅拷贝，对于引用类型仅复制引用</VT></B></p>
+<pre><code class="language-lua">a = {}
+b = a -- 此时a和b都指向同一个table
+</code></pre>
+<h3 id="类型">类型</h3>
+<p>在lua.h中有所定义：</p>
+<pre><code class="language-c">#define LUA_TNONE		(-1)
+
+#define LUA_TNIL		        0
+#define LUA_TBOOLEAN		1
+#define LUA_TLIGHTUSERDATA	2
+#define LUA_TNUMBER		3
+#define LUA_TSTRING		4
+#define LUA_TTABLE		5
+#define LUA_TFUNCTION		6
+#define LUA_TUSERDATA		7
+#define LUA_TTHREAD		8
+
+#define LUA_NUMTAGS		9
+</code></pre>
+<p>注意：LUA_XXX并非完整<code>tt_</code>，在lobject.h有注释：</p>
+<pre><code class="language-c">/*
+** tags for Tagged Values have the following use of bits:
+** bits 0-3: actual tag (a LUA_T* value)
+** bits 4-5: variant bits
+** bit 6: whether value is collectable
+*/
+</code></pre>
+<p>在lobject.h可以看到：</p>
+<pre><code class="language-c">/* Variant tags for functions */
+#define LUA_TLCL	(LUA_TFUNCTION | (0 &lt;&lt; 4))  /* Lua closure */
+#define LUA_TLCF	(LUA_TFUNCTION | (1 &lt;&lt; 4))  /* light C function */
+#define LUA_TCCL	(LUA_TFUNCTION | (2 &lt;&lt; 4))  /* C closure */
+/* Variant tags for strings */
+#define LUA_TSHRSTR	(LUA_TSTRING | (0 &lt;&lt; 4))  /* short strings */
+#define LUA_TLNGSTR	(LUA_TSTRING | (1 &lt;&lt; 4))  /* long strings */
+/* Variant tags for numbers */
+#define LUA_TNUMFLT	(LUA_TNUMBER | (0 &lt;&lt; 4))  /* float numbers */
+#define LUA_TNUMINT	(LUA_TNUMBER | (1 &lt;&lt; 4))  /* integer numbers */
+/* Bit mark for collectable types */
+#define BIT_ISCOLLECTABLE	(1 &lt;&lt; 6)
+</code></pre>
+<p>即<B><VT>对于某些类型，会派生出细分类型</VT></B><br>对于这些派生类型，创建时就会直接用上，如：<br><code>ts = createstrobj(L, l, LUA_TSHRSTR, h);</code><br>对于可GC类型，需要通过<code>ctb()</code>宏额外补充：<br><code>#define ctb(t) ((t) | BIT_ISCOLLECTABLE)</code><br>对于TValue设置类操作（如：<code>setsvalue()</code>）就会进行设置</p>
+<p>具体操作如下：</p>
+<ul>
+<li>获取：</li>
+</ul>
+<pre><code class="language-c">#define rttype(o)	((o)-&gt;tt_) // 完整tt_(0-6位)
+#define ttype(o)	(rttype(o) &amp; 0x3F) // 基础类型+派生类型(0-5位)
+#define ttnov(o)	(novariant(rttype(o))) // 基础类型(0-3位)
+
+#define novariant(x)	((x) &amp; 0x0F)
+</code></pre>
+<ul>
+<li>设置：在<code>setxxxvalue()</code>中会进行设置（第一次设置或类型改变）</li>
+</ul>
+<h3 id="gc">GC</h3>
+<p>对于需要回收的类型，会使用<B><GN>GCObject</GN></B>：</p>
+<pre><code class="language-c">typedef struct GCObject GCObject;
+struct GCObject {
+  CommonHeader;
+};
+
+#define CommonHeader GCObject *next; lu_byte tt; lu_byte marked
+</code></pre>
+<p><B><BL>问题：关于<code>TValue.tt_</code> / <code>GCObject.tt</code></BL></B><br><BL>对于GCObject来说，自身已经完全说明是带有GC的，所以tt不会存储第6位BIT_ISCOLLECTABLE信息</BL></B></p>
+<p>GCObject是一个<B><VT>公共头</VT></B>，具体有以下对象：</p>
+<ul>
+<li>TString</li>
+<li>Table</li>
+<li>Udata</li>
+<li>Proto</li>
+<li>Closure</li>
+<li>lua_State</li>
+</ul>
+<p><B><BL>问题：GCObject与TValue的关系</BL></B><br><BL>某些TValue（就是GC类型）会指向GCObject</BL><br><YL><B>举例</B>：TString是一个字符串对象，在lua中字符串是可复用的，某一个TString可能被多个TValue所引用</YL><br>即：<B><VT>TValue是栈变量（也可能是单独的一个值），GCObject就是堆内存</VT></B></p>
+<hr>
+<h2 id="字符串">字符串</h2>
+<p>字符串是lua中核心的数据类型<br>对应结构<B><GN>TString</GN></B>：</p>
+<pre><code class="language-c">typedef struct TString {
+  CommonHeader;
+  lu_byte extra;  /* reserved words for short strings; &quot;has hash&quot; for longs */
+  lu_byte shrlen;  /* length for short strings */
+  unsigned int hash;
+  union {
+    size_t lnglen;  /* length for long strings */
+    struct TString *hnext;  /* linked list for hash table */
+  } u;
+} TString;
+</code></pre>
+<p>根据注释可知：TString包含短字符串与长字符串两种，两种实际结构不同</p>
+<ul>
+<li>共有<ul>
+<li>hash：字符串哈希</li>
+</ul>
+</li>
+<li>短字符串<ul>
+<li>extra：保留字</li>
+<li>shrlen：长度</li>
+<li>u.hnext：桶链表指针</li>
+</ul>
+</li>
+<li>长字符串<ul>
+<li>extra：&quot;是否已算过hash&quot;的标记</li>
+<li>u.lnglen：长度</li>
+</ul>
+</li>
+</ul>
+<p><B>重点：</B><br><B><VT>TString本身不带有字节数据（也就是说TString是字符串头），字节数据紧跟在<GN>UTString</GN>后</B></p>
+<pre><code class="language-c">typedef union UTString {
+  L_Umaxalign dummy;  /* ensures maximum alignment for strings */
+  TString tsv;
+} UTString;
+</code></pre>
+<pre><code class="language-txt">地址 ts
+┌──────────────────────────────┐
+│ UTString (含 TString 头部)    │  sizeof(UTString)
+└──────────────────────────────┘
+┌──────────────────────────────┐
+│ 字节数据 char[0..len-1]       │  len 字节（可包含 &#39;\0&#39;）
+├──────────────────────────────┤
+│ 结尾 &#39;\0&#39;                     │  额外 1 字节
+└──────────────────────────────┘
+</code></pre>
+<p>所以可以看到取字符串宏<code>getstr()</code>是这么用的：<br><code>#define getstr(ts)  \</code><br><code>check_exp(sizeof((ts)-&gt;extra), cast(char *, (ts)) + sizeof(UTString))</code></p>
+<BR>
+
+<h3 id="luas_newlstr">`luaS_newlstr`</h3>
+<pre><code class="language-csharp">TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
+  if (l &lt;= LUAI_MAXSHORTLEN)  /* short string? */
+    return internshrstr(L, str, l);
+  else {
+    TString *ts;
+    if (l &gt;= (MAX_SIZE - sizeof(TString))/sizeof(char))
+      luaM_toobig(L);
+    ts = luaS_createlngstrobj(L, l);
+    memcpy(getstr(ts), str, l * sizeof(char));
+    return ts;
+  }
+}
+</code></pre>
+<p><code>luaS_newlstr()</code>：<B><VT>字符串创建，是核心</VT></B><br>这里也能看到字符串的长短分类，其中：<br><B><VT>宏<code>LUAI_MAXSHORTLEN</code>区分了长短字符串的长度，界限为40</VT></B></p>
+<p><B><BL>问题：长字符串/短字符串的区别</BL></B><br><BL>短字符串是驻留的，由<code>g-&gt;strt</code>拉链法哈希桶完成缓存<br>长字符串不会驻留<br><B><VT>因为：查重具有成本，长字符串不合适，同时全存的话压力会很大<br>驻留的优势：可通过地址比较（2个TValue指向同一TString）</VT></B></BL><br>无论是长字符串还是短字符串，都需要创建TString（GCObject的扩展），方法为<code>createstrobj()</code>：</p>
+<pre><code class="language-c">static TString *createstrobj (lua_State *L, size_t l, int tag, unsigned int h) {
+  TString *ts;
+  GCObject *o;
+  size_t totalsize;  /* total size of TString object */
+  totalsize = sizelstring(l);
+  o = luaC_newobj(L, tag, totalsize);
+  ts = gco2ts(o);
+  ts-&gt;hash = h;
+  ts-&gt;extra = 0;
+  getstr(ts)[l] = &#39;\0&#39;;  /* ending 0 */
+  return ts;
+}
+</code></pre>
+<p><B><DRD>注意：<code>createstrobj()</code>仅进行TString对象的创建，并不会填充字符串内容</DRD></B><br>简单来说，流程就是：</p>
+<ul>
+<li>计算分配大小</li>
+<li>分配内存（交给GC管理）</li>
+<li>GCObject转TString</li>
+<li>TString基础初始化</li>
+</ul>
+<p>在后续长字符串/短字符串会进行各自所需要设置的内容<br><B><VT>同理其它GCObject（如table）</VT></B></p>
+<h4 id="短字符串">短字符串</h4>
+<p>短字符串走的是<code>internshrstr()</code>：</p>
+<pre><code class="language-c">static TString *internshrstr (lua_State *L, const char *str, size_t l) {
+  TString *ts;
+  global_State *g = G(L);
+  unsigned int h = luaS_hash(str, l, g-&gt;seed);
+  TString **list = &amp;g-&gt;strt.hash[lmod(h, g-&gt;strt.size)];
+  lua_assert(str != NULL);  /* otherwise &#39;memcmp&#39;/&#39;memcpy&#39; are undefined */
+  for (ts = *list; ts != NULL; ts = ts-&gt;u.hnext) {
+    if (l == ts-&gt;shrlen &amp;&amp;
+        (memcmp(str, getstr(ts), l * sizeof(char)) == 0)) {
+      /* found! */
+      if (isdead(g, ts))  /* dead (but not collected yet)? */
+        changewhite(ts);  /* resurrect it */
+      return ts;
+    }
+  }
+  if (g-&gt;strt.nuse &gt;= g-&gt;strt.size &amp;&amp; g-&gt;strt.size &lt;= MAX_INT/2) {
+    luaS_resize(L, g-&gt;strt.size * 2);
+    list = &amp;g-&gt;strt.hash[lmod(h, g-&gt;strt.size)];  /* recompute with new size */
+  }
+  ts = createstrobj(L, l, LUA_TSHRSTR, h);
+  memcpy(getstr(ts), str, l * sizeof(char));
+  ts-&gt;shrlen = cast_byte(l);
+  ts-&gt;u.hnext = *list;
+  *list = ts;
+  g-&gt;strt.nuse++;
+  return ts;
+}
+</code></pre>
+<ul>
+<li>核心1：复用（哈希桶）<ul>
+<li>使用<code>luaS_hash()</code>计算哈希值<ul>
+<li><code>g-&gt;seed</code>会在<code>lua_newstate()</code>进行初始化，这也意味着<code>g-&gt;seed</code>仅存在一个值且不会变化</li>
+</ul>
+</li>
+<li>获取桶：<code>TString **list = &amp;g-&gt;strt.hash[lmod(h, g-&gt;strt.size)];</code><ul>
+<li><code>&amp;g-&gt;strt</code>：stringtable类型，是<B><VT>全局的驻留短字符串</VT></B></li>
+</ul>
+</li>
+<li>尝试在桶中找到TString</li>
+</ul>
+</li>
+<li>核心2：扩容<ul>
+<li>如果负载过高（<code>g-&gt;strt</code>用超了或但还没到达上限（MAX_INT/2））则会调用<code>luaS_resize()</code>扩表</li>
+</ul>
+</li>
+<li>核心3：设置<ul>
+<li><p>如果前面找不到复用就会创一个新的</p>
+<pre><code class="language-c">ts = createstrobj(L, l, LUA_TSHRSTR, h); // 创建短字符串
+memcpy(getstr(ts), str, l * sizeof(char)); // 拷贝值
+ts-&gt;shrlen = cast_byte(l); // 设置长度
+// 头插法（TString已入链表）
+ts-&gt;u.hnext = *list;
+*list = ts;
+</code></pre>
+</li>
+</ul>
+</li>
+</ul>
+<p>在哈希计算中提到了驻留intern，这与<code>internshrstr()</code>对应<VT>（所以intern指的其实是驻留而非内部）</VT><br><B><GN>stringtable</GN></B>可以说是专用于短字符串驻留的数据结构，具体结构如下：</p>
+<pre><code class="language-c">typedef struct stringtable {
+  TString **hash;
+  int nuse;  /* number of elements */
+  int size;
+} stringtable;
+</code></pre>
+<p><B><BL>问题：nuse和size的区别</BL></B><br><BL>其实很明确，nuse即已存在数量，size为桶大小</BL><br>可以看到<code>hash</code>是TString**类型，即数组，这与哈希计算可以对应上，即<B><GN>拉链法</GN></B>哈希冲突方案</p>
+<h4 id="长字符串">长字符串</h4>
+<p>长字符串走的是<code>luaS_createlngstrobj()</code>：</p>
+<pre><code class="language-c">TString *luaS_createlngstrobj (lua_State *L, size_t l) {
+  TString *ts = createstrobj(L, l, LUA_TLNGSTR, G(L)-&gt;seed);
+  ts-&gt;u.lnglen = l;
+  return ts;
+}
+</code></pre>
+<p>设置值被放在了外面：<code>memcpy(getstr(ts), str, l * sizeof(char));</code></p>
+<h3 id="c-api">c API</h3>
+<p>前面的<code>luaS_newlstr()</code>就是c API的最核心部分，同时也存在不同情况下的扩展</p>
+<h4 id="luas_newliteral">`luaS_newliteral`</h4>
+<pre><code class="language-c">#define luaS_newliteral(L, s)	(luaS_newlstr(L, &quot;&quot; s, \
+                                (sizeof(s)/sizeof(char))-1))
+</code></pre>
+<p><code>luaS_newliteral()</code>：字面量版<code>luaS_newlstr()</code>，本质没区别<br><B><BL>问题：<code>&quot;&quot; s</code>是什么</BL></B><br><BL>在c中，<code>&quot;abc&quot; &quot;dec&quot;</code>会自动拼接为<code>&quot;abcdef&quot;</code>，所以这里就其实是s，只要s是字符串字面量`</BL></p>
+<h4 id="luas_new">`luaS_new`</h4>
+<pre><code class="language-c">TString *luaS_new (lua_State *L, const char *str) {
+  unsigned int i = (str) % STRCACHE_N;  /* hash */
+  int j;
+  TString **p = G(L)-&gt;strcache[i];
+  for (j = 0; j &lt; STRCACHE_M; j++) {
+    if (strcmp(str, getstr(p[j])) == 0)  /* hit? */
+      return p[j];  /* that is it */
+  }
+  /* normal route */
+  for (j = STRCACHE_M - 1; j &gt; 0; j--)
+    p[j] = p[j - 1];  /* move out last element */
+  /* new element is first in the list */
+  p[0] = luaS_newlstr(L, str, strlen(str));
+  return p[0];
+}
+</code></pre>
+<p><code>luaS_new()</code>：<B><VT>在<code>luaS_newlstr()</code>的基础上添加额外缓存<code>G(L)-&gt;strcache</code></VT></B><br><B><DRD>重要：</DRD></B><br><DRD><code>strcache</code>是额外的一层前置缓存，如果没有获取到，还是会走<code>luaS_newlstr()</code>，即短字符串有缓存</DRD></p>
+<p><code>strcache</code>是一个TString二维数组，容量[53][2]，即<VT>53个桶，每个桶2个槽</VT><br><B>哈希计算：</B><br><code>% STRCACHE_N</code>很好理解，就是映射到桶里，那么真正的哈希就是<code>point2uint()</code>：<br><code>#define point2uint(p)	((unsigned int)((size_t)(p) &amp; UINT_MAX))</code><br>从名字就可以知道，是指针到uint的映射，指针作为hash虽然效果不好，但在这里已经够用了</p>
+<h4 id="luax_newstring">`luaX_newstring`</h4>
+<pre><code class="language-c">TString *luaX_newstring (LexState *ls, const char *str, size_t l) {
+  lua_State *L = ls-&gt;L;
+  TValue *o;  /* entry for &#39;str&#39; */
+  TString *ts = luaS_newlstr(L, str, l);  /* create new string */
+  setsvalue2s(L, L-&gt;top++, ts);  /* temporarily anchor it in stack */
+  o = luaH_set(L, ls-&gt;h, L-&gt;top - 1);
+  if (ttisnil(o)) {  /* not in use yet? */
+    /* boolean value does not need GC barrier;
+       table has no metatable, so it does not need to invalidate cache */
+    setbvalue(o, 1);  /* t[string] = true */
+    luaC_checkGC(L);
+  }
+  else {  /* string already present */
+    ts = tsvalue(keyfromval(o));  /* re-use value previously stored */
+  }
+  L-&gt;top--;  /* remove string from stack */
+  return ts;
+}
+</code></pre>
+<p><code>luaX_newstring()</code>：<B><VT>编译期字符串创建</VT></B><br>该函数<B><DRD>仅用于编译期</DRD></B>，在llex.c/lparser.c中出现<br>简单来说，就是<B><VT><code>luaS_newlstr()</code>在编译期的一层封装</VT></B><br><B>简单理解：</B><br><B><VT>新字符串临时压栈防GC，后续存到lua_State-&gt;h表中真正锚定<br>作用是对于长字符串同样驻留（<code>luaS_newlstr()</code>不驻留），同时长短字符串都不被GC回收（被表引用）</VT></B></p>
+<h4 id="luak_stringk">`luaK_stringK`</h4>
+<pre><code class="language-c">int luaK_stringK (FuncState *fs, TString *s) {
+  TValue o;
+  setsvalue(fs-&gt;ls-&gt;L, &amp;o, s);
+  return addk(fs, &amp;o, &amp;o);
+}
+
+static int addk (FuncState *fs, TValue *key, TValue *v) {
+  lua_State *L = fs-&gt;ls-&gt;L;
+  Proto *f = fs-&gt;f;
+  TValue *idx = luaH_set(L, fs-&gt;ls-&gt;h, key);  /* index scanner table */
+  int k, oldsize;
+  if (ttisinteger(idx)) {  /* is there an index there? */
+    k = cast_int(ivalue(idx));
+    /* correct value? (warning: must distinguish floats from integers!) */
+    if (k &lt; fs-&gt;nk &amp;&amp; ttype(&amp;f-&gt;k[k]) == ttype(v) &amp;&amp;
+                      luaV_rawequalobj(&amp;f-&gt;k[k], v))
+      return k;  /* reuse index */
+  }
+  /* constant not found; create a new entry */
+  oldsize = f-&gt;sizek;
+  k = fs-&gt;nk;
+  /* numerical value does not need GC barrier;
+     table has no metatable, so it does not need to invalidate cache */
+  setivalue(idx, k);
+  luaM_growvector(L, f-&gt;k, k, f-&gt;sizek, TValue, MAXARG_Ax, &quot;constants&quot;);
+  while (oldsize &lt; f-&gt;sizek) setnilvalue(&amp;f-&gt;k[oldsize++]);
+  setobj(L, &amp;f-&gt;k[k], v);
+  fs-&gt;nk++;
+  luaC_barrier(L, f, v);
+  return k;
+}
+</code></pre>
+<p><code>luaK_stringK</code>：<B><VT>登记TString到Proto常量表中</VT></B><br>可以看到本质上其实是在执行<code>addk()</code>：</p>
+<ul>
+<li>TString转TValue</li>
+<li>查缓存，验证通过就使用</li>
+<li>无缓存，先扩容，写入<code>Proto-&gt;k[k]</code></li>
+<li>返回索引k</li>
+</ul>
+<h3 id="lua-api">lua API</h3>
+<p>除了以上的c API，对外API也有很多</p>
+<p>简单介绍一下不常用的：</p>
+<ul>
+<li><code>lua_pushfstring()</code>：基于...的format版</li>
+<li><code>lua_pushvfstring()</code>：基于va_list的format版</li>
+</ul>
+<h4 id="lua_pushstringlua_pushlstring">`lua_pushstring`/`lua_pushlstring`</h4>
+<pre><code class="language-c">LUA_API const char *lua_pushstring (lua_State *L, const char *s) {
+  lua_lock(L);
+  if (s == NULL)
+    setnilvalue(L-&gt;top);
+  else {
+    TString *ts;
+    ts = luaS_new(L, s);
+    setsvalue2s(L, L-&gt;top, ts);
+    s = getstr(ts);  /* internal copy&#39;s address */
+  }
+  api_incr_top(L);
+  luaC_checkGC(L);
+  lua_unlock(L);
+  return s;
+}
+</code></pre>
+<p>用法：<code>lua_pushstring(L, &quot;hello&quot;);</code><br>功能：字符串压栈</p>
+<pre><code class="language-c">LUA_API const char *lua_pushlstring (lua_State *L, const char *s, size_t len) {
+  TString *ts;
+  lua_lock(L);
+  ts = (len == 0) ? luaS_new(L, &quot;&quot;) : luaS_newlstr(L, s, len);
+  setsvalue2s(L, L-&gt;top, ts);
+  api_incr_top(L);
+  luaC_checkGC(L);
+  lua_unlock(L);
+  return getstr(ts);
+}
+</code></pre>
+<p>用法：<br><code>const char buf[] = {&#39;a&#39;, &#39;b&#39;, &#39;\0&#39;, &#39;c&#39;};</code><br><code>lua_pushlstring(L, buf, 4);</code> <VT>当然直接给字符也行</VT><br>功能：字符串（明确长度）压栈</p>
+<p><B><VT>注意：</VT></B><br><VT>入栈由<code>setvalue</code>+<code>api_incr_top()</code>完成，<code>setvalue</code>仅完成了往栈顶位置赋值操作，但还需要<code>L-&gt;top++</code>才算真正完成</VT></p>
+<p><B><BL>问题：<code>lua_pushstring()</code>/<code>lua_pushlstring()</code>的区别</BL></B><br><BL>l指的是length，即指定长度操作<br>对于<code>lua_pushstring()</code>来说，会依靠<code>\0</code>确定字符串结束位置，这会导致字符串中不能带<code>\0</code>，否则会在中间停下<br>对于<code>lua_pushlstring()</code>来说，仅依靠len，所以如果是&quot;abcdef&quot;，长度为4则字符串会变为<code>&quot;abcd&quot;</code>，同时字符中也可以带有<code>\0</code></BL></p>
+<h4 id="lua_tostringlua_tolstring">`lua_tostring`/`lua_tolstring`</h4>
+<pre><code class="language-c">LUA_API const char *lua_tolstring (lua_State *L, int idx, size_t *len) {
+  StkId o = index2addr(L, idx);
+  if (!ttisstring(o)) {
+    if (!cvt2str(o)) {  /* not convertible? */
+      if (len != NULL) *len = 0;
+      return NULL;
+    }
+    lua_lock(L);  /* &#39;luaO_tostring&#39; may create a new string */
+    luaO_tostring(L, o);
+    luaC_checkGC(L);
+    o = index2addr(L, idx);  /* previous call may reallocate the stack */
+    lua_unlock(L);
+  }
+  if (len != NULL)
+    *len = vslen(o);
+  return svalue(o);
+}
+</code></pre>
+<p>用法：</p>
+<pre><code class="language-c">size_t len;
+const char *s = lua_tolstring(L, 1, &amp;len);
+if (s != NULL) {
+  /* s 指向 Lua 内部字符串，长度是 len */
+}
+</code></pre>
+<p>功能：读取（不弹栈）指定栈位置的指并获取长度<br>根据代码所示：<VT>对于非string且不可转换为string的类型是无法操作的</VT><br><code>#define cvt2str(o)	ttisnumber(o)</code> <B><VT>Tip：可以设置宏禁止转换</VT></B><br>更精准地来讲：</p>
+<ul>
+<li>常规情况来说，就是用于获取string的，只有string类型才能获取</li>
+<li>额外支持了number情况，会转换为string后返回<B><DRD>（这意味着该栈元素被直接转换为string了）</DRD></B></li>
+</ul>
+<BR>
+
+<p><code>#define lua_tostring(L,i)	lua_tolstring(L, (i), NULL)</code><br>所以说<code>lua_tostring()</code>只是<code>lua_tolstring()</code>的不求长度版<br>这意味着：<B><VT><code>lua_tostring()</code>仅应该用于不带有<code>\0</code>的字符串，否则后续没有长度无法辨别（使用c函数时）</VT></B></p>
+<h4 id="lua_rawlen">`lua_rawlen`</h4>
+<pre><code class="language-c">LUA_API size_t lua_rawlen (lua_State *L, int idx) {
+  StkId o = index2addr(L, idx);
+  switch (ttype(o)) {
+    case LUA_TSHRSTR: return tsvalue(o)-&gt;shrlen;
+    case LUA_TLNGSTR: return tsvalue(o)-&gt;u.lnglen;
+    case LUA_TUSERDATA: return uvalue(o)-&gt;len;
+    case LUA_TTABLE: return luaH_getn(hvalue(o));
+    default: return 0;
+  }
+}
+</code></pre>
+<h3 id="使用实例">使用实例</h3>
+<h4 id="词法解析器">词法解析器</h4>
+<p>词法解析器的核心是<code>llex()</code>，其中就有对字符串情况的解析：</p>
+<pre><code class="language-c">case &#39;-&#39;: {  /* &#39;-&#39; or &#39;--&#39; (comment) */
+}
+case &#39;[&#39;: {  /* long string or simply &#39;[&#39; */
+}
+case &#39;&quot;&#39;: case &#39;\&#39;&#39;: {  /* short literal strings */
+}
+default: {
+  if (lislalpha(ls-&gt;current)) {  /* identifier or reserved word? */
+  }
+}
+</code></pre>
+<p>也就是：</p>
+<ul>
+<li><code>-- comment</code>：注释，调用<code>read_long_string()</code></li>
+<li><code>[[hello]]</code>：长字符串字面量，调用<code>read_long_string()</code></li>
+<li><code>&quot;abc&quot;</code>：字符串字面量，调用<code>read_string()</code></li>
+<li><code>foo</code>：标识符，直接调用<code>luaX_newstring()</code></li>
+</ul>
+<p>无论如何，本质上都是调用<code>luaX_newstring()</code>，最终读完的信息会被保存到<code>seminfo-&gt;ts</code>中</p>
+<h4 id="语法解析器">语法解析器</h4>
+<p>词法解析器会完成按顺序完成对字符的解析，都会存入<code>seminfo-&gt;ts</code>中<br>在语法解析器中：</p>
+<ul>
+<li>走<code>codestring()</code>，登记到<code>Proto-&gt;k</code><ul>
+<li>字符串字面量：<code>&quot;a&quot;</code>/<code>[[hello]]</code>（TK_STRING）</li>
+<li>全局变量：<code>foo = 1</code>的foo（<code>singlevar()</code>）</li>
+<li>点号访问：<code>t.foo</code>的foo（<code>fieldsel()</code>）</li>
+<li>冒号访问：<code>t:move()</code>的move（<code>fieldsel()</code>）</li>
+<li>表字段名：<code>t = {x = 1}</code>的x（<code>recfield()</code>）</li>
+</ul>
+</li>
+<li>走<code>new_localvar()</code>，登记到<code>Proto-&gt;locvars[i].varname</code><ul>
+<li>局部变量名：<code>x</code></li>
+<li>局部函数名：<code>local function foo() end</code>的foo</li>
+<li>其它局部情况：for循环变量/形参</li>
+</ul>
+</li>
+<li>走<code>newupvalue()</code>，登记到<code>Proto-&gt;upvalues[].name</code></li>
+</ul>
+<p>简记：<br><B><VT>如果运行时需要拿出来用，则需要放在<code>Proto-&gt;k</code>中，否则存在其它临时调试处即可</VT></B></p>
+<hr>
+<h2 id="表">表</h2>
+<p>表是lua中核心的数据类型<br>核心：<B><VT>Lua中的Table是数组+哈希结合</VT></B></p>
+<pre><code class="language-c">typedef struct Table {
+  CommonHeader;
+  lu_byte flags;  /* 1&lt;&lt;p means tagmethod(p) is not present */
+  lu_byte lsizenode;  /* log2 of size of &#39;node&#39; array */
+  unsigned int sizearray;  /* size of &#39;array&#39; array */
+  TValue *array;  /* array part */
+  Node *node;
+  Node *lastfree;  /* any free position is before this position */
+  struct Table *metatable;
+  GCObject *gclist;
+} Table;
+</code></pre>
+<ul>
+<li>数组部分<ul>
+<li>sizearray：数组长度</li>
+<li>array：数组本体指针</li>
+</ul>
+</li>
+<li>哈希部分<ul>
+<li>lsizenode：哈希大小（log2）</li>
+<li>node：哈希本体指针</li>
+<li>lastfree：最后一个空闲位置，向前扫描</li>
+</ul>
+</li>
+<li>metatable：元表</li>
+</ul>
+<BR>
+
+<p>哈希结构<B><GN>Node</GN></B>：</p>
+<pre><code class="language-c">typedef struct Node {
+  TValue i_val;
+  TKey i_key;
+} Node;
+
+typedef union TKey {
+  struct {
+    TValuefields;
+    int next;  /* for chaining (offset for next node) */
+  } nk;
+  TValue tvk;
+} TKey;
+</code></pre>
+<p>也就是比较常规的哈希<br>其中TKey是一个union，有2种形式：</p>
+<ul>
+<li>key+next：nk</li>
+<li>纯key：tvk</li>
+</ul>
+<h3 id="哈希部分">哈希部分</h3>
+<p>哈希部分显然是Table中更关键的部分，可以说数组部分只是优化<br>回顾Table中的哈希部分：<br>核心是<code>Node *node</code>，结合<code>TKey.nk.next</code>可知：<br><B><VT>node是首桶，本质上是一个Node数组，每个node通过next即可找到下一个冲突链node</VT></B></p>
+<h4 id="哈希值">哈希值</h4>
+<p>对于哈希部分，哈希冲突的计算必然是重中之重，哈希计算使用的是<B><code>mainposition()</code></B>进行计算<B><VT>（也就是说<code>mainposition()</code>仅处理哈希部分，与数组部分无关）</VT></B></p>
+<pre><code class="language-c">static Node *mainposition (const Table *t, const TValue *key) {
+  switch (ttype(key)) {
+    case LUA_TNUMINT:
+      return hashint(t, ivalue(key));
+    case LUA_TNUMFLT:
+      return hashmod(t, l_hashfloat(fltvalue(key)));
+    case LUA_TSHRSTR:
+      return hashstr(t, tsvalue(key));
+    case LUA_TLNGSTR:
+      return hashpow2(t, luaS_hashlongstr(tsvalue(key)));
+    case LUA_TBOOLEAN:
+      return hashboolean(t, bvalue(key));
+    case LUA_TLIGHTUSERDATA:
+      return hashpointer(t, pvalue(key));
+    case LUA_TLCF:
+      return hashpointer(t, fvalue(key));
+    default:
+      lua_assert(!ttisdeadkey(key));
+      return hashpointer(t, gcvalue(key));
+  }
+}
+</code></pre>
+<p>具体来说就是以下部分：</p>
+<pre><code class="language-c">// pow2流
+#define hashpow2(t,n)		(gnode(t, lmod((n), sizenode(t))))
+#define hashstr(t,str)		hashpow2(t, (str)-&gt;hash)
+#define hashboolean(t,p)	hashpow2(t, p)
+#define hashint(t,i)		hashpow2(t, i)
+// mod流
+#define hashmod(t,n)	(gnode(t, ((n) % ((sizenode(t)-1)|1))))
+#define hashpointer(t,p)	hashmod(t, point2uint(p))
+</code></pre>
+<p>对于以上几种哈希计算，核心是<code>hashpow2()</code>/<code>hashmod()</code>，其它都是它们2种的变体<br><code>gnode()</code>：即getnode，其实就是取出i而已 <code>#define gnode(t,i)	(&amp;(t)-&gt;node[i])</code><br>所以需要关注的就是<B>参数2</B><br><B>pow2流</B><br><code>lmod((n), sizenode(t))</code><br>转换一下就是<code>n%表长</code><br>所以：n就是哈希函数结果，lmod映射到表中<br><B>mod流</B><br><code>((n) % ((sizenode(t)-1)|1))</code><br>转换一下就是<code>n%(表长-1)</code>，<VT><B>重点：表长-1一定是奇数（本质上是非二次幂）</B>（在<code>sizenode(t)</code>为幂的基础下，<code>|1</code>保证最低位为1其实是重复的，但是出于安全性考虑添加保证为奇数）</VT><br><B><BL>问题：为什么需要-1</BL></B><br><BL>与lmod相同，本质有恒等式：<code>n%2^k = n&amp;(2^k-1)</code><br>-1的本质就是保证为奇数，举几个十进制转二进制例子就清楚了：<br>4：100 | 3：011<br>8：1000 | 7：0111<br>16：10000 | 15：01111<br>对于&amp;来说，无论n多大，永远只会应用低位，而对于%来说，是全应用的<br>重点：一切都是因为二次幂导致了取余的退化，<code>&amp;(2^k-1)</code>退化了仅应用低位分布不匀但可做到快速取余，<code>%(2^k-1)</code>虽然慢但是分布更均匀</B><br><B><BL>问题：桶长为n，<code>%n-1</code>对吗</BL></B><br><BL>事实上确实不完全映射，最后一处桶是放不进去的，但是无伤大雅，后续备用桶还能用</BL></p>
+<p>由此也可以得出<B>pow2流与mod流的区别</B>：<br><B><VT>pow2流和mod流本质完全相同，只是取余方法不同，pow2更快但分布不匀，mod分布更匀但更慢</VT></B></p>
+<p>观察变体，以及<code>mainposition()</code>传入值：<br><code>hashxxx()</code>的参数2为哈希值，通常由<code>xxxvalue()</code>直接获取，即值本身，对于值本身不带有哈希信息（LUA_TLNGSTR）或作为哈希不佳的（LUA_TNUMFLT），会额外补充<br>不同<code>hashxxx()</code>变体区别不大，某些只是包装（完全一致），某些只是把哈希信息取出而已</p>
+<p><B><BL>问题：为什么整数用pow2</BL></B><br><BL>整数通常其实是放在数组部分的，只有负数/大数才会在哈希部分，此时通常具有一定的离散性了，冲突问题也不大</BL></p>
+<h4 id="冲突链遍历">冲突链遍历</h4>
+<p>冲突链遍历通常有一致的框架：</p>
+<pre><code class="language-c">Node *n = 某个主位置;
+for (;;) {
+  if (当前节点 key 匹配目标 key)
+    return 对应值;
+  else {
+    int nx = gnext(n);
+    if (nx == 0)
+      结束，表示没找到;
+    n += nx;
+  }
+}
+</code></pre>
+<p>即：算主位置，寻找该桶的所有key直到找到匹配的后取出<br><B>注意：</B><br><code>#define gnext(n)	((n)-&gt;i_key.nk.next)</code><br><B><VT>由<code>gnext()</code>可知：<code>TKey.nk.next中</code>存储的是offset</VT></B></p>
+<h3 id="luah_set">`luaH_set`</h3>
+<pre><code class="language-c">TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
+  const TValue *p = luaH_get(t, key);
+  if (p != luaO_nilobject)
+    return cast(TValue *, p);
+  else return luaH_newkey(L, t, key);
+}
+</code></pre>
+<p><code>luaH_set()</code>：核心函数，将key存到t中<br><B><DRD>注意：可以看出这里仅有设置key，没有设置key对应的值，因为都是拆成2步走的：</DRD></B> <YL>以<code>lua_rawset()</code>为例</YL><br><code>slot = luaH_set(L, hvalue(o), L-&gt;top - 2);</code><br><code>setobj2t(L, slot, L-&gt;top - 1);</code><br><B><BL>问题：为什么<code>luaH_set()</code>中<code>luaH_get()</code>可获取数组或哈希部分，而创建<code>luaH_newkey()</code>仅放置在哈希部分</BL></B><br><BL>对于get逻辑必然需要考虑数组部分，因为有可能存在数组部分，而由于哈希部分随时可加，所以会比可能扩容的数组部分更加稳定，所以调整被放在<code>rehash()</code>/<code>luaH_resize()</code>了</BL></p>
+<h4 id="luah_get">`luaH_get`</h4>
+<pre><code class="language-c">const TValue *luaH_get (Table *t, const TValue *key) {
+  switch (ttype(key)) {
+    case LUA_TSHRSTR: return luaH_getshortstr(t, tsvalue(key));
+    case LUA_TNUMINT: return luaH_getint(t, ivalue(key));
+    case LUA_TNIL: return luaO_nilobject;
+    case LUA_TNUMFLT: {
+      lua_Integer k;
+      if (luaV_tointeger(key, &amp;k, 0)) /* index is int? */
+        return luaH_getint(t, k);  /* use specialized version */
+      /* else... */
+    }  /* FALLTHROUGH */
+    default:
+      return getgeneric(t, key);
+  }
+}
+</code></pre>
+<p><code>luaH_get()</code>：获取已存在key的value的地址（表中本体）<br>在<code>luaH_set()</code>中，<code>luaH_get()</code>作为获取缓存的手段<br><B><VT>重点：虽然说是Table，但是所有的内容都是包括数组部分的，不能认为是纯哈希计算</VT></B></p>
+<p>其中<code>LUA_TNUMINT</code>是最常见的，即整数key：</p>
+<ul>
+<li>先找数组部分，找到直接取出</li>
+<li>不在数组部分，去哈希部分找</li>
+<li>找不到返回luaO_nilobject</li>
+</ul>
+<p>除此以外还有：</p>
+<ul>
+<li><code>LUA_TSHRSTR</code>：短字符串，专用哈希查找</li>
+<li><code>LUA_TNIL</code>直接返回luaO_nilobject</li>
+<li><code>LUA_TNUMFLT</code>：针对能转换为整型的浮点数，用LUA_TNUMINT方法</li>
+<li>其它：通用哈希查找</li>
+</ul>
+<p>由此也可得知：<br><B><VT>对于数组部分，仅有整型会存放（浮点型存取都会尝试转换为整型）<br>除此以外可以说只有短字符串是特殊的：由于短字符串是intern的，判断可以通过TString本身比较（同一TString只有一份）</VT></B></p>
+<h4 id="luah_newkey">`luaH_newkey`</h4>
+<pre><code class="language-c">TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
+  Node *mp;
+  TValue aux;
+  if (ttisnil(key)) luaG_runerror(L, &quot;table index is nil&quot;);
+  else if (ttisfloat(key)) {
+    lua_Integer k;
+    if (luaV_tointeger(key, &amp;k, 0)) {  /* does index fit in an integer? */
+      setivalue(&amp;aux, k);
+      key = &amp;aux;  /* insert it as an integer */
+    }
+    else if (luai_numisnan(fltvalue(key)))
+      luaG_runerror(L, &quot;table index is NaN&quot;);
+  }
+  mp = mainposition(t, key);
+  if (!ttisnil(gval(mp)) || isdummy(t)) {  /* main position is taken? */
+    Node *othern;
+    Node *f = getfreepos(t);  /* get a free place */
+    if (f == NULL) {  /* cannot find a free place? */
+      rehash(L, t, key);  /* grow table */
+      /* whatever called &#39;newkey&#39; takes care of TM cache */
+      return luaH_set(L, t, key);  /* insert key into grown table */
+    }
+    lua_assert(!isdummy(t));
+    othern = mainposition(t, gkey(mp));
+    if (othern != mp) {  /* is colliding node out of its main position? */
+      /* yes; move colliding node into free position */
+      while (othern + gnext(othern) != mp)  /* find previous */
+        othern += gnext(othern);
+      gnext(othern) = cast_int(f - othern);  /* rechain to point to &#39;f&#39; */
+      *f = *mp;  /* copy colliding node into free pos. (mp-&gt;next also goes) */
+      if (gnext(mp) != 0) {
+        gnext(f) += cast_int(mp - f);  /* correct &#39;next&#39; */
+        gnext(mp) = 0;  /* now &#39;mp&#39; is free */
+      }
+      setnilvalue(gval(mp));
+    }
+    else {  /* colliding node is in its own main position */
+      /* new node will go into free position */
+      if (gnext(mp) != 0)
+        gnext(f) = cast_int((mp + gnext(mp)) - f);  /* chain new position */
+      else lua_assert(gnext(f) == 0);
+      gnext(mp) = cast_int(f - mp);
+      mp = f;
+    }
+  }
+  setnodekey(L, &amp;mp-&gt;i_key, key);
+  luaC_barrierback(L, t, key);
+  lua_assert(ttisnil(gval(mp)));
+  return gval(mp);
+}
+</code></pre>
+<p><code>luaH_newkey()</code>：在表中插入一个新key<br>该函数是<B><VT>解决冲突链的核心</VT></B><br>流程简述：</p>
+<ul>
+<li>可用性处理：对于float尝试转换为int，nil/NaN排除</li>
+<li>计算主位置（<code>mainposition()</code>）：<ul>
+<li>主位置空的，直接放</li>
+<li>主位置被占据：<ul>
+<li>先确定一下有空位（没有多余的一个位置无论如何都放不了），没有就rehash后递归做一次</li>
+<li>情况1：主位置Node本不该在该位置<br>f位置给原主位置Node，把新Node放过去</li>
+<li>情况2：主位置Node本该在该位置<br>f位置给新Node</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>放置本身很简单，就以主位置直接放为例：</p>
+<pre><code class="language-c">setnodekey(L, &amp;mp-&gt;i_key, key);
+luaC_barrierback(L, t, key);
+lua_assert(ttisnil(gval(mp)));
+return gval(mp);
+</code></pre>
+<p>更重要的是冲突链的解决：<br><code>mp = mainposition(t, key);</code><br><code>othern = mainposition(t, gkey(mp));</code></p>
+<ul>
+<li>主位置Node：链头</li>
+<li>mp：key应该放入的主位置Node</li>
+<li>othern：主位置Node上目前所占据的key所应该在的主位置Node</li>
+</ul>
+<p>这里处理的问题是：<B>key想要放到mp处，但是mp处已经被占了</B><br>情况被分为2种：</p>
+<ul>
+<li><code>othern != mp</code>：主Node不一致，说明原key本不该在该链上（新key刚算的，肯定在）</li>
+<li><code>othern == mp</code>：原key在该链上</li>
+</ul>
+<p>这是因为：<B><VT>每个桶都应该放应该在自己链上的key</VT></B></p>
+<p><code>othern != mp</code></p>
+<pre><code class="language-c">/* yes; move colliding node into free position */
+while (othern + gnext(othern) != mp)  /* find previous */
+  othern += gnext(othern);
+gnext(othern) = cast_int(f - othern);  /* rechain to point to &#39;f&#39; */
+*f = *mp;  /* copy colliding node into free pos. (mp-&gt;next also goes) */
+if (gnext(mp) != 0) {
+  gnext(f) += cast_int(mp - f);  /* correct &#39;next&#39; */
+  gnext(mp) = 0;  /* now &#39;mp&#39; is free */
+}
+setnilvalue(gval(mp));
+</code></pre>
+<p>othern理解为原冲突链头的Node，mp理解为原key的Node：<br>先寻找原key前驱（注意：othern复用，含义改变），将原key前驱的next指向f，将mp复制到f，此时如果存在后继，修正原key的next<br>对于新key只需要将next与value设为0表示清空即可<br><B>也就是说：</B><br><B><VT>当原Node并非该链Node时，应该把位置交还给当前key，原key去f</VT></B></p>
+<p><code>othern == mp</code></p>
+<pre><code class="language-c">/* new node will go into free position */
+if (gnext(mp) != 0)
+  gnext(f) = cast_int((mp + gnext(mp)) - f);  /* chain new position */
+else lua_assert(gnext(f) == 0);
+gnext(mp) = cast_int(f - mp);
+mp = f;
+</code></pre>
+<p>othern和mp指代同一对象，这里用mp，理解为冲突链头的Node：<br>只要该链有2个Node，就使用<B>链头后插（即放到第二个位置）</B><br><B>也就是说：</B><br><B><VT>当原Node就是该链Node时，使用f放置当前key即可</VT></B></p>
+<h4 id="rehash">`rehash`</h4>
+<p>在新建key<code>luaH_newkey()</code>中，有一相当关键的函数<code>rehash()</code>，仅发生在哈希桶数量不够的时候（没有freepos）<br>同时这意味着：<B><VT>rehash只可能在<code>luaH_newkey()</code>（桶不够）时发生</VT></B></p>
+<pre><code class="language-c">static void rehash (lua_State *L, Table *t, const TValue *ek) {
+  unsigned int asize;  /* optimal size for array part */
+  unsigned int na;  /* number of keys in the array part */
+  unsigned int nums[MAXABITS + 1];
+  int i;
+  int totaluse;
+  for (i = 0; i &lt;= MAXABITS; i++) nums[i] = 0;  /* reset counts */
+  na = numusearray(t, nums);  /* count keys in array part */
+  totaluse = na;  /* all those keys are integer keys */
+  totaluse += numusehash(t, nums, &amp;na);  /* count keys in hash part */
+  /* count extra key */
+  na += countint(ek, nums);
+  totaluse++;
+  /* compute new size for array part */
+  asize = computesizes(nums, &amp;na);
+  /* resize the table to new computed sizes */
+  luaH_resize(L, t, asize, totaluse - na);
+}
+</code></pre>
+<p>可以看到<code>rehash()</code>就是在进行大量计算求得数组和哈希部分的大小，然后调用<code>luaH_resize()</code>进行设置<br>大小计算简单理解：</p>
+<ul>
+<li><code>numusearray()</code>：计算数组key数量</li>
+<li><code>numusehash()</code>：计算哈希key数量</li>
+<li><code>totaluse</code>：数组key+哈希key之和</li>
+<li><code>countint()</code>：key是否可以作为数组部分候选</li>
+<li><code>computesizes()</code>：统计实际分配情况（输出数组部分）</li>
+</ul>
+<p>这里的函数都相当重要：</p>
+<p><B>使用情况统计</B><br>数组部分：</p>
+<pre><code class="language-c">static unsigned int numusearray (const Table *t, unsigned int *nums) {
+  int lg;
+  unsigned int ttlg;  /* 2^lg */
+  unsigned int ause = 0;  /* summation of &#39;nums&#39; */
+  unsigned int i = 1;  /* count to traverse all array keys */
+  /* traverse each slice */
+  for (lg = 0, ttlg = 1; lg &lt;= MAXABITS; lg++, ttlg *= 2) {
+    unsigned int lc = 0;  /* counter */
+    unsigned int lim = ttlg;
+    if (lim &gt; t-&gt;sizearray) {
+      lim = t-&gt;sizearray;  /* adjust upper limit */
+      if (i &gt; lim)
+        break;  /* no more elements to count */
+    }
+    /* count elements in range (2^(lg - 1), 2^lg] */
+    for (; i &lt;= lim; i++) {
+      if (!ttisnil(&amp;t-&gt;array[i-1]))
+        lc++;
+    }
+    nums[lg] += lc;
+    ause += lc;
+  }
+  return ause;
+}
+</code></pre>
+<p>数组部分的统计中，重点是<B><VT>计算分布，分桶</VT></B><br>数组部分被分割为二次幂的区间：<br>(0,1](1,2](2,4](4,8](8,16](16,32]...(2^30, 2^31]<VT>（本质：(<code>2^(lg - 1), 2^lg]</code>）</VT></p>
+<p>哈希部分：</p>
+<pre><code class="language-c">static int numusehash (const Table *t, unsigned int *nums, unsigned int *pna) {
+  int totaluse = 0;  /* total number of elements */
+  int ause = 0;  /* elements added to &#39;nums&#39; (can go to array part) */
+  int i = sizenode(t);
+  while (i--) {
+    Node *n = &amp;t-&gt;node[i];
+    if (!ttisnil(gval(n))) {
+      ause += countint(gkey(n), nums);
+      totaluse++;
+    }
+  }
+  *pna += ause;
+  return totaluse;
+}
+</code></pre>
+<p>哈希部分的统计非常常规，只是全遍历统计<br><B><VT>重要：哈希部分统计的不是仅仅是数量totaluse，还统计了可放入数组部分的候选项数ause</VT></B></p>
+<p><B>分配统计</B></p>
+<pre><code class="language-c">static unsigned int computesizes (unsigned int nums[], unsigned int *pna) {
+  int i;
+  unsigned int twotoi;  /* 2^i (candidate for optimal size) */
+  unsigned int a = 0;  /* number of elements smaller than 2^i */
+  unsigned int na = 0;  /* number of elements to go to array part */
+  unsigned int optimal = 0;  /* optimal size for array part */
+  /* loop while keys can fill more than half of total size */
+  for (i = 0, twotoi = 1;
+       twotoi &gt; 0 &amp;&amp; *pna &gt; twotoi / 2;
+       i++, twotoi *= 2) {
+    if (nums[i] &gt; 0) {
+      a += nums[i];
+      if (a &gt; twotoi/2) {  /* more than half elements present? */
+        optimal = twotoi;  /* optimal size (till now) */
+        na = a;  /* all elements up to &#39;optimal&#39; will go to array part */
+      }
+    }
+  }
+  lua_assert((optimal == 0 || optimal / 2 &lt; na) &amp;&amp; na &lt;= optimal);
+  *pna = na;
+  return optimal;
+}
+</code></pre>
+<p>简单来说就是：<B><VT>每二次幂作为分割点进行检测，只要使用率超过一半就扩展至该大小</VT></B><br><B>Tip：na被重新统计了，因为实际分配会有改变</B></p>
+<p><B>分配</B></p>
+<pre><code class="language-c">void luaH_resize (lua_State *L, Table *t, unsigned int nasize,
+                                          unsigned int nhsize) {
+  unsigned int i;
+  int j;
+  AuxsetnodeT asn;
+  unsigned int oldasize = t-&gt;sizearray;
+  int oldhsize = allocsizenode(t);
+  Node *nold = t-&gt;node;  /* save old hash ... */
+  if (nasize &gt; oldasize)  /* array part must grow? */
+    setarrayvector(L, t, nasize);
+  /* create new hash part with appropriate size */
+  asn.t = t; asn.nhsize = nhsize;
+  if (luaD_rawrunprotected(L, auxsetnode, &amp;asn) != LUA_OK) {  /* mem. error? */
+    setarrayvector(L, t, oldasize);  /* array back to its original size */
+    luaD_throw(L, LUA_ERRMEM);  /* rethrow memory error */
+  }
+  if (nasize &lt; oldasize) {  /* array part must shrink? */
+    t-&gt;sizearray = nasize;
+    /* re-insert elements from vanishing slice */
+    for (i=nasize; i&lt;oldasize; i++) {
+      if (!ttisnil(&amp;t-&gt;array[i]))
+        luaH_setint(L, t, i + 1, &amp;t-&gt;array[i]);
+    }
+    /* shrink array */
+    luaM_reallocvector(L, t-&gt;array, oldasize, nasize, TValue);
+  }
+  /* re-insert elements from hash part */
+  for (j = oldhsize - 1; j &gt;= 0; j--) {
+    Node *old = nold + j;
+    if (!ttisnil(gval(old))) {
+      /* doesn&#39;t need barrier/invalidate cache, as entry was
+         already present in the table */
+      setobjt2t(L, luaH_set(L, t, gkey(old)), gval(old));
+    }
+  }
+  if (oldhsize &gt; 0)  /* not the dummy node? */
+    luaM_freearray(L, nold, cast(size_t, oldhsize)); /* free old hash */
+}
+</code></pre>
+<p>在进入函数前先考虑一下输入：<br><code>luaH_resize(L, t, asize, totaluse - na)</code></p>
+<ul>
+<li>naszie（<code>asize</code>）：数组部分大小，为二次幂</li>
+<li>nhsize（<code>totaluse-na</code>）：哈希部分大小，是目前会在哈希部分的数量</li>
+</ul>
+<p>虽然此时语义不同，但在后续计算中，<B><VT>哈希部分会被扩展为最小二次幂</VT></B>，实际上数组和哈希情况是类似的<br><B><BL>问题：数组和哈希都使用二次幂的原因</BL></B><br><BL>对于数组和哈希，两者使用二次幂的原因是不同的：</BL></p>
+<ul>
+<li><BL>数组部分：区间统计方便，可以使用前缀和</BL></li>
+<li><BL>哈希部分：模运算可以简化为位运算（虽然丢失了精度），同时也只需要保存指数</BL></li>
+</ul>
+<p>具体操作简述如下：</p>
+<ul>
+<li>新数组部分比原数组部分更大，扩展分配<code>setarrayvector()</code></li>
+<li>重初始化哈希部分<code>auxsetnode()</code></li>
+<li>新数组部分比原数组部分更小，迁移收缩部分元素至哈希并收缩分配<code>luaM_reallocvector()</code></li>
+<li>重插入哈希部分</li>
+<li>释放旧哈希<code>luaM_freearray()</code></li>
+</ul>
+<p>逻辑上是完全合理的：哈希需要在数组收缩前进行，因为需要迁移</p>
+<h3 id="遍历">遍历</h3>
+<p>在编写lua代码时，表的遍历极其常用：<code>next()</code>/<code>pair()</code>/<code>ipair()</code><br>在底层中相关内容很多，简述一下：</p>
+<ul>
+<li><code>luaH_next()</code>：底层核心</li>
+</ul>
+<h4 id="luah_next">`luaH_next`</h4>
+<pre><code class="language-c">int luaH_next (lua_State *L, Table *t, StkId key) {
+  unsigned int i = findindex(L, t, key);  /* find original element */
+  for (; i &lt; t-&gt;sizearray; i++) {  /* try first array part */
+    if (!ttisnil(&amp;t-&gt;array[i])) {  /* a non-nil value? */
+      setivalue(key, i + 1);
+      setobj2s(L, key+1, &amp;t-&gt;array[i]);
+      return 1;
+    }
+  }
+  for (i -= t-&gt;sizearray; cast_int(i) &lt; sizenode(t); i++) {  /* hash part */
+    if (!ttisnil(gval(gnode(t, i)))) {  /* a non-nil value? */
+      setobj2s(L, key, gkey(gnode(t, i)));
+      setobj2s(L, key+1, gval(gnode(t, i)));
+      return 1;
+    }
+  }
+  return 0;  /* no more elements */
+}
+</code></pre>
+<p><code>luaH_next()</code>：给定key，获取下一个kv<br>可以看到StkId，说明该函数已经在lua_State语义下了<br>逻辑上很简单：</p>
+<ul>
+<li>先算一个index值</li>
+<li>在数组部分找，找到就设置，返回1</li>
+<li>在哈希部分找，找到就设置，返回1</li>
+<li>没找到，返回0</li>
+</ul>
+<p>这里能注意到一个关键点：<br><B><VT>在栈上已经存放着上一组kv<DRD>（不准确）</DRD>，现在做的是原地修改操作</VT></B><br>所以存在2种情况：</p>
+<ul>
+<li><p>lua层：<code>next(t, k)</code><br>解析后按指令存放在栈上</p>
+</li>
+<li><p>c层：</p>
+<pre><code class="language-c">lua_pushnil(L);
+while (lua_next(L, idx) != 0) {
+  // 栈顶: value
+  // 次栈顶: key
+  lua_pop(L, 1);  // 弹出 value，保留 key
+}
+</code></pre>
+<p>严格来说：<br><B><DRD>栈顶永远是key，value会被弹栈，保证循环的正确性</DRD></B></p>
+</li>
+</ul>
+<p>在开始设置前需要先找到index，即<code>findindex()</code>：</p>
+<pre><code class="language-c">static unsigned int findindex (lua_State *L, Table *t, StkId key) {
+  unsigned int i;
+  if (ttisnil(key)) return 0;  /* first iteration */
+  i = arrayindex(key);
+  if (i != 0 &amp;&amp; i &lt;= t-&gt;sizearray)  /* is &#39;key&#39; inside array part? */
+    return i;  /* yes; that&#39;s the index */
+  else {
+    int nx;
+    Node *n = mainposition(t, key);
+    for (;;) {  /* check whether &#39;key&#39; is somewhere in the chain */
+      /* key may be dead already, but it is ok to use it in &#39;next&#39; */
+      if (luaV_rawequalobj(gkey(n), key) ||
+            (ttisdeadkey(gkey(n)) &amp;&amp; iscollectable(key) &amp;&amp;
+             deadvalue(gkey(n)) == gcvalue(key))) {
+        i = cast_int(n - gnode(t, 0));  /* key index in hash table */
+        /* hash elements are numbered after array ones */
+        return (i + 1) + t-&gt;sizearray;
+      }
+      nx = gnext(n);
+      if (nx == 0)
+        luaG_runerror(L, &quot;invalid key to &#39;next&#39;&quot;);  /* key not found */
+      else n += nx;
+    }
+  }
+}
+</code></pre>
+<p>逻辑也很简单：</p>
+<ul>
+<li>传入nil，返回0，即第一次</li>
+<li>传入数组key，返回[1,sizearray]（需保证在数组部分中）</li>
+<li>传入哈希key，返回[sizearray+1,sizearray+sizenode]</li>
+</ul>
+<p>这里的index映射很关键，因为lua下标从1开始，数组本身是从0开始：</p>
+<ul>
+<li>数组部分：<ul>
+<li><code>t-&gt;array</code>：c内部数组，从0开始</li>
+<li><code>key</code>：lua索引，从1开始</li>
+<li><code>findindex()</code>找到的是lua索引，这里不进行-1映射，等价于从第二个元素开始</li>
+</ul>
+</li>
+<li>哈希部分：<ul>
+<li><code>findindex()</code>计算出来的是一层映射，即接在数组后+哈希Node所在数组位置</li>
+<li><code>luaH_next()</code>重新从哈希Node数组头开始遍历</li>
+<li><code>findindex()</code>结果为<code>(i + 1) + t-&gt;sizearray</code>，<code>luaH_next()</code>初始值仅<code>-t-&gt;sizearray</code>，即从<code>i + 1</code>开始，等价于从第二个元素开始</li>
+</ul>
+</li>
+</ul>
+<h4 id="lua_next">`lua_next`</h4>
+<pre><code class="language-c">LUA_API int lua_next (lua_State *L, int idx) {
+  StkId t;
+  int more;
+  lua_lock(L);
+  t = index2addr(L, idx);
+  api_check(L, ttistable(t), &quot;table expected&quot;);
+  more = luaH_next(L, hvalue(t), L-&gt;top - 1);
+  if (more) {
+    api_incr_top(L);
+  }
+  else  /* no more elements */
+    L-&gt;top -= 1;  /* remove key */
+  lua_unlock(L);
+  return more;
+}
+</code></pre>
+<p><code>lua_next()</code>：<code>luaH_next()</code>的一层封装，提供给外部使用<br>逻辑相当简单：idx转TValue，执行<code>luaH_next()</code>并更改栈顶<br>本质上就是<B><VT><code>luaH_next()</code>的idx版</VT></B></p>
+<h4 id="luab_next">`luaB_next`</h4>
+<p><code>luaB_next()</code>被注册为基础函数，有：<code>{&quot;next&quot;, luaB_next}</code></p>
+<pre><code class="language-c">static int luaB_next (lua_State *L) {
+  luaL_checktype(L, 1, LUA_TTABLE);
+  lua_settop(L, 2);  /* create a 2nd argument if there isn&#39;t one */
+  if (lua_next(L, 1))
+    return 2;
+  else {
+    lua_pushnil(L);
+    return 1;
+  }
+}
+</code></pre>
+<p><code>luaB_next()</code>：next逻辑，将kv压入栈，失败则压入nil<br><B><BL>问题：<code>lua_settop()</code>是将栈帧元素数量设为2，不会把需要的Pop吗</BL></B><br><BL>不会，由于<code>next()</code>是一个函数调用，会开一个新栈帧，可能的也就是以下几种情况：<br><code>next(t)</code>即<code>next(t,nil)</code><br><code>next(t,k)</code><br><code>next(t,k,a,b)</code>即<code>next(t,k)</code><br>本质上只存在一种情况：在表中找当前key后一个kv</BL></p>
+<h4 id="pairsipairs迭代">pairs/ipairs迭代</h4>
+<p>对于迭代，我们最关心的就是<code>pairs()</code>/<code>ipairs()</code><br>实际迭代能够运行，必然是<B><VT>由VM驱动</VT></B></p>
+<h5 id="luab_pairs">`luaB_pairs`</h5>
+<p><code>luaB_pairs()</code>被注册为基础函数，有：<code>{&quot;pairs&quot;, luaB_pairs}</code></p>
+<pre><code class="language-c">static int luaB_pairs (lua_State *L) {
+  return pairsmeta(L, &quot;__pairs&quot;, 0, luaB_next);
+}
+
+static int pairsmeta (lua_State *L, const char *method, int iszero,
+                      lua_CFunction iter) {
+  luaL_checkany(L, 1);
+  if (luaL_getmetafield(L, 1, method) == LUA_TNIL) {  /* no metamethod? */
+    lua_pushcfunction(L, iter);  /* will return generator, */
+    lua_pushvalue(L, 1);  /* state, */
+    if (iszero) lua_pushinteger(L, 0);  /* and initial value */
+    else lua_pushnil(L);
+  }
+  else {
+    lua_pushvalue(L, 1);  /* argument &#39;self&#39; to metamethod */
+    lua_call(L, 1, 3);  /* get 3 values from metamethod */
+  }
+  return 3;
+}
+</code></pre>
+<p><code>luaB_pairs()</code>：三元组迭代<br><code>pairs()</code>我们都知道是全遍历，主要需要看如何迭代运作的</p>
+<ul>
+<li>检查<code>__pairs</code>元方法：<ul>
+<li>给了通过元方法获取三元组（要靠函数调用获取）</li>
+<li>没有就手动把三元组入栈（已知初始状态）</li>
+</ul>
+</li>
+</ul>
+<p>考虑已知默认初始状态，三元组为：</p>
+<ul>
+<li>函数：<code>luaB_next()</code></li>
+<li>状态：实际<code>pairs(t)</code>中传入的t</li>
+<li>初始值：nil</li>
+</ul>
+<h5 id="luab_ipairs">`luaB_ipairs`</h5>
+<p><code>luaB_ipairs()</code>被注册为基础函数，有：<code>{&quot;ipairs&quot;, luaB_ipairs}</code></p>
+<pre><code class="language-c">static int luaB_ipairs (lua_State *L) {
+#if defined(LUA_COMPAT_IPAIRS)
+  return pairsmeta(L, &quot;__ipairs&quot;, 1, ipairsaux);
+#else
+  luaL_checkany(L, 1);
+  lua_pushcfunction(L, ipairsaux);  /* iteration function */
+  lua_pushvalue(L, 1);  /* state */
+  lua_pushinteger(L, 0);  /* initial value */
+  return 3;
+#endif
+}
+</code></pre>
+<p><code>luaB_ipairs()</code>：三元组迭代<br><code>ipairs()</code>与<code>pairs()</code>不同，我们知道仅从0开始连续遍历至nil<br>根据代码会发现这里非常直接，是一个固定的三元组：</p>
+<ul>
+<li>函数：<code>ipairsaux()</code></li>
+<li>状态：实际<code>pairs(t)</code>中传入的t</li>
+<li>初始值：nil</li>
+</ul>
+<p>也就是说与<code>pairs()</code>相比，<code>ipairs()</code>使用了一个<B>特制迭代函数</B></p>
+<pre><code class="language-c">static int ipairsaux (lua_State *L) {
+  lua_Integer i = luaL_checkinteger(L, 2) + 1;
+  lua_pushinteger(L, i);
+  return (lua_geti(L, 1, i) == LUA_TNIL) ? 1 : 2;
+}
+</code></pre>
+<p>迭代函数相当简单：</p>
+<ul>
+<li>取i（从栈上取索引+1，不改栈）</li>
+<li>i压栈</li>
+<li>取t[i]压栈</li>
+</ul>
+<p>此时无非就是输出下一个（i | t[i]），或者结束（i | nil，返回nil）</p>
+<h5 id="vm-for循环">VM for循环</h5>
+<p>VM中for循环由<code>forstat()</code>控制：</p>
+<pre><code class="language-c">static void forstat (LexState *ls, int line) {
+  /* forstat -&gt; FOR (fornum | forlist) END */
+  FuncState *fs = ls-&gt;fs;
+  TString *varname;
+  BlockCnt bl;
+  enterblock(fs, &amp;bl, 1);  /* scope for loop and control variables */
+  luaX_next(ls);  /* skip &#39;for&#39; */
+  varname = str_checkname(ls);  /* first variable name */
+  switch (ls-&gt;t.token) {
+    case &#39;=&#39;: fornum(ls, varname, line); break;
+    case &#39;,&#39;: case TK_IN: forlist(ls, varname); break;
+    default: luaX_syntaxerror(ls, &quot;&#39;=&#39; or &#39;in&#39; expected&quot;);
+  }
+  check_match(ls, TK_END, TK_FOR, line);
+  leaveblock(fs);  /* loop scope (&#39;break&#39; jumps to this point) */
+}
+</code></pre>
+<p>fornum指代的是一般for循环，而forlist指代的就是泛型for循环<br>读到<code>,</code>与<code>in</code>必然就是泛型for情况<br><B><BL>问题：读到<code>,</code>不就知道是泛型for了吗，为什么需要<code>in</code></BL></B><br><BL>如果舍弃元素<code>,</code>不一定存在，需要通过<code>in</code>来判断</BL></p>
+<p>在<code>forlist()</code>中，布局代码如下所示： <VT>Tip：嵌套了<code>forbody()</code></VT></p>
+<pre><code class="language-c">/* create control variables */
+new_localvarliteral(ls, &quot;(for generator)&quot;);
+new_localvarliteral(ls, &quot;(for state)&quot;);
+new_localvarliteral(ls, &quot;(for control)&quot;);
+/* create declared variables */
+new_localvar(ls, indexname);
+while (testnext(ls, &#39;,&#39;)) {
+  new_localvar(ls, str_checkname(ls));
+  nvars++;
+}
+// ...
+// 重要：for语句体
+forbody(ls, base, line, nvars - 3, 0);
+</code></pre>
+<p>通常就会是：<br><B>generator | state | control | k | v</B><br>所以说：</p>
+<ul>
+<li>经过<code>pairs()</code>初始化，有：<br>luaB_next | t | nil | k | v</li>
+<li>经过<code>ipairs()</code>初始化，有：<br>ipairsaux | t | nil | k | v</li>
+</ul>
+<p>循环主要由2条指令控制：</p>
+<ul>
+<li>先OP_TFORCALL：组成<code>generator(state, control)</code>并调用，本质上就是调用<code>luaB_next(t, curKey)</code></li>
+<li>再OP_TFORLOOP：<ul>
+<li>如果k（在R(base+3)处）不是nil（即找到下一次k了），保存至control（在R(base+2)处），跳回去（BODY）</li>
+<li>如果是nil，结束</li>
+</ul>
+</li>
+<li>回来执行BODY</li>
+</ul>
+<p><B><VT>Tip：先OP_TFORCALL是由<code>forbody()</code>填写JMP指令跳转至OP_TFORCALL完成的，本应该是先BODY的</VT></B></p>
+<h3 id="c-api">c API</h3>
+<h4 id="luah_new">`luaH_new`</h4>
+<pre><code class="language-c">Table *luaH_new (lua_State *L) {
+  GCObject *o = luaC_newobj(L, LUA_TTABLE, sizeof(Table));
+  Table *t = gco2t(o);
+  t-&gt;metatable = NULL;
+  t-&gt;flags = cast_byte(~0);
+  t-&gt;array = NULL;
+  t-&gt;sizearray = 0;
+  setnodevector(L, t, 0);
+  return t;
+}
+
+static void setnodevector (lua_State *L, Table *t, unsigned int size) {
+  if (size == 0) {  /* no elements to hash part? */
+    t-&gt;node = cast(Node *, dummynode);  /* use common &#39;dummynode&#39; */
+    t-&gt;lsizenode = 0;
+    t-&gt;lastfree = NULL;  /* signal that it is using dummy node */
+  }
+  else {...}
+}
+</code></pre>
+<p><code>luaH_new()</code>：创建Table并初始化<br>由此可以得知：<br><B><VT>Table初始化后全为空，不会预创建</VT></B></p>
+<h4 id="luav_gettable">`luaV_gettable`</h4>
+<pre><code class="language-c">#define luaV_gettable(L,t,k,v) { const TValue *slot; \
+  if (luaV_fastget(L,t,k,slot,luaH_get)) { setobj2s(L, v, slot); } \
+  else luaV_finishget(L,t,k,v,slot); }
+</code></pre>
+<p><code>luaV_gettable()</code>：VM下由key获取value（栈中替换）<br>实际上该函数很简单，首先会使用<code>luaH_get()</code>进行获取，没有就会使用<code>luaV_finishget</code>，即<code>__index</code>元方法链调用<br><B><DRD>重要：<code>luaV_gettable()</code>并非仅用于table，只要是形如<code>xxx[]</code>都是可接受的，对于不是table情况（或没key），走<code>__index</code>即可</DRD></B></p>
+<p><B><VT>我们在VM中并不能找到函数的调用，这是因为lua复制了一份protect版本：</VT></B></p>
+<pre><code class="language-c">#define gettableProtected(L,t,k,v)  { const TValue *slot; \
+  if (luaV_fastget(L,t,k,slot,luaH_get)) { setobj2s(L, v, slot); } \
+  else Protect(luaV_finishget(L,t,k,v,slot)); }
+</code></pre>
+<h4 id="luav_settable">`luaV_settable`</h4>
+<pre><code class="language-c">#define luaV_settable(L,t,k,v) { const TValue *slot; \
+  if (!luaV_fastset(L,t,k,slot,luaH_get,v)) \
+    luaV_finishset(L,t,k,v,slot); }
+</code></pre>
+<p><code>luaV_settable()</code>：VM下设置t[k]（table情况）<br><B><VT>和<code>luaV_gettable()</code>类似，对于不是table情况（或没key），走<code>__newindex</code>即可</VT></B></p>
+<h3 id="lua-api">lua API</h3>
+<h4 id="lua_createtable">`lua_createtable`</h4>
+<pre><code class="language-c">LUA_API void lua_createtable (lua_State *L, int narray, int nrec) {
+  Table *t;
+  lua_lock(L);
+  t = luaH_new(L);
+  sethvalue(L, L-&gt;top, t);
+  api_incr_top(L);
+  if (narray &gt; 0 || nrec &gt; 0)
+    luaH_resize(L, t, narray, nrec);
+  luaC_checkGC(L);
+  lua_unlock(L);
+}
+</code></pre>
+<p><code>lua_createtable()</code>：在栈上创建table</p>
+<ul>
+<li>narray：数组元素数量</li>
+<li>nrec：哈希元素数量</li>
+</ul>
+<h4 id="lua_gettable">`lua_gettable`</h4>
+<pre><code class="language-c">LUA_API int lua_gettable (lua_State *L, int idx) {
+  StkId t;
+  lua_lock(L);
+  t = index2addr(L, idx);
+  luaV_gettable(L, t, L-&gt;top - 1, L-&gt;top - 1);
+  lua_unlock(L);
+  return ttnov(L-&gt;top - 1);
+}
+</code></pre>
+<p><code>lua_gettable()</code>：<code>luaV_gettable()</code>的简单封装，返回key对应value的类型</p>
+<h4 id="lua_settable">`lua_settable`</h4>
+<pre><code class="language-c">LUA_API void lua_settable (lua_State *L, int idx) {
+  StkId t;
+  lua_lock(L);
+  api_checknelems(L, 2);
+  t = index2addr(L, idx);
+  luaV_settable(L, t, L-&gt;top - 2, L-&gt;top - 1);
+  L-&gt;top -= 2;  /* pop index and value */
+  lua_unlock(L);
+}
+</code></pre>
+<p><code>lua_settable()</code>：<code>luaV_settable()</code>的简单封装</p>
+<h4 id="lua_rawget">`lua_rawget`</h4>
+<pre><code class="language-c">LUA_API int lua_rawget (lua_State *L, int idx) {
+  StkId t;
+  lua_lock(L);
+  t = index2addr(L, idx);
+  api_check(L, ttistable(t), &quot;table expected&quot;);
+  setobj2s(L, L-&gt;top - 1, luaH_get(hvalue(t), L-&gt;top - 1));
+  lua_unlock(L);
+  return ttnov(L-&gt;top - 1);
+}
+</code></pre>
+<p><code>lua_rawget()</code>：table原始get（跳过元方法）<br><B><VT><code>luaB_rawget()</code>又封装了一层，作为基础库函数<code>rawget()</code>使用</VT></B></p>
+<h4 id="lua_rawset">`lua_rawset`</h4>
+<pre><code class="language-c">LUA_API void lua_rawset (lua_State *L, int idx) {
+  StkId o;
+  TValue *slot;
+  lua_lock(L);
+  api_checknelems(L, 2);
+  o = index2addr(L, idx);
+  api_check(L, ttistable(o), &quot;table expected&quot;);
+  slot = luaH_set(L, hvalue(o), L-&gt;top - 2);
+  setobj2t(L, slot, L-&gt;top - 1);
+  invalidateTMcache(hvalue(o));
+  luaC_barrierback(L, hvalue(o), L-&gt;top-1);
+  L-&gt;top -= 2;
+  lua_unlock(L);
+}
+</code></pre>
+<p><code>lua_rawset()</code>：table原始set（跳过元方法）<br><B><VT><code>luaB_rawset()</code>又封装了一层，作为基础库函数<code>rawset()</code>使用</VT></B></p>
+<h3 id="使用实例">使用实例</h3>
+<p>OP_NEWTABLE：<code>luaH_new()</code>创table，有值设定数组/哈希大小就设置<br>OP_SETLIST<br>OP_GETTABLE：走<code>gettableProtected()</code><br>OP_SETTABLE：走<code>settableProtected()</code><br>OP_GETTABUP：同OP_GETTABLE，upvalue版<br>OP_SETTABUP：同OP_SETTABLE，upvalue版</p>
+<hr>
+<hr>
+<hr>
+<h1 id="函数执行">函数执行</h1>
+<p>函数执行是核心部分之一，可以分为2部分：</p>
+<ul>
+<li>函数执行</li>
+<li>安全执行</li>
+</ul>
+<hr>
+<h2 id="函数执行">函数执行</h2>
+<p>函数执行指的是函数执行流程本体<br>本质上入口只有2个函数：</p>
+<ul>
+<li><code>luaD_call()</code></li>
+<li><code>luaD_callnoyield()</code>：noyield版本</li>
+</ul>
+<p><B><VT>函数的执行与lua栈紧密相关</VT></B></p>
+<pre><code class="language-c">void luaD_call (lua_State *L, StkId func, int nResults) {
+  if (++L-&gt;nCcalls &gt;= LUAI_MAXCCALLS)
+    stackerror(L);
+  if (!luaD_precall(L, func, nResults))  /* is a Lua function? */
+    luaV_execute(L);  /* call it */
+  L-&gt;nCcalls--;
+}
+</code></pre>
+<p>流程为：</p>
+<ol>
+<li><code>luaD_precall()</code>：执行前准备</li>
+<li><code>luaV_execute()</code> / <code>(*f)(L)</code>：执行</li>
+<li><code>luaD_poscall()</code>：执行后处理</li>
+</ol>
+<p>对于LClosure来说，走的是<code>luaV_execute()</code><br>而对于CClosure来说，走的是直接调用，因为c函数根本不需要使用虚拟机完成<br>但流程上来说还是差不多的</p>
+<p><B>准备</B><br>准备即<code>luaD_precall()</code>，LClosure与CClosure的区分就是从这里开始的<br>具体来说其实有3种：</p>
+<ul>
+<li>C函数<ul>
+<li>进入新CallInfo（<code>next_ci()</code>）并设置</li>
+<li>直接调用</li>
+<li><code>luaD_poscall()</code></li>
+</ul>
+</li>
+<li>Lua函数<ul>
+<li>计算传参数量<ul>
+<li><code>adjust_varargs()</code>：具有可变参数情况的调整</li>
+<li>对于非可变参数情况，缺少参数就补nil</li>
+</ul>
+</li>
+<li>获取函数需要的栈帧大小<ul>
+<li>更新top（<code>L-&gt;top</code> / <code>ci-&gt;top</code>）</li>
+</ul>
+</li>
+<li>进入新CallInfo（<code>next_ci()</code>）并设置<ul>
+<li>关键参数savedpc：<code>p-&gt;code</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>不可调用对象<ul>
+<li>走<code>__call</code>元方法</li>
+</ul>
+</li>
+</ul>
+<p>ci即CallInfo在这里极其关键，核心就是设置ci<br><B>CallInfo的理解：</B><br>CallInfo是某函数的执行，在函数中的指令可能存在CALL命令，则会再次调用<code>luaD_call()</code>，此时就会通过<code>next_ci()</code>进行推进，链表形态的<code>L-&gt;ci</code>则会进行链接<br><code>#define next_ci(L) (L-&gt;ci = (L-&gt;ci-&gt;next ? L-&gt;ci-&gt;next : luaE_extendCI(L)))</code><br><B><BL>问题：一般来说next不存在则创建新ci，何时会发生获取next情况</BL></B><br><BL>只要以前到达过更深的调用就会复用（除非被shrink回收），因为CallInfo结构与深度确认即可，函数相关数据都是拿到后重新赋值（初始化）的</BL></p>
+<p><B>结束处理</B><br>最核心当然是返回上一CallInfo：<br><code>L-&gt;ci = ci-&gt;previous;  /* back to caller */</code><br>除此以外，进行了<code>moveresults()</code>操作：根据参数移动结果并决定新栈顶位置</p>
+<ul>
+<li><code>const TValue *firstResult</code>：原第一个返回值位置</li>
+<li><code>StkId res</code>：&quot;搬家&quot;后第一个返回值位置</li>
+<li><code>int nres</code>：返回值个数</li>
+<li><code>int wanted</code>：想要的结果数量</li>
+</ul>
+<p>理解起来很简单：<br><B><VT>根据<code>wanted</code>决定操作，需要将<code>firstResult</code>元素依次搬到<code>res</code></VT></B></p>
+<img src="Pic/lua1.png" alt="" class="mnote-img mnote-img-large" data-mnote-image="1" data-kind="large" data-width="1300" data-height="820">
+
+<hr>
+<h2 id="安全执行异常处理">安全执行（异常处理）</h2>
+<p>在 C++ / C# 中，有trycatch机制，可以保证程序的安全执行<br>但 c 中<B>没有trycatch机制</B>，但可以通过<B><GN>跳转机制</GN><VT>模拟异常</VT></B></p>
+<pre><code class="language-c">#include &lt;setjmp.h&gt;
+
+jmp_buf buf;
+
+void func() {
+    longjmp(buf, 1); // 跳回
+}
+
+int main() {
+    if (setjmp(buf) == 0) {
+        func();
+    } else {
+        printf(&quot;Caught something\n&quot;);
+    }
+}
+</code></pre>
+<p>以上就是一个安全执行实例：<br><code>setjmp()</code>：记录当前位置（保存当前执行状态并返回0，跳转回来返回1）<br><code>longjmp()</code>：跳回位置<br>也就是说：第一次<code>setjmp()</code>时会返回0，会进入if语句块，而通过<code>longjmp()</code>跳转回来时，会再次执行<code>setjmp()</code>，但此时会返回1，从而执行else语句块</p>
+<p>安全执行的<B>核心</B>为以下函数：</p>
+<ul>
+<li><code>luaD_rawrunprotected()</code>：负责利用jump机制创建安全执行环境</li>
+<li><code>luaD_throw()</code>：遇错时利用jump机制跳转回<code>luaD_rawrunprotected()</code></li>
+</ul>
+<p>具体来说是以下函数：</p>
+<ul>
+<li><code>lua_pcall()</code><ul>
+<li>本质<code>luaD_pcall()</code>的封装</li>
+</ul>
+</li>
+<li>除此以外，只要需要保护，就会通过<code>luaD_rawrunprotected()</code>启动函数（如：<code>lua_newstate()</code>中<code>f_luaopen()</code>就进行了保护）</li>
+</ul>
+<BR>
+
+<p>由于存在<B>多平台</B>情况，用宏进行控制：</p>
+<pre><code class="language-c">#if !defined(LUAI_THROW)				/* { */
+
+#if defined(__cplusplus) &amp;&amp; !defined(LUA_USE_LONGJMP)	/* { */
+
+/* C++ exceptions */
+#define LUAI_THROW(L,c)		throw(c)
+#define LUAI_TRY(L,c,a) \
+	try { a } catch(...) { if ((c)-&gt;status == 0) (c)-&gt;status = -1; }
+#define luai_jmpbuf		int  /* dummy variable */
+
+#elif defined(LUA_USE_POSIX)				/* }{ */
+
+/* in POSIX, try _longjmp/_setjmp (more efficient) */
+#define LUAI_THROW(L,c)		_longjmp((c)-&gt;b, 1)
+#define LUAI_TRY(L,c,a)		if (_setjmp((c)-&gt;b) == 0) { a }
+#define luai_jmpbuf		jmp_buf
+
+#else							/* }{ */
+
+/* ISO C handling with long jumps */
+#define LUAI_THROW(L,c)		longjmp((c)-&gt;b, 1)
+#define LUAI_TRY(L,c,a)		if (setjmp((c)-&gt;b) == 0) { a }
+#define luai_jmpbuf		jmp_buf
+
+#endif							/* } */
+
+#endif							/* } */
+</code></pre>
+<p>所以：</p>
+<ul>
+<li>C++：还是用trycatch机制</li>
+<li>POSIX（Linux/macOS）：用更高效的<code>_longjmp</code> / <code>_setjmp</code></li>
+<li>C：<code>longjmp</code> / <code>setjmp</code></li>
+</ul>
+<p><B>重点：</B><br><B><VT>由于C++/POSIX是C的超集，所以虽然源码是C编写的，但是可以直接编译成C++/POSIX<br>但C#并不是所以不行，只能通过调用 C库 / 重写 / 绑定层 方式进行</VT></B></p>
+<p><code>luaD_rawrunprotected()</code></p>
+<pre><code class="language-c">int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
+  unsigned short oldnCcalls = L-&gt;nCcalls;
+  struct lua_longjmp lj;
+  lj.status = LUA_OK;
+  lj.previous = L-&gt;errorJmp;  /* chain new error handler */
+  L-&gt;errorJmp = &amp;lj;
+  LUAI_TRY(L, &amp;lj,
+    (*f)(L, ud);
+  );
+  L-&gt;errorJmp = lj.previous;  /* restore old error handler */
+  L-&gt;nCcalls = oldnCcalls;
+  return lj.status;
+}
+</code></pre>
+<p>以C为例，宏<code>LUAI_TRY</code>可转换为：</p>
+<pre><code class="language-c">if (_setjmp((&amp;lj)-&gt;b) == 0) 
+{
+  (*f)(L, ud);
+}
+</code></pre>
+<p><code>luaD_throw()</code></p>
+<pre><code class="language-c">l_noret luaD_throw (lua_State *L, int errcode) {
+  if (L-&gt;errorJmp) {  /* thread has an error handler? */
+    L-&gt;errorJmp-&gt;status = errcode;  /* set status */
+    LUAI_THROW(L, L-&gt;errorJmp);  /* jump to it */
+  }
+  else {  /* thread has no error handler */
+    global_State *g = G(L);
+    L-&gt;status = cast_byte(errcode);  /* mark it as dead */
+    if (g-&gt;mainthread-&gt;errorJmp) {  /* main thread has a handler? */
+      setobjs2s(L, g-&gt;mainthread-&gt;top++, L-&gt;top - 1);  /* copy error obj. */
+      luaD_throw(g-&gt;mainthread, errcode);  /* re-throw in main thread */
+    }
+    else {  /* no handler at all; abort */
+      if (g-&gt;panic) {  /* panic function? */
+        seterrorobj(L, errcode, L-&gt;top);  /* assume EXTRA_STACK */
+        if (L-&gt;ci-&gt;top &lt; L-&gt;top)
+          L-&gt;ci-&gt;top = L-&gt;top;  /* pushing msg. can break this invariant */
+        lua_unlock(L);
+        g-&gt;panic(L);  /* call panic function (last chance to jump out) */
+      }
+      abort();
+    }
+  }
+}
+</code></pre>
+<p>所以说：</p>
+<ul>
+<li>只要是通过<code>luaD_rawrunprotected()</code>调用函数，函数内<code>luaD_throw()</code>触发，都可以走<code>LUAI_THROW()</code>异常处理（因为存在errorJmp）</li>
+<li>如果没有，走兜底机制：<ul>
+<li>主线程errorJmp尝试处理</li>
+<li>panic最终尝试</li>
+<li>失败，abort退出</li>
+</ul>
+</li>
+</ul>
+<hr>
+<hr>
+<hr>
+<h1 id="编译与虚拟机执行流程">编译与虚拟机执行流程</h1>
+<h2 id="启动">启动</h2>
+<p>在lua中，启动方式有很多，简单来说：</p>
+<ul>
+<li><p>命令行启动<br><code>lua script.lua</code></p>
+</li>
+<li><p>嵌入</p>
+<pre><code class="language-c">lua_State *L = luaL_newstate();
+luaL_openlibs(L);
+luaL_dofile(L, &quot;script.lua&quot;);
+lua_close(L);
+</code></pre>
+</li>
+</ul>
+<h3 id="命令行启动">命令行启动</h3>
+<p>命令行启动的本质其实就是执行可执行文件，<br>那么必然存在一个<B>main函数</B>，即lua.c的main()：</p>
+<pre><code class="language-csharp">int main (int argc, char **argv) {
+  int status, result;
+  lua_State *L = luaL_newstate();  /* create state */
+  if (L == NULL) {
+    l_message(argv[0], &quot;cannot create state: not enough memory&quot;);
+    return EXIT_FAILURE;
+  }
+  lua_pushcfunction(L, &amp;pmain);  /* to call &#39;pmain&#39; in protected mode */
+  lua_pushinteger(L, argc);  /* 1st argument */
+  lua_pushlightuserdata(L, argv); /* 2nd argument */
+  status = lua_pcall(L, 2, 1, 0);  /* do the call */
+  result = lua_toboolean(L, -1);  /* get result */
+  report(L, status);
+  lua_close(L);
+  return (result &amp;&amp; status == LUA_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+</code></pre>
+<p>对比嵌入情况，操作流程是极其相似的，都是以<code>luaL_newstate()</code>起，<code>lua_close()</code>结束，<code>luaL_openlibs()</code>同样在pmain函数中进行，只是多封装了一些启动选项（<code>-E</code>/<code>-v</code>之类的）<br>执行流程：<code>luaL_loadfile()</code> + <code>docall()</code></p>
+<h3 id="嵌入">嵌入</h3>
+<p>嵌入即<B><VT>其它语言作为宿主，驱动lua虚拟机执行lua代码</VT></B><br>如上述例子所示，为基础核心流程：</p>
+<ul>
+<li><code>luaL_newstate()</code>：启动（来自lauxlib.c，aux：辅助）</li>
+<li><code>luaL_openlibs(L)</code>：加载全局库（来自linit.c）</li>
+<li><code>luaL_dofile(L, &quot;xxx.lua&quot;)</code>：执行（核心）（来自lauxlib.h）</li>
+<li><code>lua_close(L)</code>：退出（来自lstate.c）</li>
+</ul>
+<p>这里绝大部分都是lua提供的嵌入层的封装函数，用于实现嵌入功能<br><B>前缀<code>luaL</code></B>：<VT>辅助函数</VT></p>
+<hr>
+<h2 id="编译期">编译期</h2>
+<p>无论是从：</p>
+<ul>
+<li>lua层<ul>
+<li><code>dofile()</code></li>
+<li><code>loadfile()</code></li>
+<li><code>load()</code></li>
+<li><code>require()</code></li>
+</ul>
+</li>
+<li>c辅助层<ul>
+<li><code>luaL_dofile()</code></li>
+<li><code>luaL_dostring()</code></li>
+<li><code>luaL_loadfile()</code></li>
+<li><code>luaL_loadfilex()</code></li>
+<li><code>luaL_loadstring()</code></li>
+<li><code>luaL_loadbuffer()</code></li>
+<li><code>luaL_loadbufferx()</code></li>
+</ul>
+</li>
+</ul>
+<p>最终都会汇入<B>c层的<code>lua_load()</code></B>中<br>即：<B><VT><code>lua_load()</code>是编译的统一入口</VT></B></p>
+<pre><code class="language-c">LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
+                      const char *chunkname, const char *mode) {
+  ZIO z;
+  int status;
+  lua_lock(L);
+  if (!chunkname) chunkname = &quot;?&quot;;
+  luaZ_init(L, &amp;z, reader, data);
+  status = luaD_protectedparser(L, &amp;z, chunkname, mode);
+  if (status == LUA_OK) {  /* no errors? */
+    LClosure *f = clLvalue(L-&gt;top - 1);  /* get newly created function */
+    if (f-&gt;nupvalues &gt;= 1) {  /* does it have an upvalue? */
+      /* get global table from registry */
+      Table *reg = hvalue(&amp;G(L)-&gt;l_registry);
+      const TValue *gt = luaH_getint(reg, LUA_RIDX_GLOBALS);
+      /* set global table as 1st upvalue of &#39;f&#39; (may be LUA_ENV) */
+      setobj(L, f-&gt;upvals[0]-&gt;v, gt);
+      luaC_upvalbarrier(L, f-&gt;upvals[0]);
+    }
+  }
+  lua_unlock(L);
+  return status;
+}
+</code></pre>
+<p>核心路径：</p>
+<pre><code class="language-txt">lua_load
+  -&gt; luaZ_init // 初始化
+  -&gt; luaD_protectedparser
+     -&gt; f_parser
+        -&gt; luaY_parser    // 文本源码
+        -&gt; luaU_undump    // 预编译二进制 chunk
+</code></pre>
+<ul>
+<li>reader：读取器（函数指针）<ul>
+<li><code>getF()</code>：文件读取</li>
+<li><code>getS()</code>：内存读取</li>
+<li><code>generic_reader()</code> / <code>reader()</code>（luac.c）/ 自定义</li>
+</ul>
+</li>
+<li>data：数据，<VT>与reader对应</VT><ul>
+<li>LoadF（getF）</li>
+<li>LoadS（getS）</li>
+<li>NULL（generic_reader不需要）</li>
+<li>int*（reader）</li>
+</ul>
+</li>
+<li>chunkname：来源名（没有就是<code>?</code>）</li>
+<li>mode：<ul>
+<li><code>t</code>：文本</li>
+<li><code>b</code>：二进制</li>
+<li><code>bt</code>：文本 + 二进制</li>
+</ul>
+</li>
+</ul>
+<BR>
+
+<p><B>简单理解的话：</B><br><B><VT>lua_load()就是在不断地读取，通过<code>f_parser()</code></VT></B></p>
+<pre><code class="language-c">static void f_parser (lua_State *L, void *ud) {
+  LClosure *cl;
+  struct SParser *p = cast(struct SParser *, ud);
+  int c = zgetc(p-&gt;z);  /* read first character */
+  if (c == LUA_SIGNATURE[0]) {
+    checkmode(L, p-&gt;mode, &quot;binary&quot;);
+    cl = luaU_undump(L, p-&gt;z, p-&gt;name);
+  }
+  else {
+    checkmode(L, p-&gt;mode, &quot;text&quot;);
+    cl = luaY_parser(L, p-&gt;z, &amp;p-&gt;buff, &amp;p-&gt;dyd, p-&gt;name, c);
+  }
+  lua_assert(cl-&gt;nupvalues == cl-&gt;p-&gt;sizeupvalues);
+  luaF_initupvals(L, cl);
+}
+</code></pre>
+<p><B><BL>问题：<code>LUA_SIGNATURE[0]</code>是什么</BL></B><br><BL>宏定义如下所示：<br><code>#define LUA_SIGNATURE	&quot;\x1bLua&quot;</code><br><code>LUA_SIGNATURE[0]</code>即读取了第一个字符ESC<br>这是由于<B><VT>对于luac文件（二进制文件），有固定的头，其中首字符必定是ESC</VT></B></BL></p>
+<p><code>f_parser()</code>的两种情况很好理解：</p>
+<ul>
+<li><code>luaU_undump()</code>：二进制反序列化</li>
+<li><code>luaY_parser()</code>：文本编译</li>
+</ul>
+<p><B><BL>问题：序列化 / 编译</BL></B><br><BL><code>luaU_undump()</code>对应的逆操作为<code>luaU_dump()</code>，在执行luac.c完成后，就会通过<code>luaU_dump()</code>生成luac文件<br>重点：lua源码走<code>luaY_parser()</code>生成Proto进行<code>luaU_dump</code>，luac预编译代码走<code>luaU_undump()</code>还原出Proto后再<code>luaU_dump()</code></BL></p>
+<h3 id="二进制反序列化">二进制反序列化</h3>
+<p>在这里需要说明：<br><B><VT>二进制文件其实早已经过编译，在<code>luaU_dump()</code>时已经完成序列化并进行了编译</VT></B></p>
+<p>在luac.c中，main流程其实是先进行<code>luaL_loadfile()</code>，<code>combine()</code>获取Proto后，调用<code>luaU_dump()</code>利用Proto进行序列化<br>简单理解的话：<br><B><VT>luac文件已经存储了Proto信息，大概率还是通过<code>luaY_parser()</code>完成的（也许存在lua+luac组合序列化情况）</VT></B></p>
+<p>所以：<code>luaY_parser()</code>才是编译的关键</p>
+<h3 id="文本编译">文本编译</h3>
+<p>文本编译使用的就是<code>luaY_parser()</code></p>
+<pre><code class="language-c">LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
+                       Dyndata *dyd, const char *name, int firstchar) {
+  LexState lexstate;
+  FuncState funcstate;
+  LClosure *cl = luaF_newLclosure(L, 1);  /* create main closure */
+  setclLvalue(L, L-&gt;top, cl);  /* anchor it (to avoid being collected) */
+  luaD_inctop(L);
+  lexstate.h = luaH_new(L);  /* create table for scanner */
+  sethvalue(L, L-&gt;top, lexstate.h);  /* anchor it */
+  luaD_inctop(L);
+  funcstate.f = cl-&gt;p = luaF_newproto(L);
+  luaC_objbarrier(L, cl, cl-&gt;p);
+  funcstate.f-&gt;source = luaS_new(L, name);  /* create and anchor TString */
+  lua_assert(iswhite(funcstate.f));  /* do not need barrier here */
+  lexstate.buff = buff;
+  lexstate.dyd = dyd;
+  dyd-&gt;actvar.n = dyd-&gt;gt.n = dyd-&gt;label.n = 0;
+  luaX_setinput(L, &amp;lexstate, z, funcstate.f-&gt;source, firstchar);
+  mainfunc(&amp;lexstate, &amp;funcstate);
+  lua_assert(!funcstate.prev &amp;&amp; funcstate.nups == 1 &amp;&amp; !lexstate.fs);
+  /* all scopes should be correctly finished */
+  lua_assert(dyd-&gt;actvar.n == 0 &amp;&amp; dyd-&gt;gt.n == 0 &amp;&amp; dyd-&gt;label.n == 0);
+  L-&gt;top--;  /* remove scanner&#39;s table */
+  return cl;  /* closure is on the stack, too */
+}
+</code></pre>
+<p>核心就几个：</p>
+<ul>
+<li>闭包压栈</li>
+<li>创建<code>lexstate.h</code>空表，压栈</li>
+<li>创建Proto，设置到<code>cl-&gt;p</code>/<code>funcstate.f</code></li>
+<li>读取：<code>luaX_setinput()</code>进行初始化输入状态，后续使用<code>mainfunc()</code>继续读取<br><B><DRD>注意：<code>luaX_setinput()</code>并非只是预读所需的提前处理，而是初始化</DRD></B></li>
+</ul>
+<p><B><BL>问题：为什么要先读一个字符</BL></B><br><BL>在<code>f_parser()</code>判断 binary / text 时，需要预读一个字符（ESC）进行判断</BL></p>
+<p>所以说：<br><B><VT>每次<code>luaY_parser()</code>解析都会生成一个LClosure，本质上是一个Proto附带其UpVal</VT></B><br>更重要：<br><B><DRD>Proto才是编译期真正产物，这里只是顺带完成了执行期的入口准备而已（所以才出现了LClosure，即实例创建）</DRD></B></p>
+<h4 id="mainfunc">mainfunc</h4>
+<p>文本编译的核心说到底还是在<B><code>mainfunc()</code></B>之中：</p>
+<pre><code class="language-c">static void mainfunc (LexState *ls, FuncState *fs) {
+  BlockCnt bl;
+  expdesc v;
+  open_func(ls, fs, &amp;bl);
+  fs-&gt;f-&gt;is_vararg = 1;  /* main function is always declared vararg */
+  init_exp(&amp;v, VLOCAL, 0);  /* create and... */
+  newupvalue(fs, ls-&gt;envn, &amp;v);  /* ...set environment upvalue */
+  luaC_objbarrier(ls-&gt;L, fs-&gt;f, ls-&gt;envn);
+  luaX_next(ls);  /* read first token */
+  statlist(ls);  /* parse main body */
+  check(ls, TK_EOS);
+  close_func(ls);
+}
+</code></pre>
+<p>可以观察该函数注释：</p>
+<blockquote>
+<p>compiles the main function, which is a regular vararg function with an upvalue named LUA_ENV</p>
+</blockquote>
+<p>关键点：</p>
+<ul>
+<li><code>fs-&gt;f-&gt;is_vararg = 1;</code><br>将is_vararg设置为1，说明对于主函数来说，一定可以接收vararg，即<code>...</code>可变参数</li>
+<li><code>newupvalue(fs, ls-&gt;envn, &amp;v);</code><br>给主函数Proto添加upvalue，即<code>_ENV</code>（未设置）</li>
+</ul>
+<p>更关键的是<code>luaX_next()</code> + <code>statlist()</code>，即<B>解析流程</B>：<br><B><VT>编译的本质：根据EBNF词法不断向下执行</VT></B></p>
+<pre><code class="language-c">static void statlist (LexState *ls) {
+  /* statlist -&gt; { stat [&#39;;&#39;] } */
+  while (!block_follow(ls, 1)) {
+    if (ls-&gt;t.token == TK_RETURN) {
+      statement(ls);
+      return;  /* &#39;return&#39; must be last statement */
+    }
+    statement(ls);
+  }
+}
+</code></pre>
+<p>从函数名可知：<code>statlist()</code>是一个语句（stat）列表，可能会读取多个语句<br>简单理解就是：</p>
+<ul>
+<li>遇到结束符，就终止当前<code>statlist()</code></li>
+<li>遇到<code>return</code>，就调用<code>statement()</code>处理完return内容返回<ul>
+<li>本质上和终止符不同，因为return并不意味着后面没有代码，而是单纯的遇到了return必须返回，语义上略有不同</li>
+</ul>
+</li>
+<li>否则持续进行<code>statement()</code>解析</li>
+</ul>
+<p><B><VT>重要：<code>statlist()</code>存在嵌套</VT></B><br>文件本身就是一次<code>statlist()</code>，当遇到如<code>if</code>之类的token，则会递归<code>statlist()</code></p>
+<p>流程本质：<B>读取token-&gt;消费token（解析）-&gt;生成指令 的循环</B><br><B><TT>读取与消耗</TT></B><br><B><code>llex()</code>：<VT>状态机，返回token（int值）</VT></B><br><code>luaX_next()</code>同时承担了读取与消耗token的职责</p>
+<pre><code class="language-c">void luaX_next (LexState *ls) {
+  ls-&gt;lastline = ls-&gt;linenumber;
+  if (ls-&gt;lookahead.token != TK_EOS) {  /* is there a look-ahead token? */
+    ls-&gt;t = ls-&gt;lookahead;  /* use this one */
+    ls-&gt;lookahead.token = TK_EOS;  /* and discharge it */
+  }
+  else
+    ls-&gt;t.token = llex(ls, &amp;ls-&gt;t.seminfo);  /* read next token */
+}
+</code></pre>
+<p>即：</p>
+<ul>
+<li>有预读token，消耗并设置为当前token</li>
+<li>没有预读token，调用<code>llex()</code>读取下一个token</li>
+</ul>
+<p><B><BL>问题：预读token是什么，为什么和<code>TK_EOS</code>有关</BL></B><br><BL>预读token会调用<code>luaX_lookahead()</code>预读，<br>比如：token为变量a，此时后面可以接非常多可能性，比如<code>=</code>/<code>.</code>，此时就需要预读<br>TK_EOS这里不代表终止符，而是意味着无，<code>ls-&gt;lookahead.token = TK_EOS;</code>一句也可以证明TK_EOS是用来当作无使用的<br>初始化位置：<code>luaX_setinput()</code></BL></p>
+<p><B><TT>生成指令</TT></B><br>生成指令发生在某些token流程中，本质上是在填充<code>Proto-&gt;code</code><br>指令即<B><GN>Instruction</GN></B>，本质上其实就是个32位值</p>
+<pre><code class="language-c">#if LUAI_BITSINT &gt;= 32
+typedef unsigned int Instruction;
+#else
+typedef unsigned long Instruction;
+#endif
+</code></pre>
+<p><B>指令格式</B>如下： <VT>从高到低</VT></p>
+<ul>
+<li>iABC：B:9 | C:9 | A:8 | OpCode:6</li>
+<li>iABx：Bx:18 | A:8 | OpCode:6</li>
+<li>iAsBx：sBx:18 | A:8 | OpCode:6</li>
+</ul>
+<p>在lopcodes.h中也能找到注解<br>本质上其实就是<B><VT>不同指令情况的不同分配</VT></B><br>有些指令只有2个操作数，就可以多分配一点，3个操作数就需要匀一下</p>
+<p><B><VT>重点：本质上所有生成指令函数都会收束到以下宏：</VT></B></p>
+<ul>
+<li><code>CREATE_ABC(o,a,b,c)</code></li>
+<li><code>CREATE_ABx(o,a,bc)</code></li>
+<li><code>CREATE_Ax(o,a)</code></li>
+</ul>
+<p><YL><B>举例</B>：<code>CREATE_ABC(OP_MOVE, 2, 0, 0)</code> 将R0复制到R2</YL></p>
+<p><B><code>RA(i)</code>宏</B><br>在虚拟机执行中，通常会调用<code>RA(i)</code>之类的宏获取R(A)真实地址：<br><code>#define RA(i)	(base+GETARG_A(i))</code><br><code>#define GETARG_A(i)	getarg(i, POS_A, SIZE_A)</code><br><code>#define getarg(i,pos,size)	(cast(int, ((i)&gt;&gt;pos) &amp; MASK1(size,0)))</code><br>即 <B><VT>基地址+指令i中A的逻辑索引</VT></B></p>
+<h4 id="总览">总览</h4>
+<ul>
+<li><code>luaY_parser()</code>：解析主函数，返回LClosure闭包<ul>
+<li>初始化：<ul>
+<li>创建闭包与对应Proto</li>
+<li>接收信息，组合LexState/FuncState</li>
+<li><code>luaX_setinput()</code>：额外处理lexstate中解析相关数据</li>
+</ul>
+</li>
+<li><code>mainfunc()</code>：解析流程<ul>
+<li>主函数创建环境upvalue（<code>_ENV</code>）</li>
+<li><code>luaX_next()</code>：读取首token</li>
+<li><code>statlist()</code>：正式解析<ul>
+<li><code>statement()</code>：会消费token进行相应操作<ul>
+<li>某些情况会<code>statlist()</code>递归（如TK_IF）</li>
+<li>途中需要<code>luaX_next()</code>/<code>luaX_lookahead()</code>读取token<ul>
+<li><code>luaX_next()</code>：核心为<code>llex()</code>状态机</li>
+</ul>
+</li>
+<li>会通过<code>luaK_XXX()</code>生成指令</li>
+</ul>
+</li>
+<li>最终遇到终止符退出</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="执行期">执行期</h2>
+<p>针对官方用法（lua.c），有：</p>
+<pre><code class="language-csharp">static int handle_script (lua_State *L, char **argv) {
+  int status;
+  const char *fname = argv[0];
+  if (strcmp(fname, &quot;-&quot;) == 0 &amp;&amp; strcmp(argv[-1], &quot;--&quot;) != 0)
+    fname = NULL;  /* stdin */
+  status = luaL_loadfile(L, fname);
+  if (status == LUA_OK) {
+    int n = pushargs(L);  /* push arguments to script */
+    status = docall(L, n, LUA_MULTRET);
+  }
+  return report(L, status);
+}
+</code></pre>
+<p><code>luaL_loadfile()</code>完成后会生成LClosure并压栈<br><code>docall()</code>则会调用该函数<br><B><BL>问题：LClosure为什么是函数</BL></B><br><BL><B><VT>LClosure与CClosure都是函数</VT></B>，这是由判断决定的：<br><code>#define ttisfunction(o)		checktype(o, LUA_TFUNCTION)</code><br>也就是说只要符合就是，那么LUA_TLCL，即LUA_TFUNCTION</BL></p>
+<p>更本质来说：执行调用的是<code>luaD_call()</code><br>在<a href="#%E5%87%BD%E6%95%B0%E6%89%A7%E8%A1%8C-1">函数执行</a>中，已讲解<code>luaD_call()</code>的执行流程</p>
+<h3 id="虚拟机执行">虚拟机执行</h3>
+<p>虚拟机执行即<code>luaV_execute()</code>，是执行流程的核心<br>该函数是一个极长的<B><VT>状态机</VT></B>，内部包含了所有的OpCode枚举的执行<br><B>主结构</B>如下：</p>
+<pre><code class="language-c">void luaV_execute (lua_State *L) {
+  CallInfo *ci = L-&gt;ci;
+  LClosure *cl;
+  TValue *k;
+  StkId base;
+  ci-&gt;callstatus |= CIST_FRESH;  /* fresh invocation of &#39;luaV_execute&quot; */
+ newframe:  /* reentry point when frame changes (call/return) */
+  lua_assert(ci == L-&gt;ci);
+  cl = clLvalue(ci-&gt;func);  /* local reference to function&#39;s closure */
+  k = cl-&gt;p-&gt;k;  /* local reference to function&#39;s constant table */
+  base = ci-&gt;u.l.base;  /* local copy of function&#39;s base */
+  /* main loop of interpreter */
+  for (;;) {
+    Instruction i;
+    StkId ra;
+    vmfetch();
+    vmdispatch (GET_OPCODE(i)) {
+      vmcase(OP_MOVE) {
+        setobjs2s(L, ra, RB(i));
+        vmbreak;
+      }
+      vmcase(...) {
+        ...
+      }
+      ...
+    }
+  }
+}
+</code></pre>
+<p>可以看到核心就是newframe循环，同时内部具有for循环：</p>
+<ul>
+<li>newframe循环：每次goto都是新栈帧，即进入下（上）一个函数<ul>
+<li>OP_CALL / OP_TAILCALL / OP_RETURN</li>
+</ul>
+</li>
+<li>for循环：函数内部执行循环</li>
+</ul>
+<p><code>vmfetch()</code>是循环第一步：</p>
+<pre><code class="language-c">#define vmfetch()	{ \
+  i = *(ci-&gt;u.l.savedpc++); \
+  if (L-&gt;hookmask &amp; (LUA_MASKLINE | LUA_MASKCOUNT)) \
+    Protect(luaG_traceexec(L)); \
+  ra = RA(i); /* WARNING: any stack reallocation invalidates &#39;ra&#39; */ \
+  lua_assert(base == ci-&gt;u.l.base); \
+  lua_assert(base &lt;= L-&gt;top &amp;&amp; L-&gt;top &lt; L-&gt;stack + L-&gt;stacksize); \
+}
+</code></pre>
+<p>即：</p>
+<ul>
+<li>获取i（savedpc），并移到下一个指令</li>
+<li>获取ra</li>
+</ul>
+<p><B><BL>问题：为什么这里只算了ra没算其它的</BL></B><br><BL>ra是目标寄存器，是几乎必定存在的，而其它的不一定存在</BL></p>
+<p><code>vmdispatch()</code>：宏，其实就是switch<br><code>vmcase(l)</code>：宏，其实就是case<br><code>vmbreak</code>：宏，其实就是break</p>
+<p>过程变化：</p>
+<ul>
+<li><code>cl-&gt;u.l.savedpc</code>：<B><GN>Saved Program Counter，保存的程序计数器</GN></B><ul>
+<li><code>vmfetch()</code>会直接<code>savedpc++</code>指向下一个指令（此时进行当前指令）</li>
+<li>OP_JMP / OP_TEST 之类的跳转操作会直接修改savedpc，其实就是跳过语句</li>
+</ul>
+</li>
+<li><code>cl-&gt;u.l.base</code>：基址缓存<ul>
+<li><code>goto newframe</code>会导致进入下一函数导致重置</li>
+<li><code>Protect()</code>会强制重新同步</li>
+</ul>
+</li>
+<li><code>L-&gt;top</code>：虚拟机栈顶<ul>
+<li>大多指令仅临时性修改，不改回去</li>
+<li>收尾指令会<code>L-&gt;top = ci-&gt;top</code>恢复（如OP_CALL）</li>
+</ul>
+</li>
+</ul>
+<p><B><BL>问题：<code>L-&gt;top</code>与<code>ci-&gt;top</code>的关系</BL></B><br><BL>两者指的都是<code>L-&gt;stack</code>的栈顶，但是具体含义不同：</BL></p>
+<ul>
+<li><BL><code>L-&gt;top</code>：线程当前栈顶</BL></li>
+<li><BL><code>ci-&gt;top</code>：当前栈帧允许的栈顶</BL></li>
+</ul>
+<p><BL>规则：<code>L-&gt;top &lt;= ci-&gt;top</code><br>简单理解：<B><VT><code>ci-&gt;top</code>是边界，<code>L-&gt;top</code>会自行根据边界进行调整</VT></B></BL></p>
+<p><B><VT>相比<code>L-&gt;top</code>/<code>ci-&gt;top</code>，更应该关注的是<code>L-&gt;stack</code>即真正的上限，在<code>luaD_precall()</code>中可能会执行<code>luaD_growstack()</code>扩容</VT></B></p>
+<p>当虚拟机执行完毕，<B>最后一次</B>必然会遇到OP_RETURN执行返回<br>其中会进行<code>luaD_poscall()</code>进行善后处理</p>
+<h2 id="示例">示例</h2>
+<p><B>例1：简单局部变量</B><br><code>local a = &quot;hello world&quot;</code><br><B>编译期：</B><br>核心产物：LClosure（内部核心Proto）<br><img src="Pic/luaskill1.png" alt="" class="mnote-img mnote-img-wide" data-mnote-image="1" data-kind="wide" data-width="585" data-height="84"></p>
+<ul>
+<li>常量表k：存储&quot;hello world&quot;</li>
+<li>locvars/lineinfo：调试信息（执行期无意义）</li>
+<li>槽位：2个槽位，即<code>Proto-&gt;maxstacksize = 2</code></li>
+<li>指令：<ul>
+<li><code>LOADK 0 -1</code>，即：将第一个常量（<code>K[0]</code>）加载到寄存器0</li>
+<li><code>RETURN 0 1</code>，即：结束，不返回值</li>
+</ul>
+</li>
+</ul>
+<p><B>执行期：</B><br>核心产物：CallInfo</p>
+<ul>
+<li>执行OP_LOADK：<ul>
+<li>找到ra：R(0)</li>
+<li>取常量kb：K(0)</li>
+<li>将kb写入ra：<code>setobj2s()</code></li>
+</ul>
+</li>
+</ul>
+<p>此时R(0)存放&quot;hello world&quot;，R(1)无用（但槽位存在）</p>
+<ul>
+<li>执行OP_RETURN：<ul>
+<li>直接结束chunk（因为只有一个CallInfo）</li>
+</ul>
+</li>
+</ul>
+<p><B><BL>问题：&quot;hello world&quot;没有名字吗，后续怎么访问</BL></B><br><BL>在执行期，变量没有名字，寄存器编号可以认为是它的名字<br>关键：在回收前，局部变量位置永不变</BL></p>
+<p><B>例2：综合例子</B></p>
+<pre><code class="language-lua">local x = 10
+local y = 20
+
+function add(a, b)
+    local sum = a + b
+    return sum
+end
+
+local z = add(x, y)
+print(z)
+</code></pre>
+<img src="Pic/lua2.png" alt="" class="mnote-img mnote-img-normal" data-mnote-image="1" data-kind="normal" data-width="815" data-height="467">
+
+<p>关注于指令流程：</p>
+<ul>
+<li>指令1/2，LOADK：定义x和y，存放在R(0)/R(1)</li>
+<li>指令3，CLOSURE：创建add函数</li>
+<li>指令4，SETTABUP：设置全局变量add，设到<code>_ENV</code></li>
+<li>指令5/6/7/8：调用add函数<ul>
+<li>GETTABUP：获取add函数（在<code>_ENV</code>中）</li>
+<li>MOVE：传入x和y</li>
+<li>CALL：调用<ul>
+<li>子指令1，ADD：传入参数相加</li>
+<li>子指令2，RETURN：返回结果</li>
+<li>子指令3，RETURN：默认return出口（兜底），这里不触发</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>指令9/10/11：调用print函数<ul>
+<li>GETTABUP：获取print函数（也在<code>_ENV</code>中）</li>
+<li>MOVE：传入z</li>
+<li>CALL：调用</li>
+</ul>
+</li>
+<li>指令12，RETURN：返回，没有返回值</li>
+</ul>
+<p>关注于栈变化：</p>
+<ul>
+<li>编译期处理：<ul>
+<li>5slots，最多只存在5个寄存器</li>
+<li>已决定所有操作需要的寄存器</li>
+</ul>
+</li>
+<li>执行期处理：<ul>
+<li>局部变量加载：R(0)=10 R(1)=20</li>
+<li>函数创建：R(2)=add</li>
+<li>复制参数：R(3)=10 R(4)=20</li>
+<li>调用add：调用R(2)函数，使用R(3)/R(4)参数，返回到R(2)<ul>
+<li>内部新栈帧情况：<ul>
+<li>R(0)=10 R(1)=20（复制到新栈帧）</li>
+<li>相加：R(2)=30</li>
+<li>返回：返回R(2)，即30</li>
+</ul>
+</li>
+<li>完成后R(2)被覆盖为30</li>
+<li>R(3)/R(4)大概率不会清理，但后续可直接覆盖</li>
+</ul>
+</li>
+<li>调用print：同add，但由于是CClosure，不走虚拟机执行</li>
+<li>返回：无返回值</li>
+</ul>
+</li>
+</ul>
+<hr>
+<hr>
+<hr>
+<h1 id="闭包">闭包</h1>
+<p>闭包是lua或者说几乎所有语言中至关重要的一个组成部分</p>
+<p>简述：</p>
+<ul>
+<li>编译期：在Proto中有<code>Upvaldesc *upvalues</code></li>
+<li>运行期：在Closure中有<code>c-&gt;upvalue</code>（CClosure）或<code>l-&gt;upvals</code>（LClosure）</li>
+</ul>
+<p>观察LClosure与CClosure：</p>
+<pre><code class="language-c">typedef struct LClosure {
+  ClosureHeader;
+  struct Proto *p;
+  UpVal *upvals[1];  /* list of upvalues */
+} LClosure;
+
+typedef struct CClosure {
+  ClosureHeader;
+  lua_CFunction f;
+  TValue upvalue[1];  /* list of upvalues */
+} CClosure;
+</code></pre>
+<p>可以看到LClosure使用的是UpVal，而CClosure是TValue</p>
+<p>编译期信息<B><GN>Upvaldesc</GN></B></p>
+<pre><code class="language-c">typedef struct Upvaldesc {
+  TString *name;  /* upvalue name (for debug information) */
+  lu_byte instack;  /* whether it is in stack (register) */
+  lu_byte idx;  /* index of upvalue (in stack or in outer function&#39;s list) */
+} Upvaldesc;
+</code></pre>
+<ul>
+<li>name：名字</li>
+<li>instack：1代表当前函数栈局部变量<ul>
+<li>idx：此时为外层栈帧的寄存器号（因为upvalue本来就是外层的）</li>
+</ul>
+</li>
+<li>instack：0代表外部函数自己upvalue列表<ul>
+<li>idx：外层Closure的upvalue下标</li>
+</ul>
+</li>
+</ul>
+<p><YL><B>以最常见的<code>mainfunc()</code>下创建最外层环境upvalue为例：</B><br><code>init_exp(&amp;v, VLOCAL, 0)</code><br><code>newupvalue(fs, ls-&gt;envn, &amp;v)</code><br>名字为<code>_ENV</code> instack为1 idx为0</YL></p>
+<p>执行期信息<B><GN>UpVal</GN></B></p>
+<pre><code class="language-c">struct UpVal {
+  TValue *v;  /* points to stack or to its own value */
+  lu_mem refcount;  /* reference counter */
+  union {
+    struct {  /* (when open) */
+      UpVal *next;  /* linked list */
+      int touched;  /* mark to avoid cycles with dead threads */
+    } open;
+    TValue value;  /* the value (when closed) */
+  } u;
+};
+</code></pre>
+<p>这里重要的就是：</p>
+<ul>
+<li>v：upvalue所在真实位置（根据open/close放在栈/堆，作为同一访问指针）</li>
+<li>u：开关情况数据<ul>
+<li>open：开启状态</li>
+<li>value：关闭状态，upvalue此时存储在value中</li>
+</ul>
+</li>
+</ul>
+<h2 id="upvalue判定">upvalue判定</h2>
+<p>在编译期中，寻找顺序如下：</p>
+<ul>
+<li>找当前函数局部变量</li>
+<li>找当前函数已有upvalue</li>
+<li>递归去外层函数找</li>
+</ul>
+<p>upvalue会用<code>newupvalue()</code>进行创建：</p>
+<pre><code class="language-c">static int newupvalue (FuncState *fs, TString *name, expdesc *v) {
+  Proto *f = fs-&gt;f;
+  int oldsize = f-&gt;sizeupvalues;
+  checklimit(fs, fs-&gt;nups + 1, MAXUPVAL, &quot;upvalues&quot;);
+  luaM_growvector(fs-&gt;ls-&gt;L, f-&gt;upvalues, fs-&gt;nups, f-&gt;sizeupvalues,
+                  Upvaldesc, MAXUPVAL, &quot;upvalues&quot;);
+  while (oldsize &lt; f-&gt;sizeupvalues)
+    f-&gt;upvalues[oldsize++].name = NULL;
+  f-&gt;upvalues[fs-&gt;nups].instack = (v-&gt;k == VLOCAL);
+  f-&gt;upvalues[fs-&gt;nups].idx = cast_byte(v-&gt;u.info);
+  f-&gt;upvalues[fs-&gt;nups].name = name;
+  luaC_objbarrier(fs-&gt;ls-&gt;L, f, name);
+  return fs-&gt;nups++;
+}
+</code></pre>
+<p>在<code>singlevaraux()</code>中根据情况都会设置好</p>
+<h2 id="开启情况">开启情况</h2>
+<p>由LClosure/CClosure结构可知：<br><B><VT>只有LClosure具有开启关闭状态</VT></B></p>
+<p>在UpVal中可以看到一个union结构<code>u</code>，开启时使用open，关闭时就是一个TValue<br>其判断函数如下：<br><code>#define upisopen(up)	((up)-&gt;v != &amp;(up)-&gt;u.value)</code></p>
+<p>之所以有开关状态，是因为类似以下情况：</p>
+<pre><code class="language-lua">function outer()
+  local x = 10
+  return function()
+    return x
+  end
+end
+
+f = outer()
+</code></pre>
+<p>流程：</p>
+<ul>
+<li>执行OP_CLOSURE，会创建UpVal<B><VT>（本质上创建子Closure）</VT></B><ul>
+<li>instack=1：<code>luaF_findupval(L, base + uv[i].idx)</code><br>外层函数栈帧基址</li>
+<li>instack=0：<code>encup[uv[i].idx]</code><br>外层Closure的encup（UpVal）</li>
+</ul>
+</li>
+<li>函数返回前，为open状态，此时<code>UpVal.v</code>是栈上的值</li>
+<li>函数返回时，会执行<code>luaF_close()</code>，会把所有相关UpVal拷贝至堆(<code>uv-&gt;u.value</code>)并改指向（<code>uv-&gt;v</code>-&gt;<code>uv-&gt;u.value</code>）</li>
+<li>函数返回后，为closed状态，此时<code>UpVal-&gt;v</code>是<code>UpVal-&gt;u.value</code>（与<code>upisopen()</code>对应）</li>
+</ul>
+<h2 id="openupval">`openupval`</h2>
+<p>在线程lua_State结构中，有一字段：<br><code>UpVal *openupval;  /* list of open upvalues in this stack */</code><br>指代的就是当前open的upvalue<br><B><VT>之所以在线程上，是因为多Closure都有可能需要使用，所以说UpVal是共享的，不会复制</VT></B></p>
+<p>其创建方式来自于VM OP_CLOSURE的<code>luaF_findupval()</code><br>而其关闭方式为<code>luaF_close()</code>（通常是return或条件跳转）</p>
+<h3 id="luaf_findupval">`luaF_findupval`</h3>
+<pre><code class="language-c">UpVal *luaF_findupval (lua_State *L, StkId level) {
+  UpVal **pp = &amp;L-&gt;openupval;
+  UpVal *p;
+  UpVal *uv;
+  lua_assert(isintwups(L) || L-&gt;openupval == NULL);
+  while (*pp != NULL &amp;&amp; (p = *pp)-&gt;v &gt;= level) {
+    lua_assert(upisopen(p));
+    if (p-&gt;v == level)  /* found a corresponding upvalue? */
+      return p;  /* return it */
+    pp = &amp;p-&gt;u.open.next;
+  }
+  /* not found: create a new upvalue */
+  uv = luaM_new(L, UpVal);
+  uv-&gt;refcount = 0;
+  uv-&gt;u.open.next = *pp;  /* link it to list of open upvalues */
+  uv-&gt;u.open.touched = 1;
+  *pp = uv;
+  uv-&gt;v = level;  /* current value lives in the stack */
+  if (!isintwups(L)) {  /* thread not in list of threads with upvalues? */
+    L-&gt;twups = G(L)-&gt;twups;  /* link it to the list */
+    G(L)-&gt;twups = L;
+  }
+  return uv;
+}
+</code></pre>
+<p><code>luaF_findupval()</code>：获取upval</p>
+<ul>
+<li>先查<code>L-&gt;openupval</code>链表，有没有可用UpVal，有就用</li>
+<li>没有就新建一个，加入链表</li>
+</ul>
+<h3 id="luaf_close">`luaF_close`</h3>
+<pre><code class="language-c">void luaF_close (lua_State *L, StkId level) {
+  UpVal *uv;
+  while (L-&gt;openupval != NULL &amp;&amp; (uv = L-&gt;openupval)-&gt;v &gt;= level) {
+    lua_assert(upisopen(uv));
+    L-&gt;openupval = uv-&gt;u.open.next;  /* remove from &#39;open&#39; list */
+    if (uv-&gt;refcount == 0)  /* no references? */
+      luaM_free(L, uv);  /* free upvalue */
+    else {
+      setobj(L, &amp;uv-&gt;u.value, uv-&gt;v);  /* move value to upvalue slot */
+      uv-&gt;v = &amp;uv-&gt;u.value;  /* now current value lives here */
+      luaC_upvalbarrier(L, uv);
+    }
+  }
+}
+</code></pre>
+<p><code>luaF_close()</code>：移除upval</p>
+<hr>
+<hr>
+<hr>
+<h1 id="元表">元表</h1>
+<h1 id="load">load</h1>
+<p>load是加载流程，对于lua文件本身是必定会执行的<br>回顾一下lua.c的<code>main()</code>执行，调用的是<code>luaL_loadfile()</code>，一种特殊入口（针对exe执行形式）的<code>lua_load()</code></p>
+<p>lua中的函数有以下几种：</p>
+<ul>
+<li><code>load()</code>：字符串加载</li>
+<li><code>load()()</code>：字符串加载+执行</li>
+<li><code>loadfile()</code>：文件加载</li>
+<li><code>dofile()</code>：文件加载+执行</li>
+</ul>
+<p>这些都是被作为基础库函数存在的：</p>
+<pre><code class="language-c">{&quot;dofile&quot;, luaB_dofile},
+{&quot;loadfile&quot;, luaB_loadfile},
+{&quot;load&quot;, luaB_load},
+</code></pre>
+<h2 id="luab_load">`luaB_load`</h2>
+<pre><code class="language-c">static int luaB_load (lua_State *L) {
+  int status;
+  size_t l;
+  const char *s = lua_tolstring(L, 1, &amp;l);
+  const char *mode = luaL_optstring(L, 3, &quot;bt&quot;);
+  int env = (!lua_isnone(L, 4) ? 4 : 0);  /* &#39;env&#39; index or 0 if no &#39;env&#39; */
+  if (s != NULL) {  /* loading a string? */
+    const char *chunkname = luaL_optstring(L, 2, s);
+    status = luaL_loadbufferx(L, s, l, chunkname, mode);
+  }
+  else {  /* loading from a reader function */
+    const char *chunkname = luaL_optstring(L, 2, &quot;=(load)&quot;);
+    luaL_checktype(L, 1, LUA_TFUNCTION);
+    lua_settop(L, RESERVEDSLOT);  /* create reserved slot */
+    status = lua_load(L, generic_reader, NULL, chunkname, mode);
+  }
+  return load_aux(L, status, env);
+}
+</code></pre>
+<ul>
+<li>是string，走<code>luaL_loadbufferx()</code></li>
+<li>否则只能是function，走<code>lua_load()</code></li>
+<li>最终由<code>load_aux()</code>更改env</li>
+</ul>
+<h2 id="luab_loadfile">`luaB_loadfile`</h2>
+<pre><code class="language-c">static int luaB_loadfile (lua_State *L) {
+  const char *fname = luaL_optstring(L, 1, NULL);
+  const char *mode = luaL_optstring(L, 2, NULL);
+  int env = (!lua_isnone(L, 3) ? 3 : 0);  /* &#39;env&#39; index or 0 if no &#39;env&#39; */
+  int status = luaL_loadfilex(L, fname, mode);
+  return load_aux(L, status, env);
+}
+</code></pre>
+<p><code>luaB_loadfile()</code>更简单，只有一种<code>luaL_loadfilex()</code>情况，同样需要<code>load_aux()</code>设置env</p>
+<p><B><BL>问题：<code>load_aux()</code>是什么</BL></B><br><BL>设置的就是<code>_ENV</code>，在此之前无论怎么进入都会执行<code>lua_load()</code>，此时第一个upvalue必定会被设置为全局表，经过<code>load_aux()</code>后，只要有env就可以进行覆盖</BL></p>
+<h2 id="luab_dofile">`luaB_dofile`</h2>
+<pre><code class="language-c">static int luaB_dofile (lua_State *L) {
+  const char *fname = luaL_optstring(L, 1, NULL);
+  lua_settop(L, 1);
+  if (luaL_loadfile(L, fname) != LUA_OK)
+    return lua_error(L);
+  lua_callk(L, 0, LUA_MULTRET, 0, dofilecont);
+  return dofilecont(L, 0, 0);
+}
+</code></pre>
+<p><code>luaB_dofile()</code>就是<code>luaB_loadfile()</code>的自动执行阉割版</p>
+<ul>
+<li>不具有保护（不是pcall）</li>
+<li>不能指定mode（<code>t</code>/<code>b</code>/<code>bt</code>）</li>
+<li>不能指定env</li>
+<li>直接抛异常（loadfile是<code>nil, errmsg</code>）</li>
+</ul>
+<p>所以<code>luaB_dofile()</code>只是一种便捷调用封装，如果需要更细应该用<code>luaB_loadfile()</code></p>
+<p>简单理解：</p>
+<pre><code class="language-c">// loadfile
+local f, err = loadfile(fname, mode, env)
+return f, err
+
+// dofile
+local f = assert(loadfile(fname))
+return f()
+</code></pre>
+<h2 id="require">require</h2>
+<p><code>require()</code>也可以认为是一种load，是package基础包的内容<br><code>{LUA_LOADLIBNAME, luaopen_package}</code><br><B><VT>Tip：<code>require()</code>之所以可以直接使用，是因为被注册到<code>_G</code>中了</VT></B><br>本质为：<br><code>{&quot;require&quot;, ll_require}</code></p>
+<pre><code class="language-c">
+static int ll_require (lua_State *L) {
+  const char *name = luaL_checkstring(L, 1);
+  lua_settop(L, 1);  /* LOADED table will be at index 2 */
+  lua_getfield(L, LUA_REGISTRYINDEX, LUA_LOADED_TABLE);
+  lua_getfield(L, 2, name);  /* LOADED[name] */
+  if (lua_toboolean(L, -1))  /* is it there? */
+    return 1;  /* package is already loaded */
+  /* else must load package */
+  lua_pop(L, 1);  /* remove &#39;getfield&#39; result */
+  findloader(L, name);
+  lua_pushstring(L, name);  /* pass name as argument to module loader */
+  lua_insert(L, -2);  /* name is 1st argument (before search data) */
+  lua_call(L, 2, 1);  /* run loader to load module */
+  if (!lua_isnil(L, -1))  /* non-nil return? */
+    lua_setfield(L, 2, name);  /* LOADED[name] = returned value */
+  if (lua_getfield(L, 2, name) == LUA_TNIL) {   /* module set no value? */
+    lua_pushboolean(L, 1);  /* use true as result */
+    lua_pushvalue(L, -1);  /* extra copy to be returned */
+    lua_setfield(L, 2, name);  /* LOADED[name] = true */
+  }
+  return 1;
+}
+</code></pre>
+<ul>
+<li>查<code>LUA_LOADED_TABLE</code>，即<code>package.loaded</code><ul>
+<li>已存在直接返回</li>
+</ul>
+</li>
+<li><code>findloader()</code>去<code>package.searchers</code>找loader，并调用<ul>
+<li>返回非nil，写回<code>package.loaded[name]</code></li>
+<li>返回nil，且<code>package.loaded[name]</code>还没有（也就是没有返回值的加载成功），将其设为true（代表加载过了）</li>
+</ul>
+</li>
+<li>返回<code>package.loaded[name]</code></li>
+</ul>
+<p><B><BL>问题：package下有很多内容，哪来的</BL></B><br><BL>在初始化<code>luaopen_package()</code>中会注册一些内容，有：<br><code>loadlib()</code>/<code>searchpath()</code>/<code>searchers</code>/<code>path</code>/<code>cpath</code>/<code>config</code>/<code>loaded</code>/<code>preload</code></BL><br>这里有一注意点：<B>内部访问与对外访问</B><br><code>luaL_getsubtable(L, LUA_REGISTRYINDEX, LUA_LOADED_TABLE);</code><br><code>lua_setfield(L, -2, &quot;loaded&quot;);</code><br>可以看到对于内部，都是通过<code>LUA_REGISTRYINDEX</code>对应的注册表进行访问，loaded对应的就是<code>registy[&quot;_LOADED&quot;]</code>（在global_State中）<br>而对于外部，由<code>lua_setfield()</code>设置后，即可通过<code>package.preload</code>进行<code>registry[&quot;_LOADED&quot;]</code></p>
+<p><code>package.searchers</code><br>由<code>createsearcherstable()</code>创建，顺序如下：</p>
+<ul>
+<li>searcher_preload</li>
+<li>searcher_Lua</li>
+<li>searcher_C</li>
+<li>searcher_Croot</li>
+</ul>
+<p>通常就是<code>searcher_Lua()</code>：</p>
+<pre><code class="language-c">static int searcher_Lua (lua_State *L) {
+  const char *filename;
+  const char *name = luaL_checkstring(L, 1);
+  filename = findfile(L, name, &quot;path&quot;, LUA_LSUBSEP);
+  if (filename == NULL) return 1;  /* module not found in this path */
+  return checkload(L, (luaL_loadfile(L, filename) == LUA_OK), filename);
+}
+</code></pre>
+<p>lua版相当简单，本质上就是<code>luaL_loadfile()</code>，和<code>dofile()</code>的加载逻辑一致，随后使用<code>lua_call()</code>一般执行</p>
+<p><code>searcher_preload()</code>是一个提前加载表：</p>
+<pre><code class="language-c">static int searcher_preload (lua_State *L) {
+  const char *name = luaL_checkstring(L, 1);
+  lua_getfield(L, LUA_REGISTRYINDEX, LUA_PRELOAD_TABLE);
+  if (lua_getfield(L, -1, name) == LUA_TNIL)  /* not found? */
+    lua_pushfstring(L, &quot;\n\tno field package.preload[&#39;%s&#39;]&quot;, name);
+  return 1;
+}
+</code></pre>
+<p>所以本质上<B><VT>只要在<code>package.preload[name]</code>进行注册，就可以以最高优先级进行加载</VT></B><br>所以可以做到<B><VT>覆盖默认模块/嵌入式（没有文件系统）</VT></B></p>
+<p>有时也会遇到c文件加载<code>searcher_C()</code>：</p>
+<pre><code class="language-c">static int searcher_C (lua_State *L) {
+  const char *name = luaL_checkstring(L, 1);
+  const char *filename = findfile(L, name, &quot;cpath&quot;, LUA_CSUBSEP);
+  if (filename == NULL) return 1;  /* module not found in this path */
+  return checkload(L, (loadfunc(L, filename, name) == 0), filename);
+}
+</code></pre>
+<p>对于c来说：</p>
+<ul>
+<li>找<code>.so</code>/<code>.dll</code>文件（通过<code>cpath</code>进行搜寻）</li>
+<li>找到，加载动态库，并寻找<code>luaopen_xxx()</code>，找到即成功</li>
+</ul>
+<BR>
+
+<p><code>searcher_Croot()</code>是单文件多模块版<code>searcher_C()</code>：<br><code>require(&quot;a.b.c&quot;)</code>：文件名使用Root（a.b.c取a），在a文件中会使用<code>luaopen_a_b_c()</code></p>
+<hr>
+<hr>
+<hr>
+<h1 id="元表">元表</h1>
+<p>元表是lua重要的组成部分，table经常会需要元表的改写支持</p>
+<ul>
+<li>table/userdata：对象级元表</li>
+<li>number/string/function之类的基础类型：类型级元表</li>
+</ul>
+<h2 id="初始化">初始化</h2>
+<p>在<code>luaT_init()</code>中进行了元表名字的初始化：</p>
+<pre><code class="language-c">void luaT_init (lua_State *L) {
+  static const char *const luaT_eventname[] = {  /* ORDER TM */
+    &quot;__index&quot;, &quot;__newindex&quot;,
+    &quot;__gc&quot;, &quot;__mode&quot;, &quot;__len&quot;, &quot;__eq&quot;,
+    &quot;__add&quot;, &quot;__sub&quot;, &quot;__mul&quot;, &quot;__mod&quot;, &quot;__pow&quot;,
+    &quot;__div&quot;, &quot;__idiv&quot;,
+    &quot;__band&quot;, &quot;__bor&quot;, &quot;__bxor&quot;, &quot;__shl&quot;, &quot;__shr&quot;,
+    &quot;__unm&quot;, &quot;__bnot&quot;, &quot;__lt&quot;, &quot;__le&quot;,
+    &quot;__concat&quot;, &quot;__call&quot;
+  };
+  int i;
+  for (i=0; i&lt;TM_N; i++) {
+    G(L)-&gt;tmname[i] = luaS_new(L, luaT_eventname[i]);
+    luaC_fix(L, obj2gco(G(L)-&gt;tmname[i]));  /* never collect these names */
+  }
+}
+</code></pre>
+<p>可以看到名字在<code>G(L)-&gt;tmname</code>中，<B><VT>后续查表方便</VT></B></p>
+<h2 id="查询">查询</h2>
+<p>查询一般会通过2个函数进行：</p>
+<ul>
+<li><code>luaT_gettm()</code>：已知元表，查元方法</li>
+<li><code>luaT_gettmbyobj()</code>：已知对象，找对象的元表，查元方法</li>
+</ul>
+<pre><code class="language-c">const TValue *luaT_gettm (Table *events, TMS event, TString *ename) {
+  const TValue *tm = luaH_getshortstr(events, ename);
+  lua_assert(event &lt;= TM_EQ);
+  if (ttisnil(tm)) {  /* no tag method? */
+    events-&gt;flags |= cast_byte(1u&lt;&lt;event);  /* cache this fact */
+    return NULL;
+  }
+  else return tm;
+}
+</code></pre>
+<p>可以看到一个关键优化：<br><B><VT>当元表没有元方法时，缓存到flags中（位运算）</VT></B></p>
+<pre><code class="language-c">const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
+  Table *mt;
+  switch (ttnov(o)) {
+    case LUA_TTABLE:
+      mt = hvalue(o)-&gt;metatable;
+      break;
+    case LUA_TUSERDATA:
+      mt = uvalue(o)-&gt;metatable;
+      break;
+    default:
+      mt = G(L)-&gt;mt[ttnov(o)];
+  }
+  return (mt ? luaH_getshortstr(mt, G(L)-&gt;tmname[event]) : luaO_nilobject);
+}
+</code></pre>
+<p>这里就能看出上述的一个情况：<br><B><VT>table/userdata是特殊的，对象具有metatable，而其他的在<code>G(L)-&gt;mt</code>存有类级别metatable</VT></B></p>
+<h2 id="调用">调用</h2>
+<p>调用最常用的是以下几种：</p>
+<ul>
+<li><code>luaT_callTM()</code>：元方法与参数压栈，并调用</li>
+<li><code>luaT_callbinTM()</code>：二元元方法版（如：<code>__add</code>）</li>
+<li><code>luaT_callorderTM()</code>：比较运算专用版</li>
+</ul>
+<pre><code class="language-c">void luaT_callTM (lua_State *L, const TValue *f, const TValue *p1,
+                  const TValue *p2, TValue *p3, int hasres) {
+  ptrdiff_t result = savestack(L, p3);
+  StkId func = L-&gt;top;
+  setobj2s(L, func, f);  /* push function (assume EXTRA_STACK) */
+  setobj2s(L, func + 1, p1);  /* 1st argument */
+  setobj2s(L, func + 2, p2);  /* 2nd argument */
+  L-&gt;top += 3;
+  if (!hasres)  /* no result? &#39;p3&#39; is third argument */
+    setobj2s(L, L-&gt;top++, p3);  /* 3rd argument */
+  /* metamethod may yield only when called from Lua code */
+  if (isLua(L-&gt;ci))
+    luaD_call(L, func, hasres);
+  else
+    luaD_callnoyield(L, func, hasres);
+  if (hasres) {  /* if has result, move it to its place */
+    p3 = restorestack(L, result);
+    setobjs2s(L, p3, --L-&gt;top);
+  }
+}
+</code></pre>
+<p>相当简单，就是压栈，函数调用</p>
+<p>元表调用情况如下：<br><B><VT>VM中，大多数运算会先走VM原生快路径（比如a+b可以当然就直接算掉了/表能找到value当然就直接取了），走不通才会尝试元方法，这是流程的一部分并非非法操作<br>如果需要原生，则可以调用<code>rawget()</code>/<code>rawset()</code>/<code>rawequal()</code>之类的方法绕过</VT></B></p>
+<h2 id="其它">其它</h2>
+<p>一些特殊点：</p>
+<ul>
+<li><code>__le</code>即&lt;=有回退机制，如果有<code>__lt</code>即&lt;也是可行的，因为<code>a&lt;=b</code>等价于<code>not(b&lt;a)</code></li>
+<li>对于字符串类型来说，string库把<code>__index</code>设为string库，所以可以这样调用<code>&quot;abc&quot;:sub(1,2)</code></li>
+</ul>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

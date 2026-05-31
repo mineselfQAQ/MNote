@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MicrosoftDI分析</title>
+  <link rel="stylesheet" href="../../../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>MicrosoftDI分析</BBBG></center></strong></p>
+<p><strong>参考版本：v3.1.32</strong><br><strong><a href="https://github.com/dotnet/extensions/tree/v3.1.32/src/DependencyInjection">Github</a></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E7%AE%80%E8%BF%B0">简述</a></li>
+<li><a href="#%E6%A1%86%E6%9E%B6">框架</a><ul>
+<li><a href="#%E5%9F%BA%E6%9C%AC%E6%B5%81%E7%A8%8B%E9%93%BE">基本流程链</a><ul>
+<li><a href="#servicecollection">ServiceCollection</a></li>
+<li><a href="#servicedescriptor">ServiceDescriptor</a></li>
+<li><a href="#serviceprovider">ServiceProvider</a><ul>
+<li><a href="#callsitevalidator">CallSiteValidator</a></li>
+<li><a href="#serviceproviderengine">ServiceProviderEngine</a><ul>
+<li><a href="#callsitefactory">CallSiteFactory</a></li>
+<li><a href="#callsiteruntimeresolver">CallSiteRuntimeResolver</a></li>
+<li><a href="#serviceproviderenginescope">ServiceProviderEngineScope</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E5%9F%BA%E7%A1%80%E8%B0%83%E7%94%A8">基础调用</a></li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<h1 id="简述">简述</h1>
+<p>该框架是由微软提供的<B><VT>依赖注入框架</VT></B>，全称为<code>Microsoft.Extensions.DependencyInjection</code><br>该DI框架是相对来说比较完善的，提供了诸多功能：</p>
+<ul>
+<li>服务生命周期</li>
+<li>构造函数自动注入</li>
+<li>泛型服务支持</li>
+</ul>
+<h1 id="框架">框架</h1>
+<p>对于这种比较复杂的框架，首先应该看一下<strong>使用例</strong>：</p>
+<p><strong>定义：</strong></p>
+<pre><code class="language-csharp">public interface IUserService
+{
+    string GetUserName(int userId);
+}
+public interface IEmailService
+{
+    void SendEmail(string to, string subject, string body);
+}
+
+public class UserService : IUserService
+{
+    public string GetUserName(int userId)
+    {
+        return $&quot;User_{userId}&quot;;
+    }
+}
+public class EmailService : IEmailService
+{
+    public void SendEmail(string to, string subject, string body)
+    {
+        Console.WriteLine($&quot;发送邮件给: {to}&quot;);
+        Console.WriteLine($&quot;主题: {subject}&quot;);
+        Console.WriteLine($&quot;内容: {body}&quot;);
+    }
+}
+
+public class NotificationService
+{
+    private readonly IUserService _userService;
+    private readonly IEmailService _emailService;
+
+    public NotificationService(IUserService userService, IEmailService emailService)
+    {
+        _userService = userService;
+        _emailService = emailService;
+    }
+
+    public void SendWelcomeEmail(int userId)
+    {
+        var userName = _userService.GetUserName(userId);
+        var subject = &quot;欢迎使用我们的服务&quot;;
+        var body = $&quot;亲爱的 {userName}，欢迎加入我们！&quot;;
+        
+        _emailService.SendEmail($&quot;{userName}@example.com&quot;, subject, body);
+    }
+}
+</code></pre>
+<p><strong>实现：</strong></p>
+<pre><code class="language-csharp">static void Main()
+{
+    var services = new ServiceCollection();
+    
+    services.AddTransient&lt;IUserService, UserService&gt;();
+    services.AddScoped&lt;IEmailService, EmailService&gt;();
+    services.AddSingleton&lt;NotificationService&gt;();
+    
+    services.AddTransient&lt;SomeOtherService&gt;(); // 无接口形式
+    
+    using (var serviceProvider = services.BuildServiceProvider())
+    {
+        using (var scope = serviceProvider.CreateScope())
+        {
+            var notificationService = scope.ServiceProvider.GetRequiredService&lt;NotificationService&gt;();
+            notificationService.SendWelcomeEmail(123);
+        }
+    }
+}
+
+public class SomeOtherService
+{
+    public void DoSomething()
+    {
+        Console.WriteLine(&quot;...&quot;);
+    }
+}
+</code></pre>
+<p>以上可以说是最常规的基本用法了，绝大多数情况上述内容已经够用<br><strong>特点</strong>如下：</p>
+<ul>
+<li>Transient/Scoped/Singleton是三种生命周期，会配合Scope使用</li>
+<li>ServiceCollection下<code>AddXXX()</code>，ServiceProvider下<code>GetXXX()</code></li>
+</ul>
+<BR>
+
+<h2 id="基本流程链">基本流程链</h2>
+<p>上述使用例包含了一条最基本的使用链：</p>
+<ul>
+<li>创建ServiceCollection，在其中注册服务(<code>AddXXX()</code>)</li>
+<li>通过serviceCollection创建ServiceProvider，在其中进行服务获取(<code>GetXXX()</code>)与使用</li>
+</ul>
+<h3 id="servicecollection">ServiceCollection</h3>
+<p>显而易见的是，<B><GN>ServiceCollection</GN></B>是源头<br>其<strong>声明</strong>为：<br><code>public class ServiceCollection : IServiceCollection</code><br><code>public interface IServiceCollection : IList&lt;ServiceDescriptor&gt; {}</code><br>可以看到<strong>接口IServiceCollection</strong>本质上是一个IList&lt;&gt;，即<B><VT>具有列表功能</VT></B><br>也就是说：<B><VT>本质上ServiceCollection就是一个IList实现</VT></B><br>所以在源码一开始我们就能看到：<br><code>private readonly List&lt;ServiceDescriptor&gt; _descriptors = new List&lt;ServiceDescriptor&gt;();</code><br>其余内容也只是包装一下接口函数</p>
+<p>所以<strong>总结</strong>来说：<br><strong><VT>ServiceCollection是一个储存了ServiceDescriptor列表的数据结构</VT></strong></p>
+<p><strong><BL>问题：<code>AddXXX()</code>去哪了</BL></strong><br><BL>既然不在类中，那么只可能会在扩展函数中，有<B><GN>ServiceCollectionServiceExtensions<GN></B></BL><br>观察ServiceCollectionServiceExtensions，可以发现其中有相当多的实现，<strong>汇总</strong>如下：</p>
+<ul>
+<li>函数<ul>
+<li><code>AddTransient()</code></li>
+<li><code>AddScoped()</code></li>
+<li><code>AddSingleton()</code></li>
+</ul>
+</li>
+<li>形式<ul>
+<li>类型注册<ul>
+<li><code>AddXXX(Type serviceType, Type implementationType)</code></li>
+<li><code>AddXXX(Type serviceType)</code></li>
+</ul>
+</li>
+<li>泛型注册<ul>
+<li><code>AddXXX&lt;TService, TImplementation&gt;()</code></li>
+<li><code>AddXXX&lt;TService&gt;()</code></li>
+</ul>
+</li>
+<li>工厂注册<ul>
+<li><code>AddXXX(Type serviceType, Func&lt;IServiceProvider, object&gt; implementationFactory)</code></li>
+<li><code>AddXXX&lt;TService&gt;(Func&lt;IServiceProvider, TService&gt; implementationFactory)</code></li>
+<li><code>AddXXX&lt;TService, TImplementation&gt;(Func&lt;IServiceProvider, TImplementation&gt; implementationFactory)</code></li>
+</ul>
+</li>
+<li>实例注册<VT>(仅Singleton)</VT><ul>
+<li><code>AddSingleton(Type serviceType, object implementationInstance)</code></li>
+<li><code>AddSingleton&lt;TService&gt;(TService implementationInstance)</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>一般来说<strong>泛型注册</strong>应该会是比较常用的一种形式，毕竟这看起来最方便<br>观察各个函数的实现，会发现<B>最终都是由<code>Add()</code>完成</B>：</p>
+<pre><code class="language-csharp">private static IServiceCollection Add(
+    IServiceCollection collection,
+    Type serviceType,
+    Type implementationType,
+    ServiceLifetime lifetime)
+{
+    var descriptor = new ServiceDescriptor(serviceType, implementationType, lifetime);
+    collection.Add(descriptor);
+    return collection;
+}
+
+private static IServiceCollection Add(
+    IServiceCollection collection,
+    Type serviceType,
+    Func&lt;IServiceProvider, object&gt; implementationFactory,
+    ServiceLifetime lifetime)
+{
+    var descriptor = new ServiceDescriptor(serviceType, implementationFactory, lifetime);
+    collection.Add(descriptor);
+    return collection;
+}
+</code></pre>
+<p>可以看到那么多形式最终会<strong>收束为2种</strong>：</p>
+<ul>
+<li><code>Type implementationType</code>：实现类</li>
+<li><code>Func&lt;IServiceProvider, object&gt; implementationFactory</code>：工厂，调用返回实例</li>
+</ul>
+<p><code>Add()</code>功能很简单，即<B><VT>向collection添加ServiceDescriptor</VT></B></p>
+<p><B><GN>ServiceLifetime</GN></B>是其中一个参数， 可以看到是构建ServiceDescriptor的一部分，其实是个<strong>枚举</strong>：</p>
+<pre><code class="language-csharp">public enum ServiceLifetime
+{
+    Singleton,
+    Scoped,
+    Transient
+}
+</code></pre>
+<p>显然，各种生命周期的函数都会传入相应的ServiceLifetime值</p>
+<h3 id="servicedescriptor">ServiceDescriptor</h3>
+<p>显然，<B><GN>ServiceDescriptor</GN></B>是关键的类，从descriptor也能了解到，应该是一个<B><VT>用于收集服务描述的类</VT></B><br><strong>构造函数</strong>即收集数据，无非就是：</p>
+<ul>
+<li>必有<ul>
+<li><code>ServiceLifetime lifetime</code>：生命周期</li>
+<li><code>Type serviceType</code>：基服务类型</li>
+</ul>
+</li>
+<li>3选1<ul>
+<li><code>Type implementationType</code>：实现服务类型</li>
+<li><code>object instance</code>：服务实例(此时必定为<code>ServiceLifetime.Singleton</code>情况)</li>
+<li><code>Func&lt;IServiceProvider, object&gt; factory</code>：工厂</li>
+</ul>
+</li>
+</ul>
+<p>观察其<strong>函数</strong>：</p>
+<ul>
+<li><code>Transient()</code></li>
+<li><code>Scoped()</code></li>
+<li><code>Singleton()</code></li>
+<li><code>Describe()</code>(上述3种的底层)</li>
+</ul>
+<p>可以发现其函数就是非常熟悉的<VT>生命周期创建函数，返回ServiceDescriptor</VT><br>这<strong>和ServiceCollection是一致的</strong><br>也就是说我们其实能通过<code>ServiceDescriptor.XXX()</code>直接创建出ServiceDescriptor<br>同时还有<code>AddXXX()</code>版本，在<B><GN>ServiceCollectionDescriptorExtensions</GN></B>中：</p>
+<ul>
+<li><code>Add()</code></li>
+<li><code>TryAdd()</code></li>
+<li><code>TryAddTransient()</code></li>
+<li><code>TryAddScoped()</code></li>
+<li><code>TryAddSingleton()</code></li>
+<li><code>TryAddEnumerable()</code></li>
+<li><code>Replace()</code></li>
+<li><code>RemoveAll()</code></li>
+</ul>
+<p><strong>要注意：</strong><br><strong><VT>其中的内容更丰富，但扩展对象依旧是IServiceCollection，所以用法是没有变的</VT></strong></p>
+<p>结合来看，有以下几情况：</p>
+<ul>
+<li>ServiceDescriptor静态函数创建</li>
+<li>ServiceCollectionDescriptorExtensions扩展方法(额外)</li>
+<li>ServiceCollectionServiceExtensions扩展方法(基础)</li>
+</ul>
+<p>显然ServiceCollectionServiceExtensions的是最基础最常用的，而ServiceCollectionDescriptorExtensions在某些情况会需要使用，而如<code>Add()</code>这种函数就需要ServiceDescriptor静态函数获取后才能调用</p>
+<p>这么来说：<B><VT>ServiceDescriptor就是非常简单的信息收集类，除此以外没有任何功能</VT></B></p>
+<BR>
+
+<h3 id="serviceprovider">ServiceProvider</h3>
+<p>下一个关键的内容为：<br><code>var serviceProvider = services.BuildServiceProvider()</code><br>该函数在<B><GN>ServiceCollectionContainerBuilderExtensions</GN></B>中进行扩展，其中有3种Build形式：</p>
+<pre><code class="language-csharp">public static ServiceProvider BuildServiceProvider(this IServiceCollection services)
+{
+    return BuildServiceProvider(services, ServiceProviderOptions.Default);
+}
+
+public static ServiceProvider BuildServiceProvider(this IServiceCollection services, bool validateScopes)
+{
+    return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = validateScopes });
+}
+
+public static ServiceProvider BuildServiceProvider(this IServiceCollection services, ServiceProviderOptions options)
+{
+    if (services == null)
+    {
+        throw new ArgumentNullException(nameof(services));
+    }
+
+    if (options == null)
+    {
+        throw new ArgumentNullException(nameof(options));
+    }
+
+    return new ServiceProvider(services, options);
+}
+</code></pre>
+<p>可以发现：<VT>对于ServiceProvider，其中除了IServiceCollection，还会设置一个ServiceProviderOptions</VT><br><B><GN>ServiceProviderOptions</GN></B>具体如下：</p>
+<pre><code class="language-csharp">public class ServiceProviderOptions
+{
+    internal static readonly ServiceProviderOptions Default = new ServiceProviderOptions();
+
+    public bool ValidateScopes { get; set; }
+    public bool ValidateOnBuild { get; set; }
+    internal ServiceProviderMode Mode { get; set; } = ServiceProviderMode.Default;
+}
+
+internal enum ServiceProviderMode
+{
+    Default,
+    Dynamic,
+    Runtime,
+    Expressions,
+    ILEmit
+}
+</code></pre>
+<p>这些都将在ServiceProvider的构造函数中设置<br>由此可见：<B><VT>ServiceProvider就是ServiceCollection补充了ServiceProviderOptions设置本质上其实是</VT></B><br><B><GN>ServiceProvider</GN></B><strong>声明</strong>如下：<br><code>public sealed class ServiceProvider : IServiceProvider, IDisposable, IServiceProviderEngineCallback, IAsyncDisposable</code><br>其中<strong>IDisposable/IAsyncDisposable</strong>是<B><VT>dispose功能</VT></B>，using语句就是它提供的<br><strong><VT>Tip：<code>using</code>对应IDisposable，<code>await using</code>对应IAsyncDisposable</VT></strong></p>
+<p><strong>IServiceProviderEngineCallback</strong>看起来是有关引擎的回调，内容如下：</p>
+<pre><code class="language-csharp">internal interface IServiceProviderEngineCallback
+{
+    void OnCreate(ServiceCallSite callSite);
+    void OnResolve(Type serviceType, IServiceScope scope);
+}
+</code></pre>
+<p><strong>IServiceProvider</strong>则是核心，其中只有一个函数<code>object GetService(Type serviceType)</code><br>这也是provider的功能：<B><VT>提供service</VT></B></p>
+<p>那么这里先看一下前面没有分析的<strong>构造函数</strong>：</p>
+<pre><code class="language-csharp">internal ServiceProvider(IEnumerable&lt;ServiceDescriptor&gt; serviceDescriptors, ServiceProviderOptions options)
+{
+    IServiceProviderEngineCallback callback = null;
+    if (options.ValidateScopes)
+    {
+        callback = this;
+        _callSiteValidator = new CallSiteValidator();
+    }
+
+    switch (options.Mode)
+    {
+        case ServiceProviderMode.Default:
+#if !NETCOREAPP
+            _engine = new DynamicServiceProviderEngine(serviceDescriptors, callback);
+#else
+            if (RuntimeFeature.IsSupported(&quot;IsDynamicCodeCompiled&quot;))
+            {
+                _engine = new DynamicServiceProviderEngine(serviceDescriptors, callback);
+            }
+            else
+            {
+                // Don&#39;t try to compile Expressions/IL if they are going to get interpreted
+                _engine = new RuntimeServiceProviderEngine(serviceDescriptors, callback);
+            }
+#endif
+            break;
+        case ServiceProviderMode.Dynamic:
+            _engine = new DynamicServiceProviderEngine(serviceDescriptors, callback);
+            break;
+        case ServiceProviderMode.Runtime:
+            _engine = new RuntimeServiceProviderEngine(serviceDescriptors, callback);
+            break;
+#if IL_EMIT
+        case ServiceProviderMode.ILEmit:
+            _engine = new ILEmitServiceProviderEngine(serviceDescriptors, callback);
+            break;
+#endif
+        case ServiceProviderMode.Expressions:
+            _engine = new ExpressionsServiceProviderEngine(serviceDescriptors, callback);
+            break;
+        default:
+            throw new NotSupportedException(nameof(options.Mode));
+    }
+
+    if (options.ValidateOnBuild)
+    {
+        List&lt;Exception&gt; exceptions = null;
+        foreach (var serviceDescriptor in serviceDescriptors)
+        {
+            try
+            {
+                _engine.ValidateService(serviceDescriptor);
+            }
+            catch (Exception e)
+            {
+                exceptions = exceptions ?? new List&lt;Exception&gt;();
+                exceptions.Add(e);
+            }
+        }
+
+        if (exceptions != null)
+        {
+            throw new AggregateException(&quot;Some services are not able to be constructed&quot;, exceptions.ToArray());
+        }
+    }
+}
+</code></pre>
+<p><strong>options</strong>是这样控制的：</p>
+<ul>
+<li>ValidateScopes：是否设置<code>callback</code>+<code>_callSiteValidator</code></li>
+<li>Mode：控制Engine的选择<ul>
+<li>DynamicServiceProviderEngine</li>
+<li>RuntimeServiceProviderEngine</li>
+<li>ILEmitServiceProviderEngine</li>
+<li>ExpressionsServiceProviderEngine</li>
+</ul>
+</li>
+<li>ValidateOnBuild：使用engine进行serviceDescriptor的验证</li>
+</ul>
+<p>可以看得出这里的2个关键：<strong>IServiceProviderEngine与CallSiteValidator</strong></p>
+<p>先看一下其它函数：</p>
+<ul>
+<li><code>GetService()</code></li>
+<li><code>Dispose()</code></li>
+<li><code>IServiceProviderEngineCallback.OnCreate()</code></li>
+<li><code>IServiceProviderEngineCallback.OnResolve()</code></li>
+<li><code>DisposeAsync()</code></li>
+</ul>
+<p>接口的实现就其全部，而这些函数其实都是<B><VT>engine函数的包装</VT></B><br><code>public object GetService(Type serviceType) =&gt; _engine.GetService(serviceType);</code></p>
+<p>所以我们大致可以理解：<br><strong><VT>ServiceProvider是一个用于获取service的类，这主要通过engine完成(需要CallSiteValidator的配合)</VT></strong></p>
+<h4 id="callsitevalidator">CallSiteValidator</h4>
+<p><B><GN>CallSiteValidator</GN></B>该类也算是ServiceProvider的重要组成部分<br>其<strong>创建</strong>在此处：</p>
+<pre><code class="language-csharp">// 构造函数中
+if (options.ValidateScopes)
+{
+    callback = this;
+    _callSiteValidator = new CallSiteValidator();
+}
+</code></pre>
+<p>结合唯二两处<strong>调用</strong>：</p>
+<pre><code class="language-csharp">void IServiceProviderEngineCallback.OnCreate(ServiceCallSite callSite)
+{
+    _callSiteValidator.ValidateCallSite(callSite);
+}
+void IServiceProviderEngineCallback.OnResolve(Type serviceType, IServiceScope scope)
+{
+    _callSiteValidator.ValidateResolution(serviceType, scope, _engine.RootScope);
+}
+</code></pre>
+<p>可知：<B><VT>CallSiteValidator的功能就是IServiceProviderEngineCallback接口，会在某刻进行回调调用</VT></B></p>
+<p>先看其<strong>声明</strong>：<br><code>internal class CallSiteValidator: CallSiteVisitor&lt;CallSiteValidator.CallSiteValidatorState, Type&gt;</code><br>其<B>基类<GN>CallSiteVisitor&lt;&gt;</GN></B>相当重要，除了CallSiteValidator还有很多相关的派生类：</p>
+<ul>
+<li>CallSiteValidator</li>
+<li>CallSiteJsonFormatter</li>
+<li>CallSiteRuntimeResolver</li>
+<li>ExpressionResolverBuilder</li>
+<li>ILEmitResolverBuilder</li>
+</ul>
+<p>由此可见CallSiteVisitor相当重要<br>CallSiteVisitor一看就是<B><VT>访问者模式</VT></B>，先看<strong>构造</strong>：</p>
+<pre><code class="language-csharp">protected CallSiteVisitor()
+{
+    _stackGuard = new StackGuard();
+}
+</code></pre>
+<p>构造没什么特别，<B><GN>StackGuard</GN></B>是一个用于<strong>栈检查</strong>的类，后续会通过它<B><VT>确保栈不会溢出</VT></B></p>
+<p>该类的<strong>核心</strong>是2个函数：</p>
+<pre><code class="language-csharp">protected virtual TResult VisitCallSite(ServiceCallSite callSite, TArgument argument)
+{
+    if (!_stackGuard.TryEnterOnCurrentStack())
+    {
+        return _stackGuard.RunOnEmptyStack((c, a) =&gt; VisitCallSite(c, a), callSite, argument);
+    }
+
+    switch (callSite.Cache.Location)
+    {
+        case CallSiteResultCacheLocation.Root:
+            return VisitRootCache(callSite, argument);
+        case CallSiteResultCacheLocation.Scope:
+            return VisitScopeCache(callSite, argument);
+        case CallSiteResultCacheLocation.Dispose:
+            return VisitDisposeCache(callSite, argument);
+        case CallSiteResultCacheLocation.None:
+            return VisitNoCache(callSite, argument);
+        default:
+            throw new ArgumentOutOfRangeException();
+    }
+}
+
+protected virtual TResult VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+{
+    switch (callSite.Kind)
+    {
+        case CallSiteKind.Factory:
+            return VisitFactory((FactoryCallSite)callSite, argument);
+        case  CallSiteKind.IEnumerable:
+            return VisitIEnumerable((IEnumerableCallSite)callSite, argument);
+        case CallSiteKind.Constructor:
+            return VisitConstructor((ConstructorCallSite)callSite, argument);
+        case CallSiteKind.Constant:
+            return VisitConstant((ConstantCallSite)callSite, argument);
+        case CallSiteKind.ServiceProvider:
+            return VisitServiceProvider((ServiceProviderCallSite)callSite, argument);
+        case CallSiteKind.ServiceScopeFactory:
+            return VisitServiceScopeFactory((ServiceScopeFactoryCallSite)callSite, argument);
+        default:
+            throw new NotSupportedException($&quot;Call site type {callSite.GetType()} is not supported&quot;);
+    }
+}
+</code></pre>
+<p>这里最先需要了解的是<B><GN>ServiceCallSite</GN></B>，看起来其实是<strong>一组信息</strong>，类似Descriptor，看起来都挺熟悉：<br>要注意的是：<B><VT>ServiceCallSite只是个抽象类，也就是个接口基类，需要派生</VT></B></p>
+<ul>
+<li>ServiceType</li>
+<li>ImplementationType</li>
+<li>Kind(<B><GN>CallSiteKind</GN></B>，一组枚举值)</li>
+<li>Cache(<B><GN>ResultCache</GN></B>，收集的<B><GN>CallSiteResultCacheLocation</GN></B>/<B><GN>ServiceCacheKey</GN></B>)</li>
+<li><code>CaptureDisposable()</code></li>
+</ul>
+<BR>
+
+<p>看一下函数声明，可以了解到：<br><strong><VT>泛型中，TArgument指的是传入参数，TResult指的是输出结果</VT></strong><br>以CallSiteValidator的<code>CallSiteVisitor&lt;CallSiteValidator.CallSiteValidatorState, Type&gt;</code>为例：显然是告知CallSiteValidatorState，返回一个类型</p>
+<p><code>VisitCallSite()</code>有4种选择：　<VT>默认的实现都是<code>VisitCallSiteMain()</code>，但ServiceCallSite的派生形式有所不同</VT></p>
+<ul>
+<li>VisitRootCache()</li>
+<li>VisitScopeCache()</li>
+<li>VisitDisposeCache()</li>
+<li>VisitNoCache()</li>
+</ul>
+<p><code>VisitCallSiteMain()</code>有6种选择：　<VT>都是抽象类需派生</VT></p>
+<ul>
+<li>VisitFactory()</li>
+<li>VisitIEnumerable()</li>
+<li>VisitConstructor()</li>
+<li>VisitConstant()</li>
+<li>VisitServiceProvider()</li>
+<li>VisitServiceScopeFactory()</li>
+</ul>
+<p>由<code>callSite.Cache.Location</code>可知：<br><strong><VT>对于缓存情况，只要派生类实现即可，如没有实现则使用默认创建方式<code>VisitCallSiteMain()</code>，其中<code>VisitNoCache()</code>虽然使用了virtual，但不会进行override，一定会使用<code>VisitCallSiteMain()</code>，对于创建的每一种情况则必须进行override(因为是抽象的)</VT></strong></p>
+<BR>
+
+<p>回到CallSiteValidator上，根据调用，我们知道核心其实在<code>ValidateCallSite()</code>/<code>ValidateResolution()</code>两函数：</p>
+<pre><code class="language-csharp">public void ValidateCallSite(ServiceCallSite callSite)
+{
+    var scoped = VisitCallSite(callSite, default);
+    if (scoped != null)
+    {
+        _scopedServices[callSite.ServiceType] = scoped;
+    }
+}
+
+public void ValidateResolution(Type serviceType, IServiceScope scope, IServiceScope rootScope)
+{
+    if (ReferenceEquals(scope, rootScope)
+        &amp;&amp; _scopedServices.TryGetValue(serviceType, out var scopedService))
+    {
+        if (serviceType == scopedService)
+        {
+            throw new InvalidOperationException(
+                Resources.FormatDirectScopedResolvedFromRootException(serviceType,
+                    nameof(ServiceLifetime.Scoped).ToLowerInvariant()));
+        }
+
+        throw new InvalidOperationException(
+            Resources.FormatScopedResolvedFromRootException(
+                serviceType,
+                scopedService,
+                nameof(ServiceLifetime.Scoped).ToLowerInvariant()));
+    }
+}
+</code></pre>
+<p>能够了解到：</p>
+<ul>
+<li>ValidateCallSite()：注册检测</li>
+<li>ValidateResolution()：解析检测(resolve)</li>
+</ul>
+<p>具体实现则在遇到回调时再分析</p>
+<BR>
+
+<h4 id="serviceproviderengine">ServiceProviderEngine</h4>
+<p>比起检查器来说，更重要的会是engine，再构造中，根据<code>ServiceProviderOptions.Mode</code>，有4种情况：</p>
+<ul>
+<li>DynamicServiceProviderEngine</li>
+<li>RuntimeServiceProviderEngine</li>
+<li>ILEmitServiceProviderEngine</li>
+<li>ExpressionsServiceProviderEngine</li>
+</ul>
+<p>默认情况下，优先选择DynamicServiceProviderEngine，否则会使用RuntimeServiceProviderEngine，显然<strong>动态的要更好</strong></p>
+<p>这些Engine都有一个<strong>基类</strong>，为<B><GN>ServiceProviderEngine</GN></B><br>其<strong>声明</strong>为：<br><code>internal abstract class ServiceProviderEngine : IServiceProviderEngine, IServiceScopeFactory</code></p>
+<p><strong>IServiceProviderEngine接口</strong>是一个复合接口，有：<br><code>internal interface IServiceProviderEngine : IServiceProvider, IDisposable, IAsyncDisposable</code><br>也就是：</p>
+<ul>
+<li>ServiceProvider功能：<code>GetService()</code></li>
+<li>Disposable功能：<code>Dispose()</code>/<code>DisposeAsync()</code></li>
+<li>ServiceProviderEngine功能：<code>RootScope</code>/<code>ValidateService()</code></li>
+</ul>
+<p>而<strong>IServiceScopeFactory接口</strong>提供了<code>CreateScope()</code></p>
+<p>先看<strong>构造</strong>：</p>
+<pre><code class="language-csharp">protected ServiceProviderEngine(IEnumerable&lt;ServiceDescriptor&gt; serviceDescriptors, IServiceProviderEngineCallback callback)
+{
+    _createServiceAccessor = CreateServiceAccessor;
+    _callback = callback;
+    Root = new ServiceProviderEngineScope(this);
+    RuntimeResolver = new CallSiteRuntimeResolver();
+    CallSiteFactory = new CallSiteFactory(serviceDescriptors);
+    CallSiteFactory.Add(typeof(IServiceProvider), new ServiceProviderCallSite());
+    CallSiteFactory.Add(typeof(IServiceScopeFactory), new ServiceScopeFactoryCallSite());
+    RealizedServices = new ConcurrentDictionary&lt;Type, Func&lt;ServiceProviderEngineScope, object&gt;&gt;();
+}
+</code></pre>
+<p>传入内容很简单，<VT>核心是一个serviceDescriptors，callback由options决定</VT><br>构造函数中，我们就能发现<strong>许多重要内容</strong>：</p>
+<ul>
+<li>_createServiceAccessor：一个双重回调，传入Type，返回一个Func-传入object返回<strong>ServiceProviderEngineScope</strong></li>
+<li>Root：就是一个<strong>ServiceProviderEngineScope</strong></li>
+<li>RuntimeResolver：<strong>CallSiteRuntimeResolver</strong>类似CallSiteValidator，另一种CallSiteVisitor派生</li>
+<li>CallSiteFactory：一个<strong>CallSiteFactory</strong><ul>
+<li>工厂中添加了2组键值对：Type/ServiceCallSite<ul>
+<li>IServiceProvider-ServiceProviderCallSite</li>
+<li>IServiceScopeFactory-ServiceScopeFactoryCallSite</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>RealizedServices：一个字典，key为Type，获取_createServiceAccessor的结果</li>
+</ul>
+<p>先来看一下<B>_createServiceAccessor</B>，可以说构造函数中大部分内容都在此处：<br>_createServiceAccessor是一个Func，其实就是一个函数，如下：</p>
+<pre><code class="language-csharp">private Func&lt;ServiceProviderEngineScope, object&gt; CreateServiceAccessor(Type serviceType)
+{
+    var callSite = CallSiteFactory.GetCallSite(serviceType, new CallSiteChain());
+    if (callSite != null)
+    {
+        DependencyInjectionEventSource.Log.CallSiteBuilt(serviceType, callSite);
+        _callback?.OnCreate(callSite);
+        return RealizeService(callSite);
+    }
+
+    return _ =&gt; null;
+}
+</code></pre>
+<h5 id="callsitefactory">CallSiteFactory</h5>
+<p><strong>CallSiteFactory</strong>即<B><GN>CallSiteFactory</GN></B><br><strong>构造</strong>如下：</p>
+<pre><code class="language-csharp">public CallSiteFactory(IEnumerable&lt;ServiceDescriptor&gt; descriptors)
+{
+    _stackGuard = new StackGuard();
+    _descriptors = descriptors.ToList();
+    Populate();
+}
+</code></pre>
+<p>其中<B><code>Populate()</code></B>显然是关键：</p>
+<pre><code class="language-csharp">private void Populate()
+{
+    foreach (var descriptor in _descriptors)
+    {
+        var serviceTypeInfo = descriptor.ServiceType.GetTypeInfo();
+        // 验证1
+        if (serviceTypeInfo.IsGenericTypeDefinition)
+        {
+            var implementationTypeInfo = descriptor.ImplementationType?.GetTypeInfo();
+
+            if (implementationTypeInfo == null || !implementationTypeInfo.IsGenericTypeDefinition)
+            {
+                throw new ArgumentException(
+                    Resources.FormatOpenGenericServiceRequiresOpenGenericImplementation(descriptor.ServiceType),
+                    &quot;descriptors&quot;);
+            }
+
+            if (implementationTypeInfo.IsAbstract || implementationTypeInfo.IsInterface)
+            {
+                throw new ArgumentException(
+                    Resources.FormatTypeCannotBeActivated(descriptor.ImplementationType, descriptor.ServiceType));
+            }
+        }
+        // 验证2
+        else if (descriptor.ImplementationInstance == null &amp;&amp; descriptor.ImplementationFactory == null)
+        {
+            Debug.Assert(descriptor.ImplementationType != null);
+            var implementationTypeInfo = descriptor.ImplementationType.GetTypeInfo();
+
+            if (implementationTypeInfo.IsGenericTypeDefinition ||
+                implementationTypeInfo.IsAbstract ||
+                implementationTypeInfo.IsInterface)
+            {
+                throw new ArgumentException(
+                    Resources.FormatTypeCannotBeActivated(descriptor.ImplementationType, descriptor.ServiceType));
+            }
+        }
+
+        var cacheKey = descriptor.ServiceType;
+        // 第一次也不会报错，因为ServiceDescriptorCacheItem是值类型(得default)
+        // Add()则会走_item==null情况，添加_item
+        // 同时会发现：第一次只存储_item，_items是空的，后续每一次Add()也是如此，新的在_item中，老的在_items中
+        _descriptorLookup.TryGetValue(cacheKey, out var cacheItem);
+        _descriptorLookup[cacheKey] = cacheItem.Add(descriptor);
+    }
+}
+
+// ServiceDescriptorCacheItem结构体
+public ServiceDescriptorCacheItem Add(ServiceDescriptor descriptor)
+{
+    var newCacheItem = new ServiceDescriptorCacheItem();
+    if (_item == null)
+    {
+        Debug.Assert(_items == null);
+        newCacheItem._item = descriptor;
+    }
+    else
+    {
+        newCacheItem._item = _item;
+        newCacheItem._items = _items ?? new List&lt;ServiceDescriptor&gt;();
+        newCacheItem._items.Add(descriptor);
+    }
+    return newCacheItem;
+}
+</code></pre>
+<p>观察函数，会发现应该有<strong>2个重要函数</strong>：</p>
+<pre><code class="language-csharp">// 填充_callSiteCache
+public void Add(Type type, ServiceCallSite serviceCallSite)
+{
+    _callSiteCache[type] = serviceCallSite;
+}
+
+// 获取或填充获取_callSiteCache
+// Tip：这里的形式是TValue GetOrAdd(TKey key, Func&lt;TKey, TValue&gt; valueFactory)
+internal ServiceCallSite GetCallSite(Type serviceType, CallSiteChain callSiteChain)
+{
+    return _callSiteCache.GetOrAdd(serviceType, type =&gt; CreateCallSite(type, callSiteChain));
+}
+internal ServiceCallSite GetCallSite(ServiceDescriptor serviceDescriptor, CallSiteChain callSiteChain)
+{
+    if (_descriptorLookup.TryGetValue(serviceDescriptor.ServiceType, out var descriptor))
+    {
+        return TryCreateExact(serviceDescriptor, serviceDescriptor.ServiceType, callSiteChain, descriptor.GetSlot(serviceDescriptor));
+    }
+
+    Debug.Fail(&quot;_descriptorLookup didn&#39;t contain requested serviceDescriptor&quot;);
+    return null;
+}
+</code></pre>
+<p>前文中CreateServiceAccessor函数就是调用了<code>GetCallSite()</code>：<br><code>var callSite = CallSiteFactory.GetCallSite(serviceType, new CallSiteChain());</code><br><B><GN>CallSiteChain</GN></B>是创建ServiceCallSite的关键，创建函数<code>CreateCallSite()</code>如下所示：</p>
+<pre><code class="language-csharp">private ServiceCallSite CreateCallSite(Type serviceType, CallSiteChain callSiteChain)
+{
+    if (!_stackGuard.TryEnterOnCurrentStack())
+    {
+        return _stackGuard.RunOnEmptyStack((type, chain) =&gt; CreateCallSite(type, chain), serviceType, callSiteChain);
+    }
+
+    callSiteChain.CheckCircularDependency(serviceType);
+
+    var callSite = TryCreateExact(serviceType, callSiteChain) ??
+                               TryCreateOpenGeneric(serviceType, callSiteChain) ??
+                               TryCreateEnumerable(serviceType, callSiteChain);
+
+    _callSiteCache[serviceType] = callSite;
+
+    return callSite;
+}
+</code></pre>
+<p>由<code>callSiteChain.CheckCircularDependency(serviceType)</code>一句大致可知：<br><strong><VT>CallSiteChain是一个循环链检查类</VT></strong>，后续的传递想必也是为了检查循环</p>
+<p><strong>由此我们大致可知：</strong><br><strong><VT>CallSiteFactory是一个工厂，核心就是在获取ServiceCallSite，具体的细节非常复杂</VT></strong></p>
+<BR>
+<BR>
+
+<p>获取到相应callSite后进行了这些内容：</p>
+<pre><code class="language-csharp">DependencyInjectionEventSource.Log.CallSiteBuilt(serviceType, callSite); // Log
+_callback?.OnCreate(callSite);
+return RealizeService(callSite);
+</code></pre>
+<p>_callback即前面未分析的<code>ServiceProvider.callback</code>，在这里其实就是执行了<code>_callSiteValidator.ValidateCallSite(callSite)</code>，回顾函数：</p>
+<pre><code class="language-csharp">public void ValidateCallSite(ServiceCallSite callSite)
+{
+    var scoped = VisitCallSite(callSite, default);
+    if (scoped != null)
+    {
+        _scopedServices[callSite.ServiceType] = scoped;
+    }
+}
+</code></pre>
+<p>表面上就是填充_scopedServices，这会在后续检测中<strong>作为条件</strong>：<br><code>if (ReferenceEquals(scope, rootScope) &amp;&amp; _scopedServices.TryGetValue(serviceType, out var scopedService))</code><br>看起来<B>_scopedServices的含义</B>为<B><VT>依赖的scoped服务</VT></B><br>所以：<B><VT>如果在resolve时发现在根scope下依赖了scoped服务，对于这种非法操作进行报错处理</VT></B><br>更关键的是<B><code>RealizeService()</code></B>，这是一个<strong>抽象函数</strong>，所以每一种Engine都会有自己的实现，最简单的当然是RuntimeServiceProviderEngine：</p>
+<pre><code class="language-csharp">protected override Func&lt;ServiceProviderEngineScope, object&gt; RealizeService(ServiceCallSite callSite)
+{
+    return scope =&gt;
+    {
+        Func&lt;ServiceProviderEngineScope, object&gt; realizedService = p =&gt; RuntimeResolver.Resolve(callSite, p);
+
+        RealizedServices[callSite.ServiceType] = realizedService;
+        return realizedService(scope);
+    };
+}
+</code></pre>
+<p>首先要记得的是，这里返回的是一个Func，所以操作是<B><VT>延迟执行</VT></B>的<br>不考虑细节，<strong>具体如下</strong>：<br><VT><code>RealizeService()</code>接收ServiceProviderEngineScope，返回了一个具体服务，该服务由realizedService委托执行完成，本质上其实是<code>RuntimeResolver.Resolve()</code></VT></p>
+<p>查看其它Engine的实现，其实大差不大，主要是<strong>realizedService创建方式不同</strong></p>
+<BR>
+
+<h5 id="callsiteruntimeresolver">CallSiteRuntimeResolver</h5>
+<p>如RuntimeServiceProviderEngine所示，<code>RuntimeResolver.Resolve()</code>是创建服务的关键，也就是<B><GN>CallSiteRuntimeResolver</GN></B><br>其<strong>声明</strong>为：<br><code>internal sealed class CallSiteRuntimeResolver : CallSiteVisitor&lt;RuntimeResolverContext, object&gt;</code><br>该类派生自CallSiteVisitor，结合函数<code>Resolve()</code>：</p>
+<pre><code class="language-csharp">public object Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+{
+    return VisitCallSite(callSite, new RuntimeResolverContext
+    {
+        Scope = scope
+    });
+}
+</code></pre>
+<p>该函数通过<code>VisitCallSite()</code>进行创建，具体流程大致如下：</p>
+<ul>
+<li><p>看看<code>callSite.Cache.Location</code>：</p>
+<ul>
+<li>如果说是有缓存的，则使用缓存方式：<br>尝试从resolvedServices中获取，如果获取不到则直接调用<code>VisitCallSiteMain()</code>获取</li>
+<li>如果说是没有缓存的，则直接调用<code>VisitCallSiteMain()</code></li>
+</ul>
+</li>
+<li><p>而对于具体实现，大部分都相当简单：</p>
+</li>
+</ul>
+<BR>
+
+<pre><code class="language-csharp">protected override object VisitConstant(ConstantCallSite constantCallSite, RuntimeResolverContext context)
+{
+    return constantCallSite.DefaultValue;
+}
+
+protected override object VisitServiceProvider(ServiceProviderCallSite serviceProviderCallSite, RuntimeResolverContext context)
+{
+    return context.Scope;
+}
+
+protected override object VisitServiceScopeFactory(ServiceScopeFactoryCallSite serviceScopeFactoryCallSite, RuntimeResolverContext context)
+{
+    return context.Scope.Engine;
+}
+
+protected override object VisitFactory(FactoryCallSite factoryCallSite, RuntimeResolverContext context)
+{
+    return factoryCallSite.Factory(context.Scope);
+}
+</code></pre>
+<p>由于ServiceCallSite已收集相应的信息，直接调用即可<br>VisitIEnumerable/VisitConstructor是比较复杂的2种<br><B><code>VisitConstructor()</code></B>想必是<strong>构造函数注入</strong>，流程如下：</p>
+<pre><code class="language-csharp">protected override object VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+{
+    // 将所有依赖参数进行解析
+    object[] parameterValues;
+    if (constructorCallSite.ParameterCallSites.Length == 0)
+    {
+        parameterValues = Array.Empty&lt;object&gt;();
+    }
+    else
+    {
+        parameterValues = new object[constructorCallSite.ParameterCallSites.Length];
+        for (var index = 0; index &lt; parameterValues.Length; index++)
+        {
+            parameterValues[index] = VisitCallSite(constructorCallSite.ParameterCallSites[index], context);
+        }
+    }
+
+    // 反射创建
+#if NETCOREAPP
+    return constructorCallSite.ConstructorInfo.Invoke(BindingFlags.DoNotWrapExceptions, binder: null, parameters: parameterValues, culture: null);
+#else
+    try
+    {
+        return constructorCallSite.ConstructorInfo.Invoke(parameterValues);
+    }
+    catch (Exception ex) when (ex.InnerException != null)
+    {
+        ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+        // The above line will always throw, but the compiler requires we throw explicitly.
+        throw;
+    }
+#endif
+}
+</code></pre>
+<p>而<B><code>VisitIEnumerable()</code></B>比较特殊，用于<B><VT>单接口多重服务(<code>IEnumerable&lt;IXXService&gt;</code>)</VT></B>：</p>
+<pre><code class="language-csharp">protected override object VisitIEnumerable(IEnumerableCallSite enumerableCallSite, RuntimeResolverContext context)
+{
+    // 创建数组
+    var array = Array.CreateInstance(
+        enumerableCallSite.ItemType,
+        enumerableCallSite.ServiceCallSites.Length);
+    // 将每一个服务都解析出来为数组设置
+    for (var index = 0; index &lt; enumerableCallSite.ServiceCallSites.Length; index++)
+    {
+        var value = VisitCallSite(enumerableCallSite.ServiceCallSites[index], context);
+        array.SetValue(value, index);
+    }
+    return array;
+}
+</code></pre>
+<p>可以看到这两种函数本质上其实是<B><VT>递归调用，本质上是在通过<code>VisitCallSite()</code>解析各个子服务</VT></B></p>
+<h5 id="serviceproviderenginescope">ServiceProviderEngineScope</h5>
+<p><B><GN>ServiceProviderEngineScope</GN></B>想必是一个非常重要的类，<br><code>RealizeService()</code>生成的事件就需要提供ServiceProviderEngineScope<br>其<strong>声明</strong>如下：<br><code>internal class ServiceProviderEngineScope : IServiceScope, IServiceProvider, IAsyncDisposable</code><br><strong>IServiceProvider接口</strong>是关键：</p>
+<pre><code class="language-csharp">public interface IServiceScope : IDisposable
+{
+    IServiceProvider ServiceProvider { get; }
+}
+</code></pre>
+<p>结合<strong>构造函数</strong>：</p>
+<pre><code class="language-csharp">public ServiceProviderEngineScope(ServiceProviderEngine engine)
+{
+    Engine = engine;
+}
+</code></pre>
+<p>可以看出：<B><VT>ServiceProviderEngineScope是ServiceProviderEngine的子部分，scope域的范围会更小</VT></B></p>
+<p><strong><DRD>注意：没有嵌套</DRD></strong></p>
+<pre><code class="language-csharp">using (var scope1 = serviceProvider.CreateScope())
+{
+    var service1 = scope1.ServiceProvider.GetService&lt;IMyScopedService&gt;();
+    
+    using (var scope2 = serviceProvider.CreateScope())
+    {
+        var service2 = scope2.ServiceProvider.GetService&lt;IMyScopedService&gt;();
+    }
+}
+</code></pre>
+<p><VT>看起来这是嵌套，但是由于只有ServiceProviderEngine具有IServiceScopeFactory功能(<code>CreateScope()</code>)，所以<B>都是由主serviceProvider创建得来，必定都是同层(第一层)的(包括Root)</B></VT></p>
+<BR>
+
+<h2 id="基础调用">基础调用</h2>
+<p>以上是流程链的大致分析，回顾一下调用：</p>
+<pre><code class="language-csharp">var services = new ServiceCollection();
+services.AddTransient&lt;IUserService, UserService&gt;();
+
+using (var serviceProvider = services.BuildServiceProvider())
+{
+    using (var scope = serviceProvider.CreateScope())
+    {
+        var notificationService = scope.ServiceProvider.GetRequiredService&lt;IUserService&gt;();
+        // 服务操作
+    }
+}
+</code></pre>
+<ul>
+<li><p><strong>ServiceCollection</strong>是一个IList数据结构，在创建完ServiceCollection后，添加了一个Transient服务<br>由此会在collection中添加一个<strong>ServiceDescriptor</strong><br>descriptor中表明了：</p>
+<ul>
+<li>生命周期Lifetime：<code>ServiceLifetime.Transient</code></li>
+<li>服务类型ServiceType：IUserService</li>
+<li>实现类型ImplementationType：UserService</li>
+</ul>
+</li>
+<li><p>随后通过<code>services.BuildServiceProvider()</code>创建了ServiceProvider，本质上为：</p>
+<ul>
+<li><code>IEnumerable&lt;ServiceDescriptor&gt;</code>(也就是ServiceCollection)</li>
+<li>默认<code>ServiceProviderOptions</code></li>
+</ul>
+<p>由于是默认的，所以<strong>CallSiteValidator</strong>并没有创建，同时使用的engine为<strong>RuntimeServiceProviderEngine</strong>或<strong>DynamicServiceProviderEngine</strong><VT>(假设使用的是RuntimeServiceProviderEngine)</VT></p>
+</li>
+<li><p>后续通过<code>serviceProvider.CreateScope()</code>创建了域，看似ServiceProvider类中没有该函数，这被隐藏在<B><GN>ServiceProviderServiceExtensions</GN></B>之中，本质上其实是<code>provider.GetRequiredService&lt;IServiceScopeFactory&gt;().CreateScope()</code>，其实也就是调用<code>_engine.GetService()</code>，这些内容都是由基类的ServiceProviderEngine提供<br>这段流程就是获取服务的流程：<br>尝试获取服务，获取不到，那么就去调用<code>CreateServiceAccessor()</code>，由于在构造函数中已经为<strong>CallSiteFactory</strong>添加了键值对：<code>CallSiteFactory.Add(typeof(IServiceScopeFactory), new ServiceScopeFactoryCallSite())</code>，所以将直接获取到callSite以获得<code>RealizeService()</code>内的事件并触发，其中scope使用的是Root(<strong>ServiceProviderEngineScope</strong>)，callSite使用的是<strong>ServiceScopeFactoryCallSite</strong>，计算的核心就是<code>RuntimeResolver.Resolve(callSite, p)</code>，<strong>CallSiteRuntimeResolver</strong>是CallSiteVisitor的派生类，需要进行逐层解析，由于是<code>ResultCache.None</code>所以进行<code>VisitCallSiteMain()</code>，由于是<code>CallSiteKind.ServiceScopeFactory</code>所以进行<code>VisitServiceScopeFactory()</code>，获取内容为<code>context.Scope.Engine</code>，这里的Scope即Root，而Root.Engine即RuntimeServiceProviderEngine<br>由此可知，<code>provider.GetRequiredService&lt;IServiceScopeFactory&gt;().CreateScope()</code>并无任何特殊之处，其实就是固定的<code>相应Engine.CreateScope()</code>，即创建子Scope</p>
+</li>
+<li><p><code>scope.ServiceProvider.GetRequiredService&lt;IUserService&gt;()</code>则是真正意义上的获取服务，流程上会和IServiceScopeFactory类似，但由于没有<code>CallSiteFactory.Add()</code>提前注册，所以会有所不同：<br>首先要注意到的一点是<VT>域是不同的</VT>，由于是通过scope进行的获取，<code>GetService()</code>会使用的是子域的ServiceProviderEngineScope而非Root<br>流程上核心还是<code>ServiceProviderEngine.GetService()</code>，由于是第一次，RealizedServices中必定需要Add而非Get，<code>CallSiteFactory.Create()</code>是其中的一步，<strong>CallSiteFactory</strong>记录了存储的ServiceDescriptor，在构造中会进行<code>Populate()</code>即记录键值对：Key-IUserService/Value-<strong>ServiceDescriptorCacheItem</strong><VT>(服务接口所对应的所有ServiceDescriptor)</VT>，这里由于没有提前注册，所以需要<code>CallSiteFactory.CreateCallSite()</code>以获取CallSite，对于这种基础的<code>&lt;IUserService, UserService&gt;</code>形式会使用<code>TryCreateExact()</code>的<code>CreateConstructorCallSite()</code>进行创建，对于这种无参构造，是最简单的<strong>ConstructorCallSite</strong>，信息有：</p>
+<ul>
+<li>lifetime：一组信息，为<strong>ResultCache</strong><ul>
+<li>Location：由ServiceLifetime转义成<strong>CallSiteResultCacheLocation</strong>，这里是<code>CallSiteResultCacheLocation.Dispose</code></li>
+<li>Key：为<strong>ServiceCacheKey</strong>，由服务接口Type/格子Slot组成，由于IUserService只对应UserService，所以Slot为0</li>
+</ul>
+</li>
+<li>ServiceType：服务接口</li>
+<li>ConstructorInfo：构造函数<ul>
+<li>ImplementationType：由反射信息可获取实际服务类型</li>
+</ul>
+</li>
+<li>Kind：<code>CallSiteKind.Constructor</code></li>
+</ul>
+<p>由于只有一层，也就不用考虑<strong>CallSiteChain</strong>的事情<br>同时由于默认创建，也不需要考虑_callback的事<br>接下来就是<code>RealizeService()</code>的调用，<code>RuntimeResolver.Resolve()</code>，由于是<code>CallSiteResultCacheLocation.Dispose</code>所以会调用<code>VisitDisposeCache()</code>即<code>return context.Scope.CaptureDisposable(VisitCallSiteMain(transientCallSite, context))</code>，可以看到这本质上还是在调用<code>VisitCallSiteMain()</code>即<VT>无论如何都要重新创建</VT>，对于无参构造相当简单，返回<code>constructorCallSite.ConstructorInfo.Invoke(Array.Empty&lt;object&gt;())</code>即可，随后额外处理一下Dispose即可</p>
+</li>
+</ul>
+<p>可以说以上流程就是流程的全部，对于<strong>更复杂的情况</strong>，无非就是：</p>
+<ul>
+<li>生命周期的选择</li>
+<li>Engine使用的选择</li>
+<li>各创建形式的选择</li>
+<li>其余一些设置(如ServiceProviderOptions)</li>
+<li>Keyed(该版本中被删除了，上个版本存在，后续也会出现)</li>
+</ul>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

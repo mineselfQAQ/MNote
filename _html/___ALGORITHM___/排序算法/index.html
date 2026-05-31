@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>排序算法</title>
+  <link rel="stylesheet" href="../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>排序算法</BBBG></center></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E9%81%8D%E5%8E%86%E6%8E%92%E5%BA%8F">遍历排序</a><ul>
+<li><a href="#%E9%80%89%E6%8B%A9%E6%8E%92%E5%BA%8F">选择排序</a></li>
+<li><a href="#%E5%86%92%E6%B3%A1%E6%8E%92%E5%BA%8F">冒泡排序</a></li>
+<li><a href="#%E6%8F%92%E5%85%A5%E6%8E%92%E5%BA%8F">插入排序</a></li>
+</ul>
+</li>
+<li><a href="#%E5%88%86%E6%B2%BB%E6%8E%92%E5%BA%8F">分治排序</a><ul>
+<li><a href="#%E5%B8%8C%E5%B0%94%E6%8E%92%E5%BA%8F">希尔排序</a></li>
+<li><a href="#%E5%BF%AB%E9%80%9F%E6%8E%92%E5%BA%8F">快速排序</a></li>
+<li><a href="#%E5%BD%92%E5%B9%B6%E6%8E%92%E5%BA%8F">归并排序</a></li>
+<li><a href="#%E5%A0%86%E6%8E%92%E5%BA%8F">堆排序</a></li>
+</ul>
+</li>
+<li><a href="#%E7%BA%BF%E6%80%A7%E6%8E%92%E5%BA%8F">线性排序</a></li>
+</ul>
+<!-- /TOC -->
+
+<hr>
+<hr>
+<hr>
+<img src="Pic/sort1.png" alt="" class="mnote-img mnote-img-large" data-mnote-image="1" data-kind="large" data-width="1280" data-height="720">
+
+<p>可以看到排序算法的<B>评估角度</B>有以下几种：</p>
+<ul>
+<li>时间复杂度</li>
+<li>空间复杂度</li>
+<li>稳定性：<VT>是否能排序后保持顺序</VT></li>
+<li>就地性：<VT>是否能原地排序，不需要额外空间（一般来说等价于空间复杂度O(1)(特例：快排)）</VT></li>
+<li>自适应性：<VT>部分有序对效率是否有影响</VT></li>
+<li>基于比较：<VT>是否通过比大小完成</VT></li>
+</ul>
+<hr>
+<hr>
+<hr>
+<h1 id="遍历排序">遍历排序</h1>
+<p>遍历排序共有3种：</p>
+<ul>
+<li>选择排序 Selection Sort</li>
+<li>冒泡排序 Bubble Sort</li>
+<li>插入排序 Insertion Sort</li>
+</ul>
+<p><B>简述：</B></p>
+<ul>
+<li>时间复杂度O(n2)，空间复杂度O(1)（即原地排序）<ul>
+<li><B><VT>速度慢，不适用于大数据量情况</VT></B></li>
+<li><B><VT>原地，空间上具有一定优势</VT></B></li>
+</ul>
+</li>
+<li>稳定性：<ul>
+<li>有：冒泡 / 插入</li>
+<li>无：选择</li>
+</ul>
+</li>
+<li>自适应性：<ul>
+<li>有：插入 &gt; 冒泡</li>
+<li>没有：选择</li>
+</ul>
+</li>
+</ul>
+<p><B>优秀程度：插入 &gt; 冒泡 &gt; 选择<VT>（绝对情况）</VT></B></p>
+<ul>
+<li>由于选择排序既没有稳定性，同时也没有自适应性，是最差的一种</li>
+<li>插入和冒泡都具有稳定性，而插入的自适应性会比冒泡好（插入是一个逐步有序的过程），所以插入是更好的选择</li>
+</ul>
+<hr>
+<h2 id="选择排序">选择排序</h2>
+<p>优化：</p>
+<ul>
+<li>如果找到的最小的就是第一个，那么不进行无意义交换</li>
+<li>额外存储最小值，减少列表访问</li>
+<li>双向选择：每轮寻找最小和最大，同时交换，减少一半次数</li>
+</ul>
+<hr>
+<h2 id="冒泡排序">冒泡排序</h2>
+<p>优化：</p>
+<ul>
+<li>如果某一轮没有交换，说明已完成排序，提前退出</li>
+<li>记录最后交换位置，说明之后都有序，下轮不用扫到末尾</li>
+<li>双向冒泡（鸡尾酒排序）</li>
+</ul>
+<hr>
+<h2 id="插入排序">插入排序</h2>
+<p><B><DRD>重要：</DRD></B><br><code>while (j &gt;= 0 &amp;&amp; comparer.Compare(current, list[j]) &lt; 0)</code><br><code>while (j &gt;= 0 &amp;&amp; comparer.Compare(list[j], current) &gt; 0)</code><br><DRD>两种都是可以的，但是为了稳定性，都没有<code>=</code>，而不是<code>a&lt;b</code>等价于<code>b&gt;=a</code></DRD></p>
+<p>优化：</p>
+<ul>
+<li>用shift替代swap</li>
+<li>某轮如果不用交换，直接continue<ul>
+<li>不交换情况少了1次赋值，交换情况多了1次Compare</li>
+<li>引用Compare通常更耗</li>
+<li>偏有序情况也许能加</li>
+</ul>
+</li>
+<li>二分查找插入位置<ul>
+<li>优化了Compare次数（赋值次数没变）</li>
+<li>cache不友好，分支预测不友好</li>
+</ul>
+</li>
+</ul>
+<hr>
+<hr>
+<hr>
+<h1 id="分治排序">分治排序</h1>
+<p>分治排序共有4种：</p>
+<ul>
+<li>希尔排序 Shell Sort</li>
+<li>快速排序 Quick Sort</li>
+<li>归并排序 Merge Sort</li>
+<li>堆排序 Heap Sort</li>
+</ul>
+<p><B>简述：</B></p>
+<ul>
+<li>时间复杂度(nlogn)<ul>
+<li>希尔不完全是O(nlogn)</li>
+</ul>
+</li>
+<li>空间复杂度：<ul>
+<li>希尔(O(1)) = 堆(O(1)) &gt; 快速(O(logn)) &gt; 归并(O(n))</li>
+<li>快速同样算是原地排序</li>
+</ul>
+</li>
+<li>稳定性：<ul>
+<li>有：归并</li>
+<li>没有：希尔 / 快速 / 堆</li>
+</ul>
+</li>
+<li>自适应性：<ul>
+<li>有：希尔 / 快速</li>
+<li>没有：归并 / 堆</li>
+</ul>
+</li>
+</ul>
+<p><B>优秀程度：快速排序 &gt; 归并排序 ≈ 堆排序 &gt; 希尔排序<VT>（大致来说）</VT></B></p>
+<ul>
+<li>整体都比遍历排序要快</li>
+<li>需要速度：快速</li>
+<li>需要稳定性：归并</li>
+<li>需要自适应性：归并 / 堆</li>
+<li>需要一定速度以及空间复杂度：堆（归并最差）</li>
+<li>希尔的时间复杂度优化极其有限，非常不稳定，而且并没有到达O(nlogn)级别</li>
+</ul>
+<hr>
+<h2 id="希尔排序">希尔排序</h2>
+<p>本质：插入排序的优化版，优化局部逆序，从而减轻插入排序的时间<br>所以：希尔的时间复杂度完全取决于gap的选取</p>
+<p>时间复杂度考虑：<br>外层gap循环需要O(logn)，插入排序需要O(n2)，但是前几次循环数量很少，相比最后一次gap=1可以忽略不记</p>
+<pre><code class="language-txt">第1轮（gap=n/2）：O(n)
+第2轮：O(n)
+第3轮：O(n log n)
+...
+最后一轮（gap=1）：O(n²)
+</code></pre>
+<p>优化：</p>
+<ul>
+<li>gap选取：<ul>
+<li>二分（<code>gap /= 2</code>）</li>
+<li>Knuth（<code>gap = gap * 3 + 1</code>寻找，反向<code>gap = (gap - 1) / 3</code>排序）</li>
+<li>Hibbard</li>
+<li>Sedgewick</li>
+<li>Tokuda</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="快速排序">快速排序</h2>
+<p>优化：</p>
+<ul>
+<li>pivot选取<ul>
+<li>九数取中 &gt; 三数取中 &gt; 随机</li>
+</ul>
+</li>
+<li>分区策略<ul>
+<li>Hoare：双指针 + 交换</li>
+<li>Lomuto：单指针 + 交换</li>
+<li>HoareLeftPivot：双指针 + 交换（pivot被提前换到左侧）</li>
+<li>Hole（Hoare变体）：双指针 + 覆盖</li>
+<li>ThreeWay 三路快排：<VT>用于大量重复元素情况</VT></li>
+</ul>
+</li>
+<li>较小区间递归，尾递归消除，栈空间优化至O(logn)</li>
+<li>Introsort<ul>
+<li>小区间改插入排序（比如&lt;=16）</li>
+<li>递归过深改堆排序</li>
+</ul>
+</li>
+</ul>
+<p>分区策略分析：</p>
+<ul>
+<li>从好到坏：ThreeWay &gt; Hole = Hoare &gt; HoareLeftPivot = Lomuto</li>
+<li>HoareLeftPivot / Lomuto / Hole 更容易发生退化，时间复杂度会退化为O(n2)</li>
+<li>ThreeWay针对重复情况有优化</li>
+<li>Hole使用shift替代swap，性能更好</li>
+</ul>
+<p><B><VT>重点：pivot选取与分区策略综合影响了是否会退化的情况</VT></B></p>
+<p><B><BL>问题：HoareLeftPivot与Hoare的区别</BL></B><br><BL>本质上是推进流程的区别：<br>LeftPivot版本简化了与pivot相等数的交换，这是因为如果直接更改无法推进（全相等）导致死循环<br>两者本质上区别不大，只是一些条件的更改，但是<B>Hoare更优秀</B>：<br><B><VT>Hoare对于有序情况分割更加合理（大致会在中间分割，而LeftPivot在完全有序情况会在最左侧），时间上不容易退化（空间由于尾递归优化都不容易退化）</VT></B></BL></p>
+<hr>
+<h2 id="归并排序">归并排序</h2>
+<p>优化：</p>
+<ul>
+<li>temp数组只创建一个，每次Merge都复用（内部不用清理）</li>
+<li>有序时不进行Merge</li>
+<li>小区间改插入排序（比如&lt;=16）</li>
+</ul>
+<hr>
+<h2 id="堆排序">堆排序</h2>
+<p>优化：</p>
+<ul>
+<li><code>SiftDown()</code>减少交换次数</li>
+<li>先选更大的孩子，之后只比较一次<ul>
+<li>对比max和左右比较，路径更加固定，是一定向胜者孩子的走向</li>
+</ul>
+</li>
+<li>小区间改插入排序（比如&lt;=16）</li>
+</ul>
+<p><B><BL>问题：为什么要逐层进行堆化</BL></B><br><BL>堆化的本质是向下沉而非向上浮，假设对堆顶进行堆化，唯一能知道的就是堆顶元素可能被换下去了，堆顶的元素极大概率不是最大数</BL></p>
+<p><B><BL>问题：为什么叶子节点是<code>n / 2 - 1</code></BL></B><br><BL>左节点公式：<code>2n + 1</code>，如果超过末节点说明就是叶子节点，考虑<code>n / 2</code>的叶子节点得<code>n + 1</code>，超过，所以<code>n / 2 - 1</code>是最后一个非叶子节点</BL></p>
+<hr>
+<hr>
+<hr>
+<h1 id="线性排序">线性排序</h1>
+<p>线性排序有3种：</p>
+<ul>
+<li>桶排序 Bucket Sort</li>
+<li>计数排序 Counting Sort</li>
+<li>基数排序 Radix Sort</li>
+</ul>
+<p>简述一下的话：</p>
+<ul>
+<li>桶排序核心就是将元素根据值的大小划分到不同的桶中，在桶中排序后合并</li>
+<li>计数排序核心就是统计值出现的次数，根据其值以及次数放置到原数组</li>
+<li>基数排序核心就是基于计数排序对每一位进行排序操作</li>
+</ul>
+<p>考虑各个排序的限制：</p>
+<ul>
+<li>桶排序---用于体量很大的数据，最好确定分布</li>
+<li>计数排序---数值区间最好小，数据规模最好大，只能用于非负整数数组(可以转化也行)</li>
+<li>基数排序---对于每一位来说同计数排序，除此以外，还必须可以表示为固定位数的格式(可以补0)且位数不能过大</li>
+</ul>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

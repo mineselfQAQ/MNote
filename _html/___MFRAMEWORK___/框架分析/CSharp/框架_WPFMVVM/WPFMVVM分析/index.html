@@ -1,0 +1,1027 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WPFMVVM分析</title>
+  <link rel="stylesheet" href="../../../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>WPFMVVM分析</BBBG></center></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E7%AE%80%E8%BF%B0">简述</a></li>
+<li><a href="#%E5%88%86%E6%9E%90">分析</a><ul>
+<li><a href="#%E6%A0%B8%E5%BF%83-mvvm">核心-MVVM</a><ul>
+<li><a href="#models">Models</a></li>
+<li><a href="#views">Views</a></li>
+<li><a href="#viewmodels">ViewModels</a><ul>
+<li><a href="#%E7%BB%91%E5%AE%9A">绑定</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E8%BE%85%E5%8A%A9">辅助</a><ul>
+<li><a href="#commands">Commands</a></li>
+<li><a href="#hostservicesstores">Host/Services/Stores</a><ul>
+<li><a href="#hotel%E5%88%86%E6%9E%90">Hotel分析</a></li>
+<li><a href="#navigation%E5%88%86%E6%9E%90">Navigation分析</a></li>
+</ul>
+</li>
+<li><a href="#%E6%80%BB%E7%BB%93">总结</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<h1 id="简述">简述</h1>
+<p>WPF是.NET框架下用于制作Windows桌面应用程序的框架<br>当然，与UI相关的内容最合适的就是<B><VT>使用MVVM</VT></B></p>
+<p>在WPF中，最值得注意的内容就是<B><GN>xaml文件</GN></B>了，这是一种用于定义界面信息的语言，可能长这样：</p>
+<pre><code class="language-xaml">&lt;UserControl
+    x:Class=&quot;Reservoom.Views.MakeReservationView&quot;
+    xmlns=&quot;http://schemas.microsoft.com/winfx/2006/xaml/presentation&quot;
+    xmlns:x=&quot;http://schemas.microsoft.com/winfx/2006/xaml&quot;
+    xmlns:custom=&quot;clr-namespace:LoadingSpinnerControl;assembly=LoadingSpinnerControl&quot;
+    xmlns:d=&quot;http://schemas.microsoft.com/expression/blend/2008&quot;
+    xmlns:local=&quot;clr-namespace:Reservoom.Views&quot;
+    xmlns:mc=&quot;http://schemas.openxmlformats.org/markup-compatibility/2006&quot;
+    d:DesignHeight=&quot;450&quot;
+    d:DesignWidth=&quot;800&quot;
+    mc:Ignorable=&quot;d&quot;&gt;
+    &lt;UserControl.Resources&gt;
+        &lt;BooleanToVisibilityConverter x:Key=&quot;BooleanToVisibilityConverter&quot; /&gt;
+    &lt;/UserControl.Resources&gt;
+    &lt;Grid Grid.IsSharedSizeScope=&quot;True&quot;&gt;
+        &lt;Grid.RowDefinitions&gt;
+            &lt;RowDefinition Height=&quot;auto&quot; /&gt;
+            &lt;RowDefinition Height=&quot;auto&quot; /&gt;
+            &lt;RowDefinition Height=&quot;auto&quot; /&gt;
+            &lt;RowDefinition Height=&quot;auto&quot; /&gt;
+            &lt;RowDefinition Height=&quot;auto&quot; /&gt;
+            &lt;RowDefinition Height=&quot;auto&quot; /&gt;
+        &lt;/Grid.RowDefinitions&gt;
+
+        更多内容
+    &lt;/Grid&gt;
+&lt;/UserControl&gt;
+</code></pre>
+<p>可以看得出确实都是各个组件以及其信息，其中最重要的是<B><GN>Binding</GN></B><VT>(后续分析)</VT></p>
+<h1 id="分析">分析</h1>
+<p>这里是以<B>youtube的SingletonSean的<a href="https://www.youtube.com/watch?v=fZxZswmC_BY">WPF MVVM TUTORIAL</a></B>，<B><VT>一个旅馆预定系统</VT></B>为例进行分析</p>
+<p>首先使用的是MVVM，所以框架本身怎么都脱离不了<strong>Model/View/ModelView</strong>三个内容<br>其次，由于是基于C#(.NET)，微软本身提供了非常多有用的<strong>Extensions</strong>，比如说这里最实用的<B><GN>DI(<code>Microsoft.Extensions.DependencyInjection</code>)</GN></B></p>
+<p>所以我们先来看一下<strong>目录结构</strong>：<br><img src="Pic/WPFMVVM1.png" alt="" class="mnote-img mnote-img-normal" data-mnote-image="1" data-kind="normal" data-width="338" data-height="530"></p>
+<p><strong><BL>问题:Test/E2E是什么</BL></strong><br><BL>Test我们大概率会知道，即<B><GN>单元测试<GN></B>，这是比较常见的<br>而E2E其实也是一种单元测试，只是是针对于<B><GN>端到端(End-to-End)<GN></B>，即<B><VT>从用户输入到数据用于验证操作执行正确性</VT></B></BL></p>
+<p>我们更需要关注的是本体项目的内容：</p>
+<ul>
+<li><strong>MVVM</strong><ul>
+<li>Models</li>
+<li>Views</li>
+<li>ViewModels</li>
+</ul>
+</li>
+<li><strong>辅助</strong><ul>
+<li>Commands，操作的包装</li>
+<li>Converters，view的可见性绑定</li>
+<li>DbContexts，数据库相关</li>
+<li>DTOs，数据传输对象Data Transfer Object</li>
+<li>Exceptions，异常处理</li>
+<li>HostBuilders，Host相关</li>
+<li>Migrations，EFCore(Entity Framework Core)自动生成</li>
+<li>Services，服务类，用于完成某项任务</li>
+<li>Stores，储存类，用于收集并储存，还可以提供操作</li>
+</ul>
+</li>
+</ul>
+<p>可以看到整体来说就是<B><VT>MVVM并向下细分各种类用于构建</VT></B></p>
+<h2 id="核心-mvvm">核心-MVVM</h2>
+<p>我们还是先看一下基础的M/V/VM，毕竟这是核心部分，扩展也只会从它们开始扩展</p>
+<h3 id="models">Models</h3>
+<p>Models我们知道，核心必然是用于存储数据的，但是具体来说是<B><VT>形态各异</VT></B>的<br>对于该例来说，分为4个Model：</p>
+<ul>
+<li>Hotel，旅馆本体，核心为存储一本ReservationBook</li>
+<li>ReservationBook，预定簿</li>
+<li>Reservation，预定单，为预定簿的一次预定信息</li>
+<li>RoomID，Reservation中的房间信息</li>
+</ul>
+<p><strong>形态1：纯数据</strong></p>
+<pre><code class="language-csharp">public class Reservation
+{
+    public RoomID RoomID { get; }
+    public string Username { get; }
+    public DateTime StartTime { get; }
+    public DateTime EndTime { get; }
+
+    public TimeSpan Length =&gt; EndTime.Subtract(StartTime);
+
+    public Reservation(RoomID roomID, string username, DateTime startTime, DateTime endTime)
+    {
+        RoomID = roomID;
+        Username = username;
+        StartTime = startTime;
+        EndTime = endTime;
+    }
+}
+</code></pre>
+<p><strong>形态2：数据+比较</strong></p>
+<pre><code class="language-csharp">public class RoomID
+{
+    public int FloorNumber { get; }
+    public int RoomNumber { get; }
+
+    public RoomID(int floorNumber, int roomNumber)
+    {
+        FloorNumber = floorNumber;
+        RoomNumber = roomNumber;
+    }
+
+    public override string ToString()
+    {
+        return $&quot;{FloorNumber}_{RoomNumber}&quot;;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is RoomID roomID &amp;&amp;
+            FloorNumber == roomID.FloorNumber &amp;&amp;
+            RoomNumber == roomID.RoomNumber;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(FloorNumber, RoomNumber);
+    }
+
+    public static bool operator ==(RoomID roomID1, RoomID roomID2)
+    {
+        if(roomID1 is null &amp;&amp; roomID2 is null)
+        {
+            return true;
+        }
+
+        return !(roomID1 is null) &amp;&amp; roomID1.Equals(roomID2);
+    }
+
+    public static bool operator !=(RoomID roomID1, RoomID roomID2)
+    {
+        return !(roomID1 == roomID2);
+    }
+}
+</code></pre>
+<p><strong>形态3：数据+操作</strong></p>
+<pre><code class="language-csharp">public class Hotel
+{
+    private readonly ReservationBook _reservationBook;
+
+    public string Name { get; }
+
+    public Hotel(string name, ReservationBook reservationBook)
+    {
+        Name = name;
+        _reservationBook = reservationBook;
+    }
+
+    public async Task&lt;IEnumerable&lt;Reservation&gt;&gt; GetAllReservations()
+    {
+        return await _reservationBook.GetAllReservations();
+    }
+
+    public async Task MakeReservation(Reservation reservation)
+    {
+        await _reservationBook.AddReservation(reservation);
+    }
+}
+</code></pre>
+<p><strong>所以大致其实就是：</strong><br><strong><VT>子提供数据(可附带比较)，父整合子数据并提供函数</VT></strong></p>
+<p>以上三个类都是很好理解的，而剩下的<strong>ReservationBook</strong>由于使用了<VT>DI包装</VT>，具体理解起来是比较非常复杂的：</p>
+<pre><code class="language-csharp">public class ReservationBook
+{
+    private readonly IReservationProvider _reservationProvider;
+    private readonly IReservationCreator _reservationCreator;
+    private readonly IReservationConflictValidator _reservationConflictValidator;
+
+    public ReservationBook(IReservationProvider reservationProvider, IReservationCreator reservationCreator, IReservationConflictValidator reservationConflictValidator)
+    {
+        _reservationProvider = reservationProvider;
+        _reservationCreator = reservationCreator;
+        _reservationConflictValidator = reservationConflictValidator;
+    }
+
+    public async Task&lt;IEnumerable&lt;Reservation&gt;&gt; GetAllReservations()
+    {
+        return await _reservationProvider.GetAllReservations();
+    }
+
+    public async Task AddReservation(Reservation reservation)
+    {
+        if(reservation.StartTime &gt; reservation.EndTime)
+        {
+            throw new InvalidReservationTimeRangeException(reservation);
+        }
+
+        Reservation conflictingReservation = await _reservationConflictValidator.GetConflictingReservation(reservation);
+
+        if(conflictingReservation != null)
+        {
+            throw new ReservationConflictException(conflictingReservation, reservation);
+        }
+
+        await _reservationCreator.CreateReservation(reservation);
+    }
+}
+</code></pre>
+<p>DI简化了类中理解难度，但继承调用链理解起来还是有一定的难度<br><B>专注于该类</B>，其实就是：<VT><B>Services中的三项服务</B>(后续分析)</VT></p>
+<h3 id="views">Views</h3>
+<p>在WPF中，视图展示就是通过xaml文件完成的，<strong>大致就是</strong>：<br><B><VT>一个MainWindow.xaml管理多个xaml文件</VT></B><br>对于该例来说，是通过绑定ViewModel切换界面：</p>
+<pre><code class="language-xaml">// MainWindow.xmal的切换语句
+&lt;ContentControl Content=&quot;{Binding CurrentViewModel}&quot; /&gt;
+</code></pre>
+<p>在脚本中有所对应：<br><strong>核心：<VT>继承自<code>INotifyPropertyChanged</code>，由<code>OnPropertyChanged()</code>触发PropertyChanged<br>　　　这意味着每当Store中的<code>CurrentViewModel</code>改变则会触发</VT></strong></p>
+<pre><code class="language-csharp">public class MainViewModel : ViewModelBase 
+{
+    private readonly NavigationStore _navigationStore;
+
+    public ViewModelBase CurrentViewModel =&gt; _navigationStore.CurrentViewModel;
+
+    public MainViewModel(NavigationStore navigationStore)
+    {
+        _navigationStore = navigationStore;
+
+        _navigationStore.CurrentViewModelChanged += OnCurrentViewModelChanged;
+    }
+
+    private void OnCurrentViewModelChanged()
+    {
+        OnPropertyChanged(nameof(CurrentViewModel));
+    }
+}
+
+public class ViewModelBase : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler PropertyChanged;
+
+    protected void OnPropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public virtual void Dispose() { }
+}
+</code></pre>
+<p>除了切换绑定，还有几种绑定：</p>
+<pre><code class="language-xaml">// 数据绑定
+&lt;TextBox
+    Grid.Row=&quot;1&quot;
+    Grid.Column=&quot;1&quot;
+    Margin=&quot;10,5,0,0&quot;
+    AutomationProperties.AutomationId=&quot;MakeReservationRoomNumberTextBox&quot;
+    Text=&quot;{Binding RoomNumber, UpdateSourceTrigger=PropertyChanged}&quot; /&gt;
+
+// 按钮绑定
+&lt;Button
+    AutomationProperties.AutomationId=&quot;MakeReservationSubmitButton&quot;
+    Command=&quot;{Binding SubmitCommand}&quot;
+    Content=&quot;Submit&quot; /&gt;
+
+// 列表绑定
+&lt;ListView ItemsSource=&quot;{Binding Reservations}&quot; Visibility=&quot;{Binding HasReservations, Converter={StaticResource BooleanToVisibilityConverter}}&quot;&gt;
+    &lt;ListView.ItemContainerStyle&gt;
+        &lt;Style TargetType=&quot;ListViewItem&quot;&gt;
+            &lt;Setter Property=&quot;HorizontalContentAlignment&quot; Value=&quot;Stretch&quot; /&gt;
+            &lt;Setter Property=&quot;AutomationProperties.AutomationId&quot; Value=&quot;{Binding RoomID, StringFormat={}{0}_ReservationListingItem}&quot; /&gt;
+        &lt;/Style&gt;
+    &lt;/ListView.ItemContainerStyle&gt;
+    &lt;ListView.View&gt;
+        // ...
+    &lt;/ListView.View&gt;
+&lt;/ListView&gt;
+</code></pre>
+<p>绑定可以说是WPF中的重点，也是MVVM的重点，需要着重考虑其原理</p>
+<h3 id="viewmodels">ViewModels</h3>
+<p>ViewModels是MVVM中的核心，比较MVX中都是通过X来沟通Model与View的</p>
+<p>与Models一样承担的<strong>职责</strong>都有所<strong>不同</strong>：</p>
+<ul>
+<li>MainViewModel，核心VM，用于管理各个VM</li>
+<li>MakeReservationViewModel，预定VM</li>
+<li>ReservationListingViewModel，预定列表展示VM</li>
+<li>ReservationViewModel，Reservation包装</li>
+</ul>
+<p>形态情况如下：</p>
+<ul>
+<li>形态1：数据+绑定(<code>MainViewModel</code>)</li>
+<li>形态2：数据+绑定+操作(<code>MakeReservationViewModel</code>/<code>ReservationListingViewModel</code>)</li>
+<li>形态3：数据(<code>ReservationViewModel</code>)</li>
+</ul>
+<BR>
+
+<p>具体来说对应的就是：<br><strong>数据</strong></p>
+<pre><code class="language-csharp">public class ReservationViewModel : ViewModelBase
+{
+    // 很明显，这里就是Reservation的一层包装
+    // 直接转换为视图所需的string类型，方便后续使用
+    private readonly Reservation _reservation;
+    public string RoomID =&gt; _reservation.RoomID?.ToString();
+    // ...
+}
+</code></pre>
+<p><strong>绑定</strong></p>
+<pre><code class="language-csharp">public class MainViewModel : ViewModelBase 
+{
+    private readonly NavigationStore _navigationStore;
+
+    public ViewModelBase CurrentViewModel =&gt; _navigationStore.CurrentViewModel;
+
+    public MainViewModel(NavigationStore navigationStore)
+    {
+        _navigationStore = navigationStore;
+
+        _navigationStore.CurrentViewModelChanged += OnCurrentViewModelChanged;
+    }
+
+    private void OnCurrentViewModelChanged()
+    {
+        OnPropertyChanged(nameof(CurrentViewModel));
+    }
+}
+</code></pre>
+<p><strong>操作</strong></p>
+<pre><code class="language-csharp">public void UpdateReservations(IEnumerable&lt;Reservation&gt; reservations)
+{
+    _reservations.Clear();
+
+    foreach (Reservation reservation in reservations)
+    {
+        ReservationViewModel reservationViewModel = new ReservationViewModel(reservation);
+        _reservations.Add(reservationViewModel);
+    }
+}
+</code></pre>
+<h4 id="绑定">绑定</h4>
+<p>前面也提到过，绑定是WPF的关键，所以<strong>详细</strong>来<strong>分析</strong>一下绑定：<br>比较典型的绑定就是<strong>属性绑定</strong>了：</p>
+<pre><code class="language-csharp">private string _username;
+public string Username
+{
+    get
+    {
+        return _username;
+    }
+    set
+    {
+        _username = value;
+        OnPropertyChanged(nameof(Username));
+
+        ClearErrors(nameof(Username));
+
+        if(!HasUsername)
+        {
+            AddError(&quot;Username cannot be empty.&quot;, nameof(Username));
+        }
+
+        OnPropertyChanged(nameof(CanCreateReservation));
+    }
+}
+</code></pre>
+<p>绑定的核心在于其父类<code>ViewModelBase</code>，其声明为：<br><code>public class ViewModelBase : INotifyPropertyChanged</code><br>INotifyPropertyChanged为视图绑定的核心，即调用<code>PropertyChanged</code>事件以触发相应绑定<br><strong><YL>以这里的Username为例：</YL></strong><br><YL>在某xaml中有：</YL></p>
+<pre><code class="language-xaml">&lt;TextBox
+    Grid.Row=&quot;1&quot;
+    Margin=&quot;0,5,0,0&quot;
+    AutomationProperties.AutomationId=&quot;MakeReservationUsernameTextBox&quot;
+    Text=&quot;{Binding Username, UpdateSourceTrigger=PropertyChanged}&quot; /&gt;
+</code></pre>
+<p><YL>具体来说是这样的：</YL></p>
+<ul>
+<li><YL>属性本身---<code>View-&gt;ViewModel</code>的绑定，即TextBox的更改事件</YL></li>
+<li><YL>INotifyPropertyChanged---<code>ViewModel-&gt;View</code>的绑定，即视图刷新</YL></li>
+</ul>
+<p><YL>简单理解的话就是Binding会自动寻找同名属性绑定，同时再通过INotifyPropertyChanged事件进行视图刷新</YL></p>
+<p><strong>简单解释：</strong><br><B><GN>DataContext</GN></B>是WPF的核心概念，是<B><VT>绑定操作的默认数据源</VT></B><br>DataContext可能设置于各处，在该项目中有：</p>
+<pre><code class="language-csharp">// App.cs
+services.AddSingleton(s =&gt; new MainWindow()
+{
+    DataContext = s.GetRequiredService&lt;MainViewModel&gt;()
+});
+</code></pre>
+<p>这意味着DataContext为MainViewModel</p>
+<pre><code class="language-xaml">// MainWindow.xaml
+&lt;Grid.Resources&gt;
+    &lt;DataTemplate DataType=&quot;{x:Type vms:MakeReservationViewModel}&quot;&gt;
+        &lt;views:MakeReservationView /&gt;
+    &lt;/DataTemplate&gt;
+    &lt;DataTemplate DataType=&quot;{x:Type vms:ReservationListingViewModel}&quot;&gt;
+        &lt;views:ReservationListingView /&gt;
+    &lt;/DataTemplate&gt;
+&lt;/Grid.Resources&gt;
+
+&lt;ContentControl Content=&quot;{Binding CurrentViewModel}&quot; /&gt;
+</code></pre>
+<p>这又意味着CurrentViewModel会在MakeReservationViewModel/ReservationListingViewModel两者中切换</p>
+<p><strong>更重要的是：<VT>所有子元素默认继承父元素的DataContext</VT></strong><br><strong>这意味着：<VT>该ViewModel下的所有属性都可以自动绑定</VT></strong></p>
+<h2 id="辅助">辅助</h2>
+<p>前面也说了，MVVM仅包含了最重要的部分，其余内容都被拆解为子部分了，那么这里就来详细看一下</p>
+<h3 id="commands">Commands</h3>
+<p>这里先从一个最熟悉的说起，即<B><GN>命令</GN></B><br>命令模式我们都清楚，核心就是一个非常简单的<code>Execute()</code><br>在WPF中，有自己的<strong>ICommand</strong>：</p>
+<pre><code class="language-csharp">public interface ICommand
+{
+    event EventHandler? CanExecuteChanged;
+
+    bool CanExecute(object? parameter);
+    void Execute(object? parameter);
+}
+</code></pre>
+<p>该例中<strong>扩展</strong>了一点：</p>
+<pre><code class="language-csharp">public abstract class CommandBase : ICommand
+public abstract class AsyncCommandBase : CommandBase
+</code></pre>
+<p>先看<strong>执行</strong>：<br><strong>核心：<VT>ICommand会被存入ViewModel，并在相应函数调用</VT></strong></p>
+<pre><code class="language-csharp">public ReservationListingViewModel(...)
+{
+    //...
+    LoadReservationsCommand = new LoadReservationsCommand(this, hotelStore);
+    //...
+}
+
+public static ReservationListingViewModel LoadViewModel(...)
+{
+    //...
+    viewModel.LoadReservationsCommand.Execute(null);
+
+    return viewModel;
+}
+</code></pre>
+<p>再看<strong>绑定</strong>：<br>以上是一种<VT>绑定无关的命令模式</VT>，对于这种形式，可以说就是简单的封装，一种使结构更加清晰的方式<br>但是在WPF中是可以绑定的：</p>
+<pre><code class="language-csharp">public AsyncCommandBase SubmitCommand { get; }
+public ICommand CancelCommand { get; }
+
+public MakeReservationViewModel(...)
+{
+    SubmitCommand = new MakeReservationCommand(this, hotelStore, reservationViewNavigationService);
+    CancelCommand = new NavigateCommand&lt;ReservationListingViewModel&gt;(reservationViewNavigationService);
+    // ...
+}
+</code></pre>
+<p>在类中，我们无法找到对应的Execute，因为它们在View中：</p>
+<pre><code class="language-xaml">&lt;Button
+    AutomationProperties.AutomationId=&quot;MakeReservationSubmitButton&quot;
+    Command=&quot;{Binding SubmitCommand}&quot; // 这里
+    Content=&quot;Submit&quot; /&gt;
+&lt;Button
+    Margin=&quot;10,0,0,0&quot;
+    Command=&quot;{Binding CancelCommand}&quot; // 这里
+    Content=&quot;Cancel&quot;&gt;
+    &lt;Button.Style&gt;
+        &lt;Style BasedOn=&quot;{StaticResource {x:Type Button}}&quot; TargetType=&quot;Button&quot;&gt;
+    &lt;Style.Triggers&gt;
+        &lt;DataTrigger Binding=&quot;{Binding IsSubmitting}&quot; Value=&quot;True&quot;&gt;
+            &lt;Setter Property=&quot;IsEnabled&quot; Value=&quot;False&quot; /&gt; // Tip：当IsSubmitting为true时，执行隐藏
+        &lt;/DataTrigger&gt;
+    &lt;/Style.Triggers&gt;
+&lt;/Style&gt;
+    &lt;/Button.Style&gt;
+&lt;/Button&gt;
+</code></pre>
+<p><strong><BL>问题：CanExecute是什么</BL></strong></p>
+<pre><code class="language-csharp">public abstract class CommandBase : ICommand
+{
+    public event EventHandler CanExecuteChanged;
+
+    public virtual bool CanExecute(object parameter)
+    {
+        return true;
+    }
+
+    public abstract void Execute(object parameter);
+
+    protected void OnCanExecutedChanged()
+    {
+        CanExecuteChanged?.Invoke(this, new EventArgs());
+    }
+}
+
+public abstract class AsyncCommandBase : CommandBase
+{
+    private bool _isExecuting;
+    private bool IsExecuting
+    {
+        get
+        {
+            return _isExecuting;
+        }
+        set
+        {
+            _isExecuting = value;
+            OnCanExecutedChanged();
+        }
+    }
+
+    public override bool CanExecute(object parameter)
+    {
+        return !IsExecuting &amp;&amp; base.CanExecute(parameter);
+    }
+
+    public override async void Execute(object parameter)
+    {
+        IsExecuting = true;
+
+        try
+        {
+            await ExecuteAsync(parameter);
+        }
+        finally
+        {
+            IsExecuting = false;
+        }
+    }
+
+    public abstract Task ExecuteAsync(object parameter);
+}
+</code></pre>
+<p>在ICommand中，与INotifyPropertyChanged类似，同样<strong>存在绑定</strong><br>先看上述<strong>基础继承链</strong>：<br>在CommandBase中，<br>可以发现<code>CanExecuteChanged</code>事件+<code>CanExecute()</code>+<code>OnCanExecutedChanged()</code>机制与INotifyPropertyChanged是一致的，所以说：只需在相应处执行<code>OnCanExecutedChanged()</code>并在View中绑定即可<br>在AsyncCommandBase中，<br>是异步形式，我们会发现<code>OnCanExecutedChanged()</code>已经被融入到<code>IsExecuting</code>中了，所以说一旦命令执行或结束，都会进行<code>CanExecute()</code>检测</p>
+<p><strong><YL>以MakeReservationCommand为例：</YL></strong></p>
+<pre><code class="language-csharp">public class MakeReservationCommand : AsyncCommandBase
+{
+    public MakeReservationCommand(...)
+    {
+        // 这里绑定到PropertyChanged上了，即可以通过OnPropertyChanged触发OnViewModelPropertyChanged
+        _makeReservationViewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    public override bool CanExecute(object parameter)
+    {
+        return _makeReservationViewModel.CanCreateReservation &amp;&amp; base.CanExecute(parameter);
+    }
+
+    public override async Task ExecuteAsync(object parameter)
+    {
+        // ...
+        _makeReservationViewModel.IsSubmitting = true;
+
+        // 一系列操作
+
+        _makeReservationViewModel.IsSubmitting = false;
+    }
+
+    // 触发内容：执行OnCanExecutedChanged，即CanExecuteChanged
+    private void OnViewModelPropertyChanged(object sender, PropertyChangedEventArgs e)
+    {
+        if(e.PropertyName == nameof(MakeReservationViewModel.CanCreateReservation))
+        {
+            OnCanExecutedChanged();
+        }
+    }
+}
+</code></pre>
+<p>以上内容将<code>CanExecute()</code>绑定至<code>OnPropertyChanged()</code>，执行在相应处调用以触发即可：</p>
+<pre><code class="language-csharp">// MakeReservationViewModel
+private string _username;
+public string Username
+{
+    get
+    {
+        return _username;
+    }
+    set
+    {
+        _username = value;
+        OnPropertyChanged(nameof(Username));
+
+        ClearErrors(nameof(Username));
+
+        if(!HasUsername)
+        {
+            AddError(&quot;Username cannot be empty.&quot;, nameof(Username));
+        }
+
+        // 是这个
+        OnPropertyChanged(nameof(CanCreateReservation));
+    }
+}
+// 还有相关的FloorNumber/StartDate/EndDate都具有该OnPropertyChanged
+
+public bool CanCreateReservation =&gt;
+    HasUsername &amp;&amp;
+    HasFloorNumberGreaterThanZero &amp;&amp;
+    HasStartDateBeforeEndDate &amp;&amp;
+    !HasErrors;
+</code></pre>
+<p><strong>调用链：</strong><code>Username</code>变更触发<code>OnPropertyChanged(nameof(CanCreateReservation))</code>触发<code>OnViewModelPropertyChanged()</code>执行<code>OnCanExecutedChanged()</code>触发<code>CanExecuteChanged</code>事件，执行<code>CanExecute()</code>并更新激活性<br><strong>简述：<VT>Username属性的变更会触发到<code>OnCanExecutedChanged()</code>，即执行<code>CanExecute()</code>并更新激活性</VT></strong></p>
+<p><strong>总结：</strong><br><strong><VT>结合代码与view来看，Button通常会绑定一个ICommand，核心会执行<code>Execute()</code>，<br>同时通过上述流程可通过<code>CanExecute()</code>控制按钮可用性</VT></strong></p>
+<h3 id="hostservicesstores">Host/Services/Stores</h3>
+<p>在该例中，<strong>Services</strong>是很重要的：<br>在核心的App.xaml.cs中大量出现，这其实就是我们所熟知<B><GN>DI框架</GN></B>，即<B><VT>通过接口代替类注册与创建</VT></B></p>
+<p>该例中涉及的服务有这几种：</p>
+<ul>
+<li>ReservationBook工具<ul>
+<li>DatabaseReservationConflictValidator</li>
+<li>DatabaseReservationCreator</li>
+<li>DatabaseReservationProvider</li>
+</ul>
+</li>
+<li>一般服务<ul>
+<li>NavigationService</li>
+</ul>
+</li>
+</ul>
+<p>前三者都是在为ReservationBook服务，而<code>NavigationService</code>显然是导航功能</p>
+<p>在该例中，<strong>Stores</strong>同样是很重要的：<br>有2个：</p>
+<ul>
+<li>HotelStore---Hotel存储</li>
+<li>NavigationStore---导航存储</li>
+</ul>
+<p>而真正的汇总工具为<strong>Host</strong>：</p>
+<pre><code class="language-csharp">// App.xaml.cs
+public App()
+{
+    _host = Host.CreateDefaultBuilder()
+        .AddViewModels()
+        .ConfigureServices((hostContext, services) =&gt;
+        {
+            // ...
+        })
+        .Build();
+}
+</code></pre>
+<p>基本上来说，就是由这三者的配合从而完成构建</p>
+<BR>
+
+<p><strong>接下来详细来看一下：</strong><br>根据上述内容，可以得知有2个部分：<strong>Hotel/Navigation</strong></p>
+<h4 id="hotel分析">Hotel分析</h4>
+<p>Hotel本身是Models中的一个类，也就是旅馆本身，回忆一下，是一个存放了一个<code>ReservationBook</code>并提供<code>GetAllReservations()</code>/<code>MakeReservation()</code>以创建或获取的类<br><strong><BL>问题：Hotel是怎么被创建出来的</BL></strong><br><BL>一切的创建都会在App.xaml.cs中执行，如下：</BL></p>
+<pre><code class="language-csharp">public App()
+{
+    _host = Host.CreateDefaultBuilder()
+        .AddViewModels()
+        .ConfigureServices((hostContext, services) =&gt;
+        {
+            // ...
+            // 创建ReservationBook的前提
+            services.AddSingleton&lt;IReservationProvider, DatabaseReservationProvider&gt;();
+            services.AddSingleton&lt;IReservationCreator, DatabaseReservationCreator&gt;();
+            services.AddSingleton&lt;IReservationConflictValidator, DatabaseReservationConflictValidator&gt;();
+
+            // 创建Hotel的前提
+            services.AddTransient&lt;ReservationBook&gt;();
+
+            // 创建HotelStore的前提
+            string hotelName = hostContext.Configuration.GetValue&lt;string&gt;(&quot;HotelName&quot;);
+            services.AddSingleton((s) =&gt; new Hotel(hotelName, s.GetRequiredService&lt;ReservationBook&gt;()));
+
+            services.AddSingleton&lt;HotelStore&gt;();
+            // ...
+        })
+        .Build();
+}
+</code></pre>
+<p><BL>可以看到这其实是<B>嵌套</B>的：<br>为了创建HotelStore，我们需要先创建构造函数所需的Hotel，<br>为了创建Hotel，我们需要先创建构造函数所需的ReservationBook，<br>为了创建ReservationBook，我们需要先创建构造函数所需的3个服务工具</BL><br>由此逻辑也清晰了起来，我们也能得知：<B><VT>Services是独立的功能，无需结合来看</VT></B></p>
+<p><strong><YL>这里就拿最简单的IReservationProvider为例：</YL></strong><br><YL>在ReservationBook中只是一个简单的调用：</YL></p>
+<pre><code class="language-csharp">// ReservationBook中
+public async Task&lt;IEnumerable&lt;Reservation&gt;&gt; GetAllReservations()
+{
+    return await _reservationProvider.GetAllReservations();
+}
+
+public class DatabaseReservationProvider : IReservationProvider
+{
+    private readonly IReservoomDbContextFactory _dbContextFactory;
+
+    public DatabaseReservationProvider(IReservoomDbContextFactory dbContextFactory)
+    {
+        _dbContextFactory = dbContextFactory;
+    }
+
+    public async Task&lt;IEnumerable&lt;Reservation&gt;&gt; GetAllReservations()
+    {
+        using (ReservoomDbContext context = _dbContextFactory.CreateDbContext())
+        {
+            IEnumerable&lt;ReservationDTO&gt; reservationDTOs = await context.Reservations.ToListAsync();
+
+            return reservationDTOs.Select(r =&gt; ToReservation(r));
+        }
+    }
+
+    private static Reservation ToReservation(ReservationDTO dto)
+    {
+        return new Reservation(new RoomID(dto.FloorNumber, dto.RoomNumber), dto.Username, dto.StartTime, dto.EndTime);
+    }
+}
+</code></pre>
+<p><YL>可以看得出：<B><VT>不论过程，核心就是一个获取Reservation列表的工具类</VT></B></YL></p>
+<p>而<B><VT>HotelStore则是Hotel的封装</VT></B>，内容如下：</p>
+<pre><code class="language-csharp">public HotelStore(Hotel hotel)
+{
+    _hotel = hotel;
+    _initializeLazy = new Lazy&lt;Task&gt;(Initialize);
+
+    _reservations = new List&lt;Reservation&gt;();
+}
+
+// 以及一些操作函数
+</code></pre>
+<p><strong><BL>问题：为什么要封装一个Store，Hotel本身不够吗？</BL></strong><br><BL>确实如此，以一个函数为例：</BL></p>
+<pre><code class="language-csharp">public async Task MakeReservation(Reservation reservation)
+{
+    await _hotel.MakeReservation(reservation);
+    _reservations.Add(reservation);
+    OnReservationMade(reservation);
+}
+</code></pre>
+<p><BL>很明显，虽然是同一件事，但是还需要额外操作，这并不在Hotel本身中<br>所以说<B>封装是有必要的</B></BL></p>
+<p>大致阅读代码可发现，<strong>HotelStore的核心</strong>为：</p>
+<ul>
+<li><code>Load()</code>---延迟执行的初始化，用于更新<code>_reservations</code></li>
+<li><code>MakeReservation()</code>---添加新预定，并更新到<code>_reservations</code></li>
+</ul>
+<p>所以可以发现<B><code>_reservations</code>是HotelStore中添加的重要内容</B><br>其<strong>目的</strong>当然是<B><VT>提供<code>_reservations</code>:</VT></B></p>
+<pre><code class="language-csharp">// LoadReservationsCommand
+public override async Task ExecuteAsync(object parameter)
+{
+    // ...
+    try
+    {
+        await _hotelStore.Load();
+        _viewModel.UpdateReservations(_hotelStore.Reservations); // 用于更新真正VM的数据
+    }
+    catch (Exception) {...}
+    // ...
+}
+</code></pre>
+<p><strong>由此我们也能看出：</strong><br><B><VT><code>HotelStore._reservations</code>并非最终数据，而应该是<code>ReservationListingViewModel._reservations</code></VT></B><br>简单描述一下它们的<strong>区别</strong>：</p>
+<ul>
+<li><code>Reservation</code>---一个Model，是预定信息本体</li>
+<li><code>HotelStore._reservations</code>---Hotel本身具有一个ReservationBook，可以认为是Reservation列表，HotelStore作为一个存储管理类进行了一次包装</li>
+<li><code>ReservationListingViewModel._reservations</code>---ViewModel作为真正的视图刷新数据通过<code>HotelStore._reservations</code>封装成了<strong>ReservationViewModel列表</strong>供视图刷新使用</li>
+</ul>
+<h4 id="navigation分析">Navigation分析</h4>
+<p>Navigation指的是<strong>导航功能</strong>，简单来说就是<VT>从界面a跳转至界面b</VT><br>与其相关的当然是<strong>NavigationService</strong>与<strong>NavigationStore</strong><br>先来看一下Service的声明：<br><code>public class NavigationService&lt;TViewModel&gt; where TViewModel : ViewModelBase</code><br>这说明了：</p>
+<ul>
+<li>NavigationService是泛型，存在多个</li>
+<li>需要的TViewModel是ViewModel</li>
+</ul>
+<p>结合代码可以<strong>推论</strong>：<B><VT>NavigationService提供了切换ViewModel的服务</VT></B></p>
+<p>NavigationService的代码如下：</p>
+<pre><code class="language-csharp">public class NavigationService&lt;TViewModel&gt; where TViewModel : ViewModelBase
+{
+    private readonly NavigationStore _navigationStore;
+    private readonly Func&lt;TViewModel&gt; _createViewModel;
+
+    public NavigationService(NavigationStore navigationStore, Func&lt;TViewModel&gt; createViewModel)
+    {
+        _navigationStore = navigationStore;
+        _createViewModel = createViewModel;
+    }
+
+    public void Navigate()
+    {
+        _navigationStore.CurrentViewModel = _createViewModel();
+    }
+}
+</code></pre>
+<p>从该脚本我们就可以看出：<br><strong><VT><code>_navigationStore</code>是一个管理CurrentViewModel的地方，同时仅存在一个ViewModel，通过<code>NavigationService.Navigate()</code>可延迟调用初始化工厂以更新CurrentViewModel</VT></strong></p>
+<p><strong>最终存放处：<code>MainViewModel.CurrentViewModel</code><VT>(为了视图更新绑定)</VT></strong></p>
+<p><strong>调用有2种：</strong><br>一种当然是App.xaml.cs的初始化：</p>
+<pre><code class="language-csharp">protected override void OnStartup(StartupEventArgs e)
+{
+    // ...
+    // 初始化使用ReservationListingViewModel
+    NavigationService&lt;ReservationListingViewModel&gt; navigationService = _host.Services.GetRequiredService&lt;NavigationService&lt;ReservationListingViewModel&gt;&gt;();
+    navigationService.Navigate();
+    // ...
+}
+</code></pre>
+<p>另一种是被封装为Command：</p>
+<ul>
+<li>在初始列表界面ReservationListingViewModel时<ul>
+<li>MakeReservationCommand(<code>NavigateCommand&lt;MakeReservationViewModel&gt;</code>)可进入预定界面</li>
+</ul>
+</li>
+<li>在预定界面MakeReservationViewModel时<ul>
+<li>CancelCommand(<code>NavigateCommand&lt;ReservationListingViewModel&gt;</code>)可回退至列表界面</li>
+<li>SubmitCommand(<code>MakeReservationCommand</code>)也回退至列表界面，但会进行额外的更新列表操作</li>
+</ul>
+</li>
+</ul>
+<h3 id="总结">总结</h3>
+<p>总的来说，这是一个非常完整的项目，它通过大量.NET库辅助完成的项目<br>虽然它<B><GN>很完整很&quot;清晰&quot;</GN></B>，但是对于我第一次看源码，会感觉<B><DRD>非常&quot;碎&quot;非常不好理解，类需要其它类进行构造，嵌套非常深</DRD></B><br>但作为一个完整项目，这种拆分其实应该是比较好的一种构建，只是需要个人具有一定的熟练度才能比较容易地看懂</p>
+<p><strong>从MVVM的角度进行分析：</strong><br>前面也提到过，MVVM本身就是一种框架用于联系数据与视图<br>在WPFMVVM中，我认为<B><VT>.NET底层进行的绑定才是关键</VT></B><br>细节方面实在过于复杂，我这里先列举出网上的信息：</p>
+<ul>
+<li>绑定依赖于：<ul>
+<li>DependencyProperty</li>
+<li>反射</li>
+<li>事件(INotifyPropertyChanged)</li>
+</ul>
+</li>
+</ul>
+<p>绑定带来的最大的一个<strong>好处</strong>就是<VT><B>低耦合</B>：ViewModel与View不需要有引用(在表面上消失，但实际还是存在的)</VT></p>
+<p><strong>所以说：</strong><br><strong><VT>以上的分析只能代表MVVM的功能以及拆分方式，而具体的核心双向绑定被WPF隐藏在底层了</VT></strong></p>
+<p>那么就从<strong>表层</strong>来看一下吧：</p>
+<ul>
+<li>在WPF中，显示的基础是创建一个MainWindow，其中存储了DataContext，而DataContext是某个ViewModel</li>
+<li>ViewModels中有属性，在View中需要Binding，也就是：<br>用户输入-&gt;set方法触发(含事件回调INotifyPropertyChanged)-&gt;视图变更</li>
+<li>各项模块：<ul>
+<li>Models---纯数据+数据操作函数</li>
+<li>Views---纯视图+绑定(与ViewModel)</li>
+<li>ViewModels---Models的包装，具有View所想要的数据并在set方法中有事件回调(INotifyPropertyChanged)</li>
+<li>Stores---Models的包装，是&quot;共享容器&quot;，用于提供某些属性</li>
+<li>Services---服务，其实就是功能函数，供其它类使用</li>
+</ul>
+</li>
+<li>各项模块最终会在App.xaml.cs，也就是主函数中通过DI的方式注册与使用</li>
+</ul>
+<p><strong><BL>问题：Models/ViewModels/Stores的区别</BL></strong><br><BL>Models是数据本身，ViewModels是View所需的数据<br>而Stores是一种在Models之上，ViewModels之下的数据，包装Models后唯一存在，供ViewModels使用</BL></p>
+<p>虽然不分析底层，我们无法得知真正的流程，但是我们最起码还是了解了<strong>ViewModels与Models/Views的关系，简单来说：</strong><br><strong><VT>ViewModels是Models的一层包装，其中收集了视图刷新所需的所有数据，数据有2种：</VT></strong></p>
+<ul>
+<li>绑定数据，如<code>MakeReservationViewModel.Username</code></li>
+<li>数据的数据，如<code>ReservationViewModel</code>类的属性，在ReservationListingViewModel中有字段：<code>ObservableCollection&lt;ReservationViewModel&gt; _reservations</code></li>
+</ul>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

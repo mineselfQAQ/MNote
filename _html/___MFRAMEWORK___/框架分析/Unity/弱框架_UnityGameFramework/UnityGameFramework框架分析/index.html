@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UnityGameFramework框架分析</title>
+  <link rel="stylesheet" href="../../../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>UnityGameFramework分析</BBBG></center></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E7%AE%80%E8%BF%B0">简述</a></li>
+<li><a href="#%E6%A1%86%E6%9E%B6">框架</a><ul>
+<li><a href="#unitygameframeworkruntimeasmdef">UnityGameFramework.Runtime.asmdef</a><ul>
+<li><a href="#gameentry">GameEntry</a></li>
+<li><a href="#basecomponent">BaseComponent</a></li>
+</ul>
+</li>
+<li><a href="#gameframeworkdll">GameFramework.dll</a><ul>
+<li><a href="#gameframeworkentry">GameFrameworkEntry</a></li>
+<li><a href="#%E5%85%B6%E5%AE%83">其它</a></li>
+</ul>
+</li>
+<li><a href="#%E7%AE%80%E5%8D%95%E6%80%BB%E7%BB%93">简单总结</a></li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<h1 id="简述">简述</h1>
+<p>查看该Unity项目，大致可以发现，<strong>框架功能偏多，框架虽有但比较简单</strong><br>首先看看<strong>框架结构</strong>：<br><img src="Pic/pic1.png" alt="" class="mnote-img mnote-img-small" data-mnote-image="1" data-kind="small" data-width="265" data-height="201"><br>可以看到是：<strong>dll+asmdef</strong>的搭配</p>
+<h1 id="框架">框架</h1>
+<p>由于dll+asmdef的拆分，框架会显得比较&quot;散&quot;，但并不是没有，大致了解一下代码就会发现体系其实是很完整的</p>
+<p><strong><VT>该框架基本上基于一个prefab：GameFramework</VT></strong><br><img src="Pic/pic3.png" alt="" class="mnote-img mnote-img-tall" data-mnote-image="1" data-kind="tall" data-width="202" data-height="461"><br>可以看到这就是<strong>框架的形式</strong>：<br><B><VT>Component构成(每个GameObject分别对应一个功能)</VT></B><br>在GameFramework物体上有Base组件，在Config物体上有Config组件，由于都是MonoBehaviour，所以可以执行相应操作，同时由某种方式可按顺序执行</p>
+<h2 id="unitygameframeworkruntimeasmdef">UnityGameFramework.Runtime.asmdef</h2>
+<p>该部分为dll扩展部分，必然会基于dll的实现进行添加或者扩展<br>其文件夹大致分类为：</p>
+<ul>
+<li>基<ul>
+<li>Base</li>
+</ul>
+</li>
+<li>功能<ul>
+<li>Config</li>
+<li>Localization</li>
+<li>...</li>
+</ul>
+</li>
+</ul>
+<p>显然框架必然会是Base中的内容，内容不多：<br><img src="Pic/pic2.png" alt="" class="mnote-img mnote-img-small" data-mnote-image="1" data-kind="small" data-width="267" data-height="99"></p>
+<h3 id="gameentry">GameEntry</h3>
+<p><B><GN>GameEntry</GN></B>是其<strong>游戏入口</strong>，是一个静态类，也就是提供功能的<br>功能不多，但很重要：</p>
+<ul>
+<li>GetComponent()：获取组件(框架扩展的)</li>
+<li>Showdown()：程序关闭(None/Restart/Quit)</li>
+<li>RegisterComponent()：注册组件</li>
+</ul>
+<p>显然，这里最重要的是<strong>注册组件</strong>，这在Component基类即<B><GN>GameFrameworkComponent</GN></B>中有所调用：</p>
+<pre><code class="language-csharp">public abstract class GameFrameworkComponent : MonoBehaviour
+{
+    protected virtual void Awake()
+    {
+        GameEntry.RegisterComponent(this);
+    }
+}
+</code></pre>
+<p><strong>GameFrameworkComponent</strong>唯一做的就是<B><VT>在Awake时将自己注册进GameEntry</VT></B><br>由此会<strong>通过<code>s_GameFrameworkComponents</code>在GameEntry中进行存储</strong></p>
+<h3 id="basecomponent">BaseComponent</h3>
+<p><B><GN>BaseComponent</GN></B>的<strong>声明</strong>如下：<br><code>public sealed class BaseComponent : GameFrameworkComponent</code><br>包括BaseComponent，以及其它所有功能的扩展Component都将<strong>继承于GameFrameworkComponent</strong>，由此可将所有的内容都注册到GameEntry中<br>显然BaseComponent承担的职责是更多的</p>
+<p>BaseComponent具有一定的<strong>不可配置字段/可配置字段/属性</strong>，都将在不同的地方使用<br>除此以外，更重要的是其<strong>生命周期</strong>：</p>
+<pre><code class="language-csharp">protected override void Awake()
+{
+    base.Awake();
+
+    InitVersionHelper();
+    InitLogHelper();
+    Log.Info(&quot;Game Framework Version: {0}&quot;, GameFramework.Version.GameFrameworkVersion);
+    Log.Info(&quot;Game Version: {0} ({1})&quot;, GameFramework.Version.GameVersion, GameFramework.Version.InternalGameVersion.ToString());
+    Log.Info(&quot;Unity Version: {0}&quot;, Application.unityVersion);
+
+#if UNITY_5_3_OR_NEWER || UNITY_5_3
+    InitCompressionHelper();
+    InitJsonHelper();
+
+    Utility.Converter.ScreenDpi = Screen.dpi;
+    if (Utility.Converter.ScreenDpi &lt;= 0)
+    {
+        Utility.Converter.ScreenDpi = DefaultDpi;
+    }
+
+    m_EditorResourceMode &amp;= Application.isEditor;
+    if (m_EditorResourceMode)
+    {
+        Log.Info(&quot;During this run, Game Framework will use editor resource files, which you should validate first.&quot;);
+    }
+
+    Application.targetFrameRate = m_FrameRate;
+    Time.timeScale = m_GameSpeed;
+    Application.runInBackground = m_RunInBackground;
+    Screen.sleepTimeout = m_NeverSleep ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
+#else
+    Log.Error(&quot;Game Framework only applies with Unity 5.3 and above, but current Unity version is {0}.&quot;, Application.unityVersion);
+    GameEntry.Shutdown(ShutdownType.Quit);
+#endif
+#if UNITY_5_6_OR_NEWER
+    Application.lowMemory += OnLowMemory;
+#endif
+}
+
+private void Start()
+{
+}
+
+private void Update()
+{
+    GameFrameworkEntry.Update(Time.deltaTime, Time.unscaledDeltaTime);
+}
+
+private void OnApplicationQuit()
+{
+#if UNITY_5_6_OR_NEWER
+    Application.lowMemory -= OnLowMemory;
+#endif
+    StopAllCoroutines();
+}
+
+private void OnDestroy()
+{
+    GameFrameworkEntry.Shutdown();
+}
+</code></pre>
+<p>可以发现：其中<B><VT>涉及许多dll内部实现</VT></B><br>比如说<code>InitVersionHelper()</code>就是在填充GameFramework命名空间中的<code>Version.s_VersionHelper</code><br>其中<strong>值得注意</strong>的有：<br><code>GameFrameworkEntry.Update(Time.deltaTime, Time.unscaledDeltaTime);</code><br><code>GameFrameworkEntry.Shutdown();</code><br>显然这是dll中的生命周期函数</p>
+<h2 id="gameframeworkdll">GameFramework.dll</h2>
+<p>dll部分被拆分成各个命名空间，简单来说有：</p>
+<ul>
+<li><code>GameFramework</code></li>
+<li><code>GameFramework.xxx</code>(Config/Localization/...)</li>
+</ul>
+<p>显然<B><VT>GameFramework命名空间是主体部分，其余的都是功能实现</VT></B></p>
+<h3 id="gameframeworkentry">GameFrameworkEntry</h3>
+<p>与Unity的asmdef部分非常类似，GameEntry对应着这里的<B><GN>GameFrameworkEntry</GN></B><br>两者的结构是非常相似的，<strong>内容</strong>如下：</p>
+<ul>
+<li>s_GameFrameworkModules：收集的GameFrameworkModule</li>
+<li>Update()</li>
+<li>Shutdown()</li>
+<li>GetModule()　没有则会CreateModule()</li>
+</ul>
+<p>在GameEntry中是Component，GameFrameworkEntry中则是<strong>Module</strong></p>
+<p><strong>Module</strong><br>实际中就会有这样的使用：<br><code>m_SoundManager = GameFrameworkEntry.GetModule&lt;ISoundManager&gt;();</code><br>流程如下：</p>
+<pre><code class="language-csharp">public static T GetModule&lt;T&gt;() where T : class
+{
+Type type = typeof (T);
+if (!type.IsInterface)
+    throw new GameFrameworkException(Utility.Text.Format(&quot;You must get module by interface, but &#39;{0}&#39; is not.&quot;, (object) type.FullName));
+if (!type.FullName.StartsWith(&quot;GameFramework.&quot;, StringComparison.Ordinal))
+    throw new GameFrameworkException(Utility.Text.Format(&quot;You must get a Game Framework module, but &#39;{0}&#39; is not.&quot;, (object) type.FullName));
+string typeName = Utility.Text.Format(&quot;{0}.{1}&quot;, (object) type.Namespace, (object) type.Name.Substring(1));
+return GameFrameworkEntry.GetModule(Type.GetType(typeName) ?? throw new GameFrameworkException(Utility.Text.Format(&quot;Can not find Game Framework module type &#39;{0}&#39;.&quot;, (object) typeName))) as T;
+}
+
+private static GameFrameworkModule GetModule(Type moduleType)
+{
+foreach (GameFrameworkModule gameFrameworkModule in GameFrameworkEntry.s_GameFrameworkModules)
+{
+    if (gameFrameworkModule.GetType() == moduleType)
+    return gameFrameworkModule;
+}
+return GameFrameworkEntry.CreateModule(moduleType);
+}
+
+private static GameFrameworkModule CreateModule(Type moduleType)
+{
+GameFrameworkModule instance = (GameFrameworkModule) Activator.CreateInstance(moduleType);
+if (instance == null)
+    throw new GameFrameworkException(Utility.Text.Format(&quot;Can not create module &#39;{0}&#39;.&quot;, (object) moduleType.FullName));
+LinkedListNode&lt;GameFrameworkModule&gt; node = GameFrameworkEntry.s_GameFrameworkModules.First;
+while (node != null &amp;&amp; instance.Priority &lt;= node.Value.Priority)
+    node = node.Next;
+if (node != null)
+    GameFrameworkEntry.s_GameFrameworkModules.AddBefore(node, instance);
+else
+    GameFrameworkEntry.s_GameFrameworkModules.AddLast(instance);
+return instance;
+}
+</code></pre>
+<p>由此可知：所有Module都是继承与<B><GN>GameFrameworkModule</GN></B>的<br>就像：<br><code>internal sealed class SoundManager : GameFrameworkModule, ISoundManager</code><br><strong><BL>问题：为什么module是GameFrameworkModule，但是能获取到如ISoundManager等接口</BL></strong><br><BL>要知道的是<code>GetModule()</code>并非获取的是GameFrameworkModule基类，而是具体类，可以看到在<code>GetMoudle&lt;T&gt;()</code>中首先获取了实际的类名typeName，通过typeName转换为Type获取了具体类，由此生成的类必然是具体类</BL></p>
+<p><strong>生命周期</strong><br>虽然dll并不基于MonoBehaviour，但是会被BaseComponent调用：</p>
+<pre><code class="language-csharp">private void Update()
+{
+    GameFrameworkEntry.Update(Time.deltaTime, Time.unscaledDeltaTime);
+}
+
+private void OnDestroy()
+{
+    GameFrameworkEntry.Shutdown();
+}
+</code></pre>
+<p>具体实现如下：</p>
+<pre><code class="language-csharp">public static void Update(float elapseSeconds, float realElapseSeconds)
+{
+    foreach (GameFrameworkModule gameFrameworkModule in GameFrameworkEntry.s_GameFrameworkModules)
+        gameFrameworkModule.Update(elapseSeconds, realElapseSeconds);
+}
+
+public static void Shutdown()
+{
+    for (LinkedListNode&lt;GameFrameworkModule&gt; linkedListNode = GameFrameworkEntry.s_GameFrameworkModules.Last; linkedListNode != null; linkedListNode = linkedListNode.Previous)
+        linkedListNode.Value.Shutdown();
+    GameFrameworkEntry.s_GameFrameworkModules.Clear();
+    ReferencePool.ClearAll();
+    Utility.Marshal.FreeCachedHGlobal();
+    GameFrameworkLog.SetLogHelper((GameFrameworkLog.ILogHelper) null);
+}
+</code></pre>
+<p>显然：<B><VT>GameFrameworkModule具有<code>Update()</code>/<code>Shutdown()</code>，每个模块(Manager)需实现</VT></B><br>所以说<strong>对于模块来说有如下生命周期</strong>：</p>
+<ul>
+<li>第一次<code>GetModule()</code>即创建，此时会通过构造函数初始化</li>
+<li>Update时对所有模块进行<code>Update()</code></li>
+<li>OnDestroy时对所有模块进行<code>Shutdown()</code></li>
+</ul>
+<p>Update轮询我们可能觉得不太常见，毕竟这些本质上都属于功能类，提供服务即可，但并不如此<br><strong>持续轮询的有以下模块：</strong></p>
+<ul>
+<li>DownloadManager</li>
+<li>EntityManager</li>
+<li>EventManager</li>
+<li>FsmManager</li>
+<li>NetworkManager</li>
+<li>ObjectPoolManager</li>
+<li>ResourceManager</li>
+<li>UIManager</li>
+<li>WebRequestManager</li>
+</ul>
+<BR>
+
+<h3 id="其它">其它</h3>
+<p>以上可以说是框架构成的重要部分，在GameFramework命名空间下还有一些其它的内容：</p>
+<ul>
+<li>数据结构扩展新增<ul>
+<li>GameFrameworkLinkedListRange</li>
+<li>GameFrameworkLinkedList</li>
+<li>GameFrameworkMultiDictionary</li>
+<li>ReferencePool</li>
+<li>TaskPool</li>
+</ul>
+</li>
+<li>基础功能<ul>
+<li>Version</li>
+<li>GameFrameworkSerializer</li>
+<li>GameFrameworkLog</li>
+<li>数据解析<ul>
+<li>DataProviderCreator</li>
+<li>DataProvider</li>
+<li>IDataProviderHelper(需派生)</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>功能<ul>
+<li>Utility</li>
+</ul>
+</li>
+</ul>
+<p><VT>以上并非内容的所有，同时其它命名空间下有着更多的内容，在Unity的asmdef中也会进行扩展</VT></p>
+<BR>
+
+<h2 id="简单总结">简单总结</h2>
+<p>可以看得出来，框架部分其实内容不多，只是将dll与asmdef联系起来，并且以Moudle的形式编写功能类，以Component的形式在Unity中扩展<br>整体来说<B><VT>简单，但条理是比较清晰的</VT></B></p>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C#反射</title>
+  <link rel="stylesheet" href="../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><BBBG>C#反射</BBBG></center></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#api">API</a><ul>
+<li><a href="#assembly">Assembly</a></li>
+<li><a href="#type">Type</a></li>
+<li><a href="#activator">Activator</a></li>
+<li><a href="#%E5%90%84%E5%AF%B9%E8%B1%A1%E8%8E%B7%E5%8F%96">各对象获取</a><ul>
+<li><a href="#bindingflags">BindingFlags</a></li>
+<li><a href="#xxxinfo">XXXInfo</a><ul>
+<li><a href="#memberinfo">MemberInfo</a></li>
+<li><a href="#fieldinfo">FieldInfo</a></li>
+<li><a href="#propertyinfo">PropertyInfo</a></li>
+<li><a href="#methodinfoconstructorinfo">MethodInfo/ConstructorInfo</a></li>
+<li><a href="#eventinfo">EventInfo</a></li>
+<li><a href="#parameterinfo">ParameterInfo</a></li>
+<li><a href="#attribute">Attribute</a></li>
+<li><a href="#%E9%AB%98%E7%BA%A7">高级</a><ul>
+<li><a href="#%E6%B3%9B%E5%9E%8B">泛型</a></li>
+<li><a href="#%E5%85%B6%E5%AE%83">其它</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E5%B8%B8%E7%94%A8%E5%AE%9E%E4%BE%8B">常用实例</a></li>
+</ul>
+<!-- /TOC -->
+
+<p>反射是一种比较常见的功能，简单来说就是：<br><strong><VT>程序运行时，获取并操作&quot;类型本身&quot;的能力</VT></strong></p>
+<p><strong>重要：<DRD>反射虽然方便，但是很慢</DRD></strong></p>
+<h1 id="api">API</h1>
+<p>反射都知道怎么一回事，但是API总的来说是比较复杂的，需要整理一下</p>
+<h2 id="assembly">Assembly</h2>
+<p>Assembly即<B><GN>程序集(dll/exe)</GN></B>，某些情况下需要从<strong>Assembly</strong>开始<strong>获取</strong>，操作如下：</p>
+<ul>
+<li><code>Assembly.Load()</code>：按名称</li>
+<li><code>Assembly.LoadFrom()</code>：按路径</li>
+<li><code>Assembly.LoadFile()</code>：按完整路径</li>
+<li><code>typeof(xxx).Assembly</code>：通过类型获取</li>
+</ul>
+<p>需要注意：<code>Load()</code>不需要后缀，<code>LoadFrom()/LoadFile()</code>需要后缀</p>
+<p>获取到Assembly对象后，最常用的就是<strong>获取Assembly下的类型</strong>：</p>
+<ul>
+<li><code>asm.GetTypes()</code></li>
+<li><code>asm.GetType()</code>　　<VT>需要传入FullName(命名空间+类名)</VT></li>
+</ul>
+<p><strong><BL>问题：为什么有时获取不到Type</BL></strong><br><BL>一般来说是缺引用了，假如A引用了B，如果B获取不到，那么A自然也无法获取</BL></p>
+<h2 id="type">Type</h2>
+<p>Type是反射中的重中之重，可以说一切的起点就是类型</p>
+<p><strong>类型的获取</strong>很简单：</p>
+<ul>
+<li><code>typeof(xxx)</code></li>
+<li><code>obj.GetType()</code></li>
+<li><code>Assembly.GetType()</code></li>
+<li><code>Type.GetType()</code>：全局搜索<DRD>(不推荐，仅在当前程序集+.NET核心)</DRD></li>
+</ul>
+<p>以下是Type的<strong>核心属性</strong>：</p>
+<ul>
+<li><code>t.Assembly</code></li>
+<li><code>t.Namespace</code></li>
+<li><code>t.Name</code></li>
+<li><code>t.FullName</code></li>
+<li><code>t.BaseType</code>：父类</li>
+<li><code>t.IsClass</code></li>
+<li><code>t.IsAbstract</code></li>
+<li><code>t.IsInterface</code></li>
+</ul>
+<h2 id="activator">Activator</h2>
+<p>Activator即<B><GN>激活器</GN></B>，从名字上来看就是用来<strong>创建</strong>的<br>该静态类中仅有一种函数：<code>Activator.CreateInstance()</code><br>有多种调用方式：</p>
+<pre><code class="language-csharp">public static object CreateInstance(Type type);
+public static object CreateInstance(Type type, bool nonPublic);
+public static object CreateInstance(Type type, params object[] args);
+public static object CreateInstance(Type type, object[] args, object[] activationAttributes);
+
+public static object CreateInstance(
+Type type,
+BindingFlags bindingAttr,
+Binder binder,
+object[] args,
+CultureInfo culture);
+
+public static object CreateInstance(
+Type type,
+BindingFlags bindingAttr,
+Binder binder,
+object[] args,
+CultureInfo culture,
+object[] activationAttributes);
+
+public static T CreateInstance&lt;T&gt;();
+</code></pre>
+<p><strong>注意：</strong><br><strong><DRD><code>(Type type, bool nonPublic)</code>版本指定了访问性，除复杂版本(带BindingFlags)，都等价于寻找public版本</DRD></strong></p>
+<h2 id="各对象获取">各对象获取</h2>
+<h3 id="bindingflags">BindingFlags</h3>
+<p>对于获取对象，非常常见的一种参数就是<strong>BindingFlags</strong>，从名字上来看，其含义为<strong>绑定标识</strong>，其实各类控制开关<br><strong>常用的</strong>如下所示：</p>
+<ul>
+<li>访问修饰符<ul>
+<li>Instance/Static</li>
+<li>Public/NonPublic</li>
+</ul>
+</li>
+<li>其它<ul>
+<li>DeclaredOnly：当前类(默认会带上父类)<br><VT>所以可以排除<code>ToString()</code>这种来自object的</VT></li>
+<li>IgnoreCase：忽略大小写</li>
+<li>FlattenHierarchy：支持父类public与protected的static</li>
+<li>ExactBinding：精准匹配<VT>(用于相似重载，尤其是可隐式转换的情况)</VT></li>
+<li>OptionalParamBinding：支持可选参数<VT>(如<code>Foo(int x = 1)</code>)</VT></li>
+</ul>
+</li>
+</ul>
+<p>这里最关键的就是<strong>访问修饰符</strong>：<br>几个flag的含义很清楚，但是有2点需要注意：</p>
+<ul>
+<li>无参情况<strong>默认</strong>为<code>BindingFlags.Public | BindingFlags.Instance</code></li>
+<li>4种访问修饰符<strong>不是互斥的</strong></li>
+<li>Public包含public<br>NonPublic包含private/protected/internal</li>
+</ul>
+<h3 id="xxxinfo">XXXInfo</h3>
+<p>反射中能获取到各种对象，每种对象都对应着一种<strong>XXXInfo</strong></p>
+<p><strong>获取XXXInfo：</strong><br>一般来说通过<code>GetXXX()</code>即可，具体如下：<br><VT>Tip：都有单数形式，同时不一定通过Type获取</VT></p>
+<ul>
+<li>ConstructorInfo：<code>GetConstructors()</code></li>
+<li>MethodInfo：<code>GetMethods()</code></li>
+<li>PropertyInfo：<code>GetProperties()</code></li>
+<li>FieldInfo：<code>GetFields()</code></li>
+<li><code>GetCustomAttributes()</code>，返回<code>IEnumerable&lt;Attribute&gt;</code></li>
+</ul>
+<p><strong>继承链：</strong></p>
+<ul>
+<li>MemberInfo<ul>
+<li>Type</li>
+<li>FieldInfo</li>
+<li>MethodBase<ul>
+<li>MethodInfo</li>
+<li>ConstructorInfo</li>
+</ul>
+</li>
+<li>PropertyInfo</li>
+<li>EventInfo</li>
+</ul>
+</li>
+<li>其它<ul>
+<li>ParameterInfo</li>
+<li>Attribute</li>
+</ul>
+</li>
+</ul>
+<h4 id="memberinfo">MemberInfo</h4>
+<p>可以看到MemberInfo是<strong>最基类</strong>，大部分其它的Info都会继承于它，因为说到底是某种对象<br>值得注意的是<B><VT>Type也是继承于MemberInfo的</VT></B></p>
+<p>既然是最基类，那么其中必然具有一些<strong>通用内容</strong>：</p>
+<ul>
+<li><code>Name</code></li>
+<li><code>MemberType</code>：成员类型，为<B><GN>MemberTypes枚举</GN></B></li>
+<li><code>DeclaringType</code>：声明Member的最基类</li>
+<li><code>ReflectedType</code>：当前类</li>
+</ul>
+<BR>
+
+<p>一般情况下，虽然我们会获取MemberInfo，但在之后必然会通过MemberInfo获取所需的XXXInfo进行操作</p>
+<h4 id="fieldinfo">FieldInfo</h4>
+<p>Field即<strong>字段</strong><br><strong>内容</strong>有：</p>
+<ul>
+<li><code>GetValue()</code></li>
+<li><code>SetValue()</code></li>
+<li><code>FieldType</code></li>
+<li><code>IsStatic</code></li>
+<li><code>IsPrivate</code></li>
+</ul>
+<h4 id="propertyinfo">PropertyInfo</h4>
+<p>Property即<strong>属性</strong><br><strong>内容</strong>有：</p>
+<ul>
+<li><code>GetValue()</code></li>
+<li><code>SetValue()</code></li>
+<li><code>PropertyType</code></li>
+<li><code>CanRead</code></li>
+<li><code>CanWrite</code></li>
+<li><code>GetMethod</code>：获取getter方法(MethodInfo)</li>
+<li><code>SetMethod</code>：获取setter方法(MethodInfo)</li>
+</ul>
+<h4 id="methodinfoconstructorinfo">MethodInfo/ConstructorInfo</h4>
+<p>Method即<strong>方法</strong>，Constructor即<strong>构造方法</strong>，本质上两者都是方法，所以它们有一基类MethodBase<br>由于是方法，所以有一些<strong>共有内容</strong>：</p>
+<ul>
+<li><code>Invoke()</code></li>
+<li><code>GetParameters()</code></li>
+<li><code>IsStatic</code></li>
+</ul>
+<p>而MethodInfo会有<code>ReturnType</code>/<code>ReturnParameter</code>/<code>ReturnTypeCustomAttributes</code>：</p>
+<ul>
+<li><code>ReturnType</code>就是一个返回值Type</li>
+<li><code>ReturnParameter</code>比较特殊，指代的也是返回值，但是是其ParameterInfo元数据</li>
+<li><code>ReturnTypeCustomAttributes</code>则是一个可能会获取的项，如果函数上有<code>[return: MyAttr]</code>则可能使用</li>
+</ul>
+<h4 id="eventinfo">EventInfo</h4>
+<p>Event即<strong>事件</strong><br>内容有：</p>
+<ul>
+<li><code>AddEventHandler()</code></li>
+<li><code>RemoveEventHandler()</code></li>
+<li><code>EventHandlerType</code></li>
+</ul>
+<h4 id="parameterinfo">ParameterInfo</h4>
+<p>Parameter即<strong>参数</strong><br><strong>内容</strong>有：</p>
+<ul>
+<li><code>Name</code></li>
+<li><code>ParameterType</code></li>
+<li><code>HasDefaultValue</code></li>
+<li><code>DefaultValue</code></li>
+</ul>
+<p>参数通常来自方法，通常有<code>method.GetParameters()</code>(包括MethodInfo和ConstructorInfo)<br>但也有其它情况，也就是<strong>索引器</strong>：<code>public string this[int index] { get; set; }</code>，其获取方法为：</p>
+<pre><code class="language-csharp">var prop = type.GetProperty(&quot;Item&quot;); // 索引器是一种属性
+var ps = prop.GetIndexParameters();
+</code></pre>
+<h4 id="attribute">Attribute</h4>
+<p>Attribute即<strong>特性</strong>，也就是在内容前的<code>[XXX]</code><br><strong>内容</strong>有：</p>
+<ul>
+<li><code>Attribute.GetCustomAttribute()</code></li>
+<li><code>Attribute.GetCustomAttributes()</code></li>
+<li><code>Attribute.IsDefined()</code></li>
+</ul>
+<p>除了通过静态方法来获取特性，<B><VT>只要该内容可以添加<code>[XXX]</code>，相应内容就存在GetCustomAttribute方法</VT></B></p>
+<h4 id="高级">高级</h4>
+<h5 id="泛型">泛型</h5>
+<p>对于泛型，值得详细了解一下<br>首先是<strong>名字</strong>：<br>以<code>typeof(Dictionary&lt;,&gt;)</code>为例，其名为<code>Dictionary`2</code>，即：<code>类名+ˋ+泛型参数数量</code><br>以嵌套情况举例：</p>
+<pre><code class="language-csharp">class A&lt;T1&gt;
+{
+    class B&lt;T2&gt; {}
+}
+</code></pre>
+<p>对于B(<code>typeof(A&lt;&gt;.B&lt;&gt;)</code>)来说，其名为<code>A`1+B`1</code><br><DRD>注意：传参也是传2个，顺序为从外到内</DRD></p>
+<p>一个重要的<strong>概念</strong>：</p>
+<ul>
+<li><B><GN>开放泛型</GN></B>：<code>X&lt;&gt;</code>，即泛型本身，类型未确认</li>
+<li><B><GN>半开放泛型</GN></B>：<code>X&lt;T&gt;</code>，即未确认泛型</li>
+<li><B><GN>封闭泛型</GN></B>：<code>X&lt;int&gt;</code>，即已确认泛型</li>
+</ul>
+<BR>
+
+<p><strong>对于泛型来说，存在于两处：</strong></p>
+<ul>
+<li>Type</li>
+<li>MethodBase<VT>(仅指代MethodInfo，因为泛型构造根本就不存在，编译都不会通过)</VT></li>
+</ul>
+<BR>
+
+<p><strong>对于Type情况</strong>，分为3种情况： <VT>以<code>class XXX&lt;T&gt; {}</code>为例</VT></p>
+<ul>
+<li><code>XXX&lt;T&gt;</code>：泛型定义(可以理解为开放泛型)</li>
+<li><code>XXX&lt;int&gt;</code>：泛型实例(可以理解为封闭泛型)</li>
+<li><code>T</code>：泛型参数占位符</li>
+</ul>
+<p>一些重要方法/属性：</p>
+<ul>
+<li>重要函数<ul>
+<li><code>MakeGenericType()</code>：创建开放泛型的封闭泛型(只有转为封闭类型后才能调用创建实例)</li>
+<li><code>GetGenericArguments()</code>：获取泛型参数(<code>Type[]</code>)</li>
+</ul>
+</li>
+<li>判断属性<ul>
+<li><code>IsGenericType</code></li>
+<li><code>IsGenericTypeDefinition</code></li>
+<li><code>ContainsGenericParameters</code></li>
+<li><code>IsGenericParameter</code></li>
+</ul>
+</li>
+<li>约束<ul>
+<li><code>GetGenericParameterConstraints()</code>：类型约束(仅包含接口和基类)</li>
+<li><code>GenericParameterAttributes</code>：修饰符约束(<code>class</code>/<code>struct</code>/<code>new()</code>之类的)</li>
+</ul>
+</li>
+</ul>
+<p>其中<code>IsGenericType</code>/<code>IsGenericTypeDefinition</code>/<code>ContainsGenericParameters</code>是一组内容，区别如下：</p>
+<ul>
+<li><code>IsGenericType</code>：是否是泛型</li>
+<li><code>IsGenericTypeDefinition</code>：是否为泛型定义(模板)</li>
+<li><code>ContainsGenericParameters</code>：是否具有泛型参数</li>
+</ul>
+<p>这样看很难理解，首先先看一下各属性为true的情况：</p>
+<ul>
+<li><code>IsGenericType==true</code>：开放泛型/半开放泛型/封闭泛型</li>
+<li><code>IsGenericTypeDefinition==true</code>：开放泛型</li>
+<li><code>ContainsGenericParameters==true</code>：开放泛型/半开放泛型</li>
+</ul>
+<p>由此也可以大概理解了</p>
+<p><strong>对于MethodBase情况</strong><br>一些重要方法/属性：</p>
+<ul>
+<li><code>MakeGenericMethod()</code></li>
+<li><code>GetGenericArguments()</code></li>
+<li><code>IsGenericMethodDefinition</code></li>
+</ul>
+<p>总的来说和Type还是类似的，由于是方法，有一重要函数：</p>
+<p><strong><BL>问题：为什么字段之类的没有，明明有<code>List&lt;T&gt;</code>这种</BL></strong><br><BL>并不是没有，而是被包含了，以字段为例，有<code>FieldInfo.FieldType</code>，使用该属性即可判断</BL></p>
+<h5 id="其它">其它</h5>
+<ul>
+<li>实例构造函数名为<code>.ctor</code>，静态构造函数名为<code>..ctor</code></li>
+<li>索引器的名字为<code>Item</code>，是属性的一员</li>
+<li>事件类似于属性，属性是getter/setter，而事件是add方法/remove方法<br>这些方法的名字都是以<code>操作_名字</code>命名，如Age属性就有<code>set_Age()</code></li>
+<li><code>IsSpecialName</code>可用于检查是否为语法糖名，适用于Field/Property/Method/Constructor/Event</li>
+<li><code>Attributes</code>是一更底层的属性，对应一个XXXAttributes枚举，适用于Field/Property/Method/Constructor/Event/Parameter，其中可以发现如<code>FieldAttributes.Private</code>这种值，而更多的是一些高级的值</li>
+<li>如果想获取一个virtual方法的根，可以通过<code>GetBaseDefinition()</code>获取</li>
+</ul>
+<BR>
+
+<h1 id="常用实例">常用实例</h1>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>

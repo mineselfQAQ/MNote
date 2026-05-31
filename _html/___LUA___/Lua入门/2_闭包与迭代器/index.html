@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>2_闭包与迭代器</title>
+  <link rel="stylesheet" href="../../../styles/mnote.css">
+<!-- The content below will be included at the end of the <head> element. -->
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+<p><strong><center><T>2_闭包</T></center></strong></p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#%E5%89%8D%E7%BD%AE%E5%9F%BA%E7%A1%80">前置基础</a></li>
+<li><a href="#%E9%97%AD%E5%8C%85%E5%9F%BA%E7%A1%80">闭包基础</a><ul>
+<li><a href="#%E9%97%AD%E5%8C%85">闭包</a></li>
+<li><a href="#%E5%B0%BE%E9%80%92%E5%BD%92">尾递归</a></li>
+<li><a href="#%E9%97%AD%E5%8C%85%E5%AE%9E%E4%BE%8B">闭包实例</a><ul>
+<li><a href="#%E5%9B%9E%E8%B0%83%E5%87%BD%E6%95%B0">回调函数</a></li>
+<li><a href="#%E9%87%8D%E5%AE%9A%E4%B9%89%E5%87%BD%E6%95%B0">重定义函数</a></li>
+<li><a href="#%E5%AE%89%E5%85%A8%E7%9A%84%E8%BF%90%E8%A1%8C%E6%97%B6%E7%8E%AF%E5%A2%83">安全的运行时环境</a></li>
+<li><a href="#%E5%87%BD%E6%95%B0%E5%BC%8F%E7%BC%96%E7%A8%8B">函数式编程</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#%E8%BF%AD%E4%BB%A3%E5%99%A8%E4%B8%8E%E6%B3%9B%E5%9E%8Bfor">迭代器与泛型for</a><ul>
+<li><a href="#%E8%BF%AD%E4%BB%A3%E5%99%A8">迭代器</a></li>
+<li><a href="#%E5%8E%9F%E7%90%86%E6%8E%A2%E5%AF%BB">原理探寻</a></li>
+<li><a href="#%E6%B3%9B%E5%9E%8Bfor">泛型for</a><ul>
+<li><a href="#%E4%BE%8B%E5%AD%90%E9%93%BE%E8%A1%A8%E9%81%8D%E5%8E%86">例子：链表遍历</a></li>
+<li><a href="#%E4%BE%8B%E5%AD%90key%E6%8E%92%E5%BA%8F">例子：key排序</a></li>
+<li><a href="#%E8%80%81%E5%BC%8F%E8%BF%AD%E4%BB%A3%E5%99%A8">老式迭代器</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<h1 id="前置基础">前置基础</h1>
+<p>由于函数是<B><GN>第一类值</GN></B>，所以<B><VT>数字和字符串是具有相同权力</VT></B>的<br>这也意味着：<B><VT>函数可以存储到变量/table中，可以作为实参传入函数，也可以作为返回值</VT></B></p>
+<p>由于Lua函数<B><VT>可以嵌套，且内部函数可以访问外部变量</VT></B>，所以可以应用<B><GN>函数式编程</GN></B><br>需要注意的是：<B><DRD>函数是匿名的</DRD></B><br>一般情况下我们会这么写函数：<br><code>function foo(x) return 2*x end</code><br>上述写法其实是一种<strong>语法糖</strong>，事实上这等价于：<br><code>foo = function(x) return 2*x end</code><br>即<strong>foo是一个变量，存储了一个匿名函数</strong><br>所以说：<VT><code>function() ... end</code>其实是类似于<code>{}</code>(table构造式)的函数构造式</VT></p>
+<p><B><VT>以另一个函数为参数的函数</VT></B>被称为<B><GN>高阶函数</GN></B><br>可以有：<code>table.sort(network, function(a,b) return (a.name &gt; b.name) end)</code> <VT>此时sort函数高阶函数</VT></p>
+<p>在table中，由于函数是第一类值，我们可以将其定义为<strong>局部函数</strong>，有2种方法：</p>
+<pre><code class="language-lua">-- 方法1
+local fact -- 前向声明
+fact = function(n)
+  if n == 0 then return 1
+  else return n * fact(n-1) -- 虽然此时fact()还是没有定义完成，但是至少指代的是local的fact，解释型语言自然能知道fact是什么
+  end
+end
+
+-- 方法2
+local function fact(n)
+  if n == 0 then return 1
+  else return n * fact(n-1)
+  end
+end
+</code></pre>
+<p><strong><DRD>要注意的是：这里<code>local fact</code>必须提前声明，否则递归的<code>fact()</code>只能去寻找全局的fact，全局的话不存在也不正确</DRD></strong><br><strong><BL>问题：为什么方法2可以<BL></strong><br><BL>方法2是一种语法糖，这等价于方法1</BL></p>
+<p><strong><VT>Tip：对于间接递归函数(由调用其它函数调回自己的递归方式)必须使用方法1，即明确前向声明</VT></strong><br><strong><BL>问题：为什么<BL></strong><br>如以下最简单的间接递归函数例子：</p>
+<pre><code class="language-lua">local f, g
+
+function g()
+    -- ...
+    f()
+    -- ...
+end
+function f()
+    -- ...
+    g()
+    -- ...
+end
+</code></pre>
+<p>在这里如果是前向声明那一定是可以的，但是如果使用语法糖，其实就变成了：</p>
+<pre><code class="language-lua">local g
+function g()
+    f()
+end
+local f
+function f()
+    g()
+end
+</code></pre>
+<p>那么在g函数声明的时候f变量并没有赋值，当然是不可行的<br><strong><DRD>所以：尽量不要使用语法糖形式，否则就需要仔细检查一下</DRD></strong></p>
+<h1 id="闭包基础">闭包基础</h1>
+<h2 id="闭包">闭包</h2>
+<p><B><GN>闭包</GN></B>指的是：<B><VT>一个函数加上该函数所需访问的所有upvalue</VT></B><br><B><GN>闭包函数</GN></B>指的是：<B><VT>捕获到外部变量的那个函数，即内层函数</VT></B><br><B><GN>upvalue</GN></B>指的是：<B><VT>被捕获到的外部变量</VT></B></p>
+<pre><code class="language-lua">-- Tip：比较函数比的是table的value
+names = {&quot;Peter&quot;, &quot;Paul&quot;, &quot;Mary&quot;}
+grades = {Mary = 10, Paul = 7, Peter = 8}
+table.sort(names, function (n1, n2)
+    return grades[n1] &gt; grades[n2] -- 比较年纪
+end)
+
+-- 写成函数
+function sortbygrade(names, grades)
+    table.sort(names, function (n1, n2)
+        return grades[n1] &gt; grades[n2] -- 比较年纪
+    end)
+end
+</code></pre>
+<p>在这里有局部变量<code>names</code> <code>grades</code>，它们都被<code>table.sort()</code>内部函数所使用，由于<code>grades</code>在匿名函数中，它被称为<B><GN>非局部变量(non-local varibale)，即上值(upvalue)</GN></B><br><strong><BL>问题：为什么<code>grades</code>是upvalue而<code>name</code>不是</BL></strong><br><BL>以C#的说法的话，其实就是闭包存在于lambda表达式与局部函数(C#的)<br>在Lua的话虽然概念不同，但其实和C#完全一致，只有2种形式，即<B>匿名函数与内部函数</B><br>那么names并不符合，当然不是upvalue</BL></p>
+<p><B><DRD>注意：同一个函数可以产生多个闭包</DRD></B></p>
+<h2 id="尾递归">尾递归</h2>
+<pre><code class="language-lua">function newCounter()
+    local i = 0
+    return function()
+        i = i + 1
+        return i
+    end
+end
+
+c1 = newCounter()
+print(c1()) -- 1
+print(c1()) -- 2
+
+c2 = newCounter()
+print(c2()) -- 1
+print(c1()) -- 3
+print(c2()) -- 2
+</code></pre>
+<p>c1和c2的两次函数创建了不同的局部变量i，c1和c2当然是<strong>不同的闭包</strong><br>此处使用到了<B><GN>尾调用</GN></B>---<B><VT>函数是另一个函数的最后一个动作</VT></B><br>Lua支持<B><GN>尾调用消除</GN></B>，所以说：<B><VT>解释器会对尾调用优化，不会耗费任何栈空间</VT></B><br><strong><DRD>注意：尾递归必须是最后一个动作，如<code>return g(x)+1</code>由于加法操作，并不是最后一个动作，需注意</DRD></strong><br>尾递归的一种应用：<B><YL>状态机<YL></B></p>
+<pre><code class="language-lua">-- 每个房间都如此，那么虽然会在房间穿梭，
+-- 但是由于发生的都是尾递归，所以尾递归消除的优化避免了栈的无限深入
+function room1 ()
+    local move = io.read()
+    if move == &quot;south&quot; then 
+        return room3()
+    elseif move == &quot;east&quot; then 
+        return room2()
+    else
+        print(&quot;invalid move&quot;)
+        return room1() -- stay in the same room
+    end
+end
+</code></pre>
+<h2 id="闭包实例">闭包实例</h2>
+<h3 id="回调函数">回调函数</h3>
+<pre><code class="language-lua">-- GUI中，有一个十进制计算机，一下为按钮的定义
+-- 在这里，匿名函数能够捕获到digit
+function digitButton(digit)
+    return Button{label = tostring(digit),
+                  action = function()
+                              add_to_display(digit)
+                            end
+                  }
+end
+</code></pre>
+<h3 id="重定义函数">重定义函数</h3>
+<pre><code class="language-lua">-- oldSin()即math.sin()被完全覆盖了，所以此时：
+-- · math.sin()被覆盖为新的算法，我们只能调用到新的math.sin()
+-- · 老的math.sin()已不复存在，我们只能通过新的math.sin()闭包调用oldSin访问到
+-- 总的来说：是因为oldSin被包裹在了一个块中，那么出块后oldSin定义域一过就访问不了了，而math.sin是全局的，直接就被覆盖了
+do
+  local oldSin = math.sin
+  local k = math.pi/180
+  math.sin = function (x)
+    return oldSin(x*k)
+  end
+end
+</code></pre>
+<h3 id="安全的运行时环境">安全的运行时环境</h3>
+<pre><code class="language-lua">-- 在调用io.open()前先进行权限检查，通过才调用
+do
+    local oldOpen = io.open
+    local access_OK = function(filename, mode)
+        -- 检查访问权限
+    end
+    io.open = function(filename, mode)
+        if access_OK(filename, mode) then
+            return oldOpen(filename, mode)
+        else
+            return nil, &quot;access denied&quot;
+        end
+    end
+end
+</code></pre>
+<h3 id="函数式编程">函数式编程</h3>
+<pre><code class="language-lua">function disk(cx, cy, r)
+    return function(x, y)
+        return (x - cx)^2 + (y - cy)^2 &lt;= r^2
+    end
+end
+  
+function rect(left, right, bottom, up)
+    return function(x, y)
+        return left &lt;= x and x &lt;= right and bottom &lt;= y and y &lt;= up
+    end
+end
+  
+function complement(r)
+    return function(x, y)
+        return not r(x, y)
+    end
+end
+  
+function union(r1, r2)
+    return function(x, y)
+        return r1(x, y) or r2(x, y)
+    end
+end
+  
+function intersection(r1, r2)
+    return function(x, y)
+        return r1(x, y) and r2(x, y)
+    end
+end
+  
+function difference(r1, r2)
+    return function(x, y)
+        return r1(x, y) and not r2(x, y)
+    end
+end
+
+function translate(r, dx, dy)
+    return function(x, y)
+        return r(x - dx, y - dy)
+    end
+end
+
+-- 函数用于将区域函数r绘制为ASCII艺术
+-- M是宽度，N是高度
+function plot(r, M, N)
+  io.write(&quot;P1\n&quot;, M, &quot; &quot;, N, &quot;\n&quot;)  -- 写入PBM格式的文件头
+  
+  for i = 1, N do                    -- 对于每一行
+    local y = (N - i*2)/N            -- 计算y坐标
+    
+    for j = 1, M do                  -- 对于每一列
+      local x = (j*2 - M)/M          -- 计算x坐标
+      
+      io.write(r(x, y) and &quot;1&quot; or &quot;0&quot;)  -- 如果点在区域内写1，否则写0
+    end
+    
+    io.write(&quot;\n&quot;)                   -- 行结束换行
+  end
+end
+
+c1 = disk(0,0,1)
+plot(difference(c1, translate(c1, 0.3, 0)), 500, 500)
+</code></pre>
+<h1 id="迭代器与泛型for">迭代器与泛型for</h1>
+<h2 id="迭代器">迭代器</h2>
+<p><strong><BL>问题：迭代器是什么</BL></strong><br><BL>迭代器无论是在Lua还是在C#中都是非常使用的一个内容，以下为基础用法：</BL></p>
+<pre><code class="language-csharp">//C#形式
+foreach(var i in list)
+{
+    //...
+}
+</code></pre>
+<pre><code class="language-lua">-- lua形式
+for k,v in pairs(list) do
+  -- ...
+end
+</code></pre>
+<p><BL>以上都是<B><GN>泛型for<GN></B>形式<br>而<strong>迭代器</strong>的话是<B><VT>使用泛型for这种便捷方式的必须条件(在C#中的话就是IEnumerable接口(本质上是GetEnumerator函数))</VT></B></BL></p>
+<h2 id="原理探寻">原理探寻</h2>
+<p>在<a href="../1_%E5%9F%BA%E7%A1%80/index.html#变长参数">1_基础_变长参数</a>中提到了<strong>ipairs</strong>其实不是什么语法糖，它就是<strong>一个函数</strong><br>通过闭包，我们可以编写出和ipairs一样的函数：</p>
+<pre><code class="language-lua">-- 一种闭包的迭代器实现
+function values(t)
+    local i = 0
+    return function() i = i + 1; return t[i] end
+end
+</code></pre>
+<p>可以有：</p>
+<pre><code class="language-lua">-- while形式
+t = {10,20,30}
+iter = values(t)
+while true do
+    local element = iter()
+    if element == nil then break end
+    print(element)
+end
+
+-- 泛型for也可以
+t = {10,20,30}
+for element in values(t) do
+    print(element)
+end
+</code></pre>
+<p>可以看到这与C#中迭代器的本质是几乎相同的：</p>
+<ol>
+<li>首先进行一次<code>Reset()</code>，也就是闭包中的<code>i = 0</code></li>
+<li>进行无限循环，每次都进行<code>MoveNext()</code>找到下一个值并且返回<code>Current</code></li>
+<li>找不到了说明遍历结束，退出即可</li>
+</ol>
+<h2 id="泛型for">泛型for</h2>
+<p><strong>泛型for</strong>其实就是一种<B><GN>语法糖</GN></B>，它会<B><VT>不断地调用迭代器函数获得输出并传入参数(<code>in</code>前的，如<code>k</code> <code>v</code>)，使用参数进行操作后再次调用迭代器函数，直到返回nil</VT></B><br><strong>具体来说，泛型for语法糖等价于：</strong></p>
+<pre><code class="language-lua">-- 泛型for形式
+for var_1,...,var_n in &lt;explist&gt; do
+    &lt;block&gt;
+end
+
+-- 等价于
+do
+    local _f,_s,_var = &lt;explist&gt;
+    while true do
+        local var_1,...,var_n = _f(_s,_var)
+        _var = var_1
+        if _var == nil then break end
+        &lt;block&gt;
+    end
+end
+</code></pre>
+<p>其中：</p>
+<ul>
+<li><code>_f</code>---迭代器函数</li>
+<li><code>_s</code>---恒定状态</li>
+<li><code>_var</code>---控制变量，指的是<strong>in前返回变量的第一个</strong></li>
+</ul>
+<p>也就是说，<B>完整来说&lt;explist&gt;表达式需要输出<VT>迭代器函数/恒定状态/控制变量初始值</VT>以提供泛型for所需参数</B></p>
+<p>在前面的<code>values(t)</code>例子中，我们的<code>&lt;explist&gt;</code>只返回了一个值，指的就是<B>_f</B>，_s和_var被补全为nil，这是<B><VT>通过闭包的方式代替了恒定状态与控制变量初始值</VT></B><br>我们可以认为<code>values(t)</code>是一种<B><GN>简单迭代器</GN></B><br>我们可以称完整的<strong>三参数</strong>迭代器为<B><GN>无状态迭代器</GN></B>---<B><VT>自身不保存任何状态，避免创建新闭包</VT></B><br>最简单的例子就是<strong>Lua中的ipairs与pairs</strong><VT>(源码为C)</VT>：</p>
+<pre><code class="language-lua">-- iapirs --
+-- iter不再需要闭包，而是通过_s即a，_var即i完成
+local function iter(a,i)
+    i = i + 1
+    local v = a[i]
+    if v then
+        return i,v
+    end
+end
+function ipairs(a)
+    return iter, a, 0 -- 参数3为_var的初始值
+end
+
+-- pairs --
+function pairs(t)
+    return next, t, nil -- 使用内置函数next()完成
+end
+</code></pre>
+<h3 id="例子链表遍历">例子：链表遍历</h3>
+<pre><code class="language-lua">local function getnext(list, node)
+    if not node then
+        return list -- 第一次取头
+    else
+        return node.next
+    end
+end
+
+function traverse(list)
+    return getnext, list, nil
+end
+</code></pre>
+<h3 id="例子key排序">例子：key排序</h3>
+<p>对于一个table来说，我们想<strong>通过key进行排序</strong>，但是这无法做到，我们最简单可以通过<B><VT>转移到新表</VT></B>完成：</p>
+<pre><code class="language-lua">lines = {
+    [&quot;luaH_set&quot;] = 10,
+    [&quot;luaH_get&quot;] = 24,
+    [&quot;luaH_present&quot;] = 48,
+}
+a = {}
+for n in pairs(lines) do a[#a+1] = n end
+table.sort(a) -- 排序(key并不会有所改变，还是1|2|3)
+for k,n in ipairs(a) do print(k,n) end
+</code></pre>
+<p><strong><DRD>注意：只有数组部分才能使用<code>table.sort()</code>，这也是成立的原因</DRD></strong><br>另一种方法就是<B><VT>使用迭代器</VT></B>：</p>
+<pre><code class="language-lua">function pairsByKeys(t,f)
+    local a = {}
+    for n in pairs(t) do
+        a[#a+1] = n
+    end
+    table.sort(a,f)
+    local i = 0
+    return function()
+        i = i + 1
+        return a[i], t[a[i]]
+    end
+end
+
+for name, line in pairsByKeys(lines) do
+    print(name, line)
+end
+</code></pre>
+<p>与其说是另一种方法不如说是通过闭包的方式使其可以使用泛型for而已，做法还是一样的</p>
+<h3 id="老式迭代器">老式迭代器</h3>
+<p><strong><GN>老式迭代器</GN></strong><VT>(因为没有泛型for)</VT>如下所示：　　<strong><VT>即回调形式</VT></strong></p>
+<pre><code class="language-lua">function allwords(f)
+    for line in io.lines() do
+        for word in string,gmatch(line, &quot;%w+&quot;) do
+            f(word) -- 回调
+        end
+    end
+end
+
+allwords(print) -- 即找到单词后就print
+--也可以有：
+local count = 0
+allwords(function(w)
+    if w == &quot;hello&quot; then count = count + 1 end
+end
+print(count))
+</code></pre>
+
+    </article>
+  </div>
+  <div class="mnote-lightbox" data-mnote-lightbox aria-hidden="true">
+    <div class="mnote-lightbox__toolbar" aria-label="Image controls">
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomOut" aria-label="Zoom out">-</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="zoomIn" aria-label="Zoom in">+</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="actual" aria-label="Actual size">1:1</button>
+      <button class="mnote-lightbox__button" type="button" data-mnote-lightbox-action="fit" aria-label="Fit image">Fit</button>
+      <button class="mnote-lightbox__button is-close" type="button" data-mnote-lightbox-close aria-label="Close image">×</button>
+    </div>
+    <div class="mnote-lightbox__stage" data-mnote-lightbox-stage>
+      <img class="mnote-lightbox__image" data-mnote-lightbox-image alt="">
+    </div>
+  </div>
+  <script>
+(function () {
+  var lightbox = document.querySelector("[data-mnote-lightbox]");
+  if (!lightbox) return;
+  var stage = lightbox.querySelector("[data-mnote-lightbox-stage]");
+  var image = lightbox.querySelector("[data-mnote-lightbox-image]");
+  var closeButton = lightbox.querySelector("[data-mnote-lightbox-close]");
+  var scale = 1;
+  var fitScale = 1;
+  var panX = 0;
+  var panY = 0;
+  var drag = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function clampPan() {
+    var stageRect = stage.getBoundingClientRect();
+    var imageWidth = (image.naturalWidth || 1) * scale;
+    var imageHeight = (image.naturalHeight || 1) * scale;
+    var maxX = Math.max(0, (imageWidth - stageRect.width) / 2);
+    var maxY = Math.max(0, (imageHeight - stageRect.height) / 2);
+    panX = maxX ? clamp(panX, -maxX, maxX) : 0;
+    panY = maxY ? clamp(panY, -maxY, maxY) : 0;
+  }
+
+  function applyTransform() {
+    clampPan();
+    image.style.transform = "translate(-50%, -50%) translate(" + panX + "px, " + panY + "px) scale(" + scale + ")";
+    stage.classList.toggle("is-draggable", scale > fitScale * 1.01);
+  }
+
+  function measureFitScale() {
+    var stageRect = stage.getBoundingClientRect();
+    var safeWidth = Math.max(1, stageRect.width - 24);
+    var safeHeight = Math.max(1, stageRect.height - 24);
+    var naturalWidth = image.naturalWidth || 1;
+    var naturalHeight = image.naturalHeight || 1;
+    fitScale = Math.min(safeWidth / naturalWidth, safeHeight / naturalHeight, 1);
+    if (!Number.isFinite(fitScale) || fitScale <= 0) fitScale = 1;
+  }
+
+  function applyScale(nextScale) {
+    scale = clamp(nextScale, fitScale, 20);
+    if (scale <= fitScale * 1.02) {
+      fit();
+      return;
+    }
+    applyTransform();
+  }
+
+  function fit() {
+    measureFitScale();
+    scale = fitScale;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+  }
+
+  function actualSize() {
+    measureFitScale();
+    applyScale(Math.max(1, fitScale));
+  }
+
+  function close() {
+    lightbox.classList.remove("is-open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.removeAttribute("src");
+    image.alt = "";
+    image.removeAttribute("data-kind");
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    drag = null;
+    stage.classList.remove("is-draggable", "is-dragging");
+    document.documentElement.style.overflow = "";
+  }
+
+  function open(source) {
+    var kind = source.getAttribute("data-kind") || "normal";
+    image.src = source.currentSrc || source.src;
+    image.alt = source.alt || "";
+    image.setAttribute("data-kind", kind);
+    image.style.width = "";
+    image.style.transform = "";
+    scale = 1;
+    fitScale = 1;
+    panX = 0;
+    panY = 0;
+    lightbox.classList.add("is-open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.documentElement.style.overflow = "hidden";
+    if (image.complete) requestAnimationFrame(fit);
+    else image.onload = function () { requestAnimationFrame(fit); };
+  }
+
+  function runAction(action) {
+    if (action === "zoomIn") applyScale(scale * 1.4);
+    else if (action === "zoomOut") applyScale(scale / 1.4);
+    else if (action === "actual") actualSize();
+    else if (action === "fit") fit();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var actionButton = target && target.closest ? target.closest("[data-mnote-lightbox-action]") : null;
+    if (target && target.matches && target.matches("img.mnote-img[data-mnote-image]")) {
+      event.preventDefault();
+      open(target);
+    } else if (actionButton) {
+      event.preventDefault();
+      runAction(actionButton.getAttribute("data-mnote-lightbox-action"));
+    } else if (target === lightbox || target === closeButton) {
+      close();
+    }
+  });
+
+  stage.addEventListener("wheel", function (event) {
+    if (!lightbox.classList.contains("is-open")) return;
+    event.preventDefault();
+    applyScale(scale * (event.deltaY < 0 ? 1.35 : 1 / 1.35));
+  }, { passive: false });
+
+  image.addEventListener("dblclick", function (event) {
+    event.preventDefault();
+    if (scale <= fitScale * 1.01) actualSize();
+    else fit();
+  });
+
+  stage.addEventListener("mousedown", function (event) {
+    if (!stage.classList.contains("is-draggable")) return;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: panX,
+      panY: panY
+    };
+    stage.classList.add("is-dragging");
+    event.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!drag) return;
+    panX = drag.panX + (event.clientX - drag.x);
+    panY = drag.panY + (event.clientY - drag.y);
+    applyTransform();
+  });
+
+  document.addEventListener("mouseup", function () {
+    drag = null;
+    stage.classList.remove("is-dragging");
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && lightbox.classList.contains("is-open")) close();
+    if (!lightbox.classList.contains("is-open")) return;
+    if (event.key === "+" || event.key === "=") applyScale(scale * 1.4);
+    if (event.key === "-") applyScale(scale / 1.4);
+    if (event.key === "0") fit();
+    if (event.key === "1") actualSize();
+  });
+})();
+  </script>
+</body>
+</html>
