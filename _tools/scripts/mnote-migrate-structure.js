@@ -97,6 +97,10 @@ function relativeMarkdownLink(fromFile, targetFile, hash = "") {
   return next + hash;
 }
 
+function escapeMarkdownLabel(value) {
+  return String(value).replace(/([\\`*_[\]{}()#+\-.!|>])/g, "\\$1");
+}
+
 function copyImageForNote(oldSourceAbs, newSourceAbs, href) {
   const { href: cleanHref } = splitAttrs(href);
   if (!cleanHref || isExternal(cleanHref)) return href;
@@ -188,6 +192,53 @@ function listVisibleChildren(dir) {
     .sort((a, b) => path.basename(a).localeCompare(path.basename(b), "zh-Hans-CN"));
 }
 
+function childLinkLine(dir, child) {
+  const childEntry = entryFileForDir(child);
+  const href = toPosix(path.relative(dir, childEntry));
+  const wrapped = /[()\s#]/.test(href) ? `<${href}>` : href;
+  return `- [${escapeMarkdownLabel(path.basename(child))}](${wrapped})`;
+}
+
+function isGeneratedIndexFile(file) {
+  if (!fs.existsSync(file)) return false;
+  return /^# .+ 笔记索引\s*\n/m.test(readUtf8(file));
+}
+
+function generatedIndexText(dir, children) {
+  const title = path.basename(dir);
+  const directories = [];
+  const notes = [];
+  for (const child of children) {
+    const childEntry = entryFileForDir(child);
+    if (isGeneratedIndexFile(childEntry)) directories.push(child);
+    else notes.push(child);
+  }
+  const lines = [`# ${title} 笔记索引`, ""];
+  if (directories.length) {
+    lines.push("## 目录", "");
+    for (const child of directories) lines.push(childLinkLine(dir, child));
+    lines.push("");
+  }
+  if (notes.length) {
+    lines.push("## 笔记", "");
+    for (const child of notes) lines.push(childLinkLine(dir, child));
+    lines.push("");
+  }
+  if (!directories.length && !notes.length) lines.push("## 目录", "");
+  lines.push("");
+  return lines.join("\n");
+}
+
+function isGeneratedIndex(current, dir, category) {
+  const trimmed = current.trim();
+  return (
+    /^# .*(笔记索引)?\s*\n\s*## 主题/m.test(current) ||
+    /^# .*(笔记索引)?\s*\n\s*## 目录/m.test(current) ||
+    trimmed === `# ${path.basename(dir)}` ||
+    trimmed === `# ${category}`
+  );
+}
+
 function createIndexes(topicDirs) {
   for (const topicDir of topicDirs) {
     const category = path.basename(topicDir);
@@ -205,22 +256,22 @@ function createIndexes(topicDirs) {
     }
 
     for (const dir of dirs) {
+      const children = listVisibleChildren(dir);
+      if (!children.length) continue;
+      const entry = entryFileForDir(dir);
+      if (!fs.existsSync(entry)) {
+        writeUtf8(entry, generatedIndexText(dir, []));
+      }
+    }
+
+    for (const dir of dirs) {
       const children = listVisibleChildren(dir).filter((child) => hasEntry(child));
       if (!children.length) continue;
       const entry = entryFileForDir(dir);
       if (!fs.existsSync(entry)) continue;
-      const title = path.basename(dir);
-      const lines = [`# ${title} 笔记索引`, "", "## 主题", ""];
-      for (const child of children) {
-        const childEntry = entryFileForDir(child);
-        const href = toPosix(path.relative(dir, childEntry));
-        const wrapped = /[()\s#]/.test(href) ? `<${href}>` : href;
-        lines.push(`- [${path.basename(child)}](${wrapped})`);
-      }
-      lines.push("");
       const current = readUtf8(entry);
-      if (/^# .*(笔记索引)?\s*\n\s*## 主题/m.test(current) || current.trim() === `# ${path.basename(dir)}` || current.trim() === `# ${category}`) {
-        writeUtf8(entry, `${lines.join("\n")}`);
+      if (isGeneratedIndex(current, dir, category)) {
+        writeUtf8(entry, generatedIndexText(dir, children));
       }
     }
   }

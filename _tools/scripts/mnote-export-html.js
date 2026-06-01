@@ -84,6 +84,18 @@ function isEntryRel(rel) {
   return base.toLowerCase() === dirBase.toLowerCase();
 }
 
+function isTopicEntryRel(rel) {
+  const normalized = rel.replace(/\\/g, "/");
+  const dir = path.posix.dirname(normalized);
+  const base = path.posix.basename(normalized, ".md");
+  return isTopicDir(dir) && base.toLowerCase() === dir.toLowerCase();
+}
+
+function isGeneratedNavigationIndex(markdown, sourceRel) {
+  if (isTopicEntryRel(sourceRel)) return false;
+  return /^# .+ 笔记索引\s*\n\s*## (主题|目录|笔记)/m.test(markdown);
+}
+
 function markdownToHtmlRel(rel) {
   const normalized = rel.replace(/\\/g, "/");
   if (isEntryRel(normalized)) {
@@ -727,13 +739,13 @@ for (const source of targets) {
   writeUtf8(htmlAbs, makeHtml(path.basename(source, ".md"), source, body));
   copyDir(path.join(path.dirname(mdAbs), "Pic"), path.join(path.dirname(htmlAbs), "Pic"));
   for (const item of checkMissingImages(mdAbs, markdown)) missingImages.push({ file: source, ...item });
-  results.push({ source, output: htmlRel });
+  results.push({ source, output: htmlRel, navigationIndex: isGeneratedNavigationIndex(markdown, source) });
 }
 
 const cards = topics
   .map((topic) => {
     const href = markdownToHtmlRel(path.posix.join(topic, `${topic}.md`));
-    const count = results.filter((item) => item.source.startsWith(`${topic}/`)).length;
+    const count = results.filter((item) => item.source.startsWith(`${topic}/`) && !item.navigationIndex && !isTopicEntryRel(item.source)).length;
     return `<section class="mnote-category-card"><a href="${escapeHtml(href)}">${escapeHtml(topic)}</a><p>${count} 篇笔记</p></section>`;
   })
   .join("\n");
