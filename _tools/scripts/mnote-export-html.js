@@ -105,12 +105,20 @@ function markdownToHtmlRel(rel) {
   return stripMdExt(normalized) + ".html";
 }
 
-function markdownHrefToHtml(href) {
+function splitMarkdownHref(href) {
   const clean = href.replace(/^<|>$/g, "");
+  // Only treat "#" after the .md suffix as an anchor. MNote paths may contain
+  // literal "#" characters, such as C# or 算法API_C#.
   const mdIndex = clean.toLowerCase().indexOf(".md");
   const hashIndex = mdIndex >= 0 ? clean.indexOf("#", mdIndex + 3) : clean.indexOf("#");
-  const base = hashIndex >= 0 ? clean.slice(0, hashIndex) : clean;
-  const hash = hashIndex >= 0 ? clean.slice(hashIndex) : "";
+  return {
+    base: hashIndex >= 0 ? clean.slice(0, hashIndex) : clean,
+    hash: hashIndex >= 0 ? clean.slice(hashIndex) : "",
+  };
+}
+
+function markdownHrefToHtml(href) {
+  const { base, hash } = splitMarkdownHref(href);
   if (!/\.md$/i.test(base) || /^[a-z]+:/i.test(base)) return href;
   return markdownToHtmlRel(base) + hash;
 }

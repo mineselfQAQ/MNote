@@ -64,6 +64,8 @@ function isCategoryEntry(file, topicDir) {
 
 function parseHref(raw) {
   const trimmed = raw.trim();
+  // Only treat "#" after the .md suffix as an anchor. MNote paths may contain
+  // literal "#" characters, such as C# or 算法API_C#.
   const mdIndex = trimmed.toLowerCase().indexOf(".md");
   const hashIndex = mdIndex >= 0 ? trimmed.indexOf("#", mdIndex + 3) : trimmed.indexOf("#");
   return {
