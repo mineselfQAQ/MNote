@@ -1,16 +1,22 @@
-**<center><BBBG>IOC模块</BBBG></center>**
+<center><B><BBBG>IOC模块</BBBG></B></center>
+
+---
+---
+---
 
 # v1.0
 
+---
+
 ## 概述
 
-**核心设计**如下：
+<B>核心设计</B>如下：
 
 - MIOCContainer：核心IOC创建器
   - MDIContainer：DI实现(未完成)
   - MSLContainer：SL实现
 
-**重点简述：**
+<B>重点简述：</B>
 
 - MSLContainer：
   SL容器，可创建多个(但一般来说有1个就行了)
@@ -18,6 +24,8 @@
   对于瞬态情况Transient，每次`Resolve()`都会调用工厂函数创建新的
   对于实例情况Instance，每次`Resolve()`都会取出Lazy后的单例
   对于瞬态/实例两者，都是延迟解析(对初始化流程非常有帮助)
+
+---
 
 ## 使用例
 
@@ -94,7 +102,13 @@ public class C
 }
 ```
 
+---
+---
+---
+
 # v1.1
+
+---
 
 ## 更新概述
 

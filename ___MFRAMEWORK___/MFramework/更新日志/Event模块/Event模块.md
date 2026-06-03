@@ -1,16 +1,22 @@
-**<center><BBBG>核心模块</BBBG></center>**
+<center><B><BBBG>核心模块</BBBG></B></center>
+
+---
+---
+---
 
 # v1.0
 
+---
+
 ## 概述
 
-**核心设计**如下：
+<B>核心设计</B>如下：
 
 - MEventBus：事件中心，提供`Register()`/`RegisterSafe()`/`Publish()`方法
 
 <BR>
 
-一些**注意事项**：
+一些<B>注意事项</B>：
 
 - 提供了2组声明：
   - 提供`(string eventName, Action handler)`，通过`(string eventName)`发布
@@ -18,6 +24,8 @@
 - IEvent接口为空接口，仅供提示作用
 - 一般使用`RegisterSafe()`，会保证执行Action错误时catch
   如果能确保不发生错误，使用`Register()`也行
+
+---
 
 ## 使用例
 

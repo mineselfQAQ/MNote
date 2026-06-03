@@ -1,4 +1,4 @@
-**<center><BBBG>LoxodonFramework分析</BBBG></center>**
+<center><B><BBBG>LoxodonFramework分析</BBBG></B></center>
 
 <!-- TOC -->
 
@@ -56,25 +56,29 @@
 <!-- /TOC -->
 <!-- /TOC -->
 
+---
+---
+---
+
 # 简述
 
-LoxodonFramework是一套**基于Unity**的**UI框架**
-它自称为**MVVM+数据绑定框架**
+LoxodonFramework是一套<B>基于Unity</B>的<B>UI框架</B>
+它自称为<B>MVVM+数据绑定框架</B>
 但从项目结构来看，是<B><VT>比较清晰的</VT>，特点</B>如下：
 
-- **<GN>优点</GN>**
+- <B><GN>优点</GN></B>
   - 体系完整，内容多
   - 提供Lua方案
   - 有大量案例以及说明文档
-- **<DRD>缺点</DRD>**
+- <B><DRD>缺点</DRD></B>
   - 咱无
 
 <BR>
 
 该框架并没有着重于表现效果(如LunaUI)，是比较<B><VT>偏向于架构</VT></B>的框架
-在文档中其实已经提及其**关键特性**，这里再**从项目结构上来看一下**：
+在文档中其实已经提及其<B>关键特性</B>，这里再<B>从项目结构上来看一下</B>：
 ![](Pic/Loxodon1.png) <VT>核心脚本都在Framework中</VT>
-我们也能看到**除此以外的内容**：
+我们也能看到<B>除此以外的内容</B>：
 
 - Editor---编辑器工具
 - PackageResources
@@ -82,11 +86,17 @@ LoxodonFramework是一套**基于Unity**的**UI框架**
   - Tutorials---单项解决方案
 
 可以看到就是那么的<B><VT>简单清晰</VT></B>
-研究后会发现：该框架是以**扩展**的形式添加非必须内容的，在github上有各个包可供下载：
+研究后会发现：该框架是以<B>扩展</B>的形式添加非必须内容的，在github上有各个包可供下载：
 ![](Pic/Loxodon2.png)
 这也是一个非常不错的选择，可以<B><VT>使使用者在初期先熟悉必要内容，再选择是否添加可选内容</VT></B>
 
+---
+---
+---
+
 # 分析
+
+---
 
 ## 分层架构
 
@@ -104,28 +114,30 @@ LoxodonFramework是一套**基于Unity**的**UI框架**
   - 各类组件(如网络/Log/...)
   - 辅助类
 
-**<BL>问题：Gen中的`R.cs`是什么</BL>**
+<B><BL>问题：Gen中的`R.cs`是什么</BL></B>
 <BL>是本地化自动生成的文件</BL>
 
-**基础层**就是<B><VT>基础功能</VT></B>
-**领域层+表现层**就是<B><VT>MVVM</VT></B>
-**服务层**就是<B><VT>业务功能</VT></B>
+<B>基础层</B>就是<B><VT>基础功能</VT></B>
+<B>领域层+表现层</B>就是<B><VT>MVVM</VT></B>
+<B>服务层</B>就是<B><VT>业务功能</VT></B>
 
-**大致浏览代码后可以发现一些基础规则：**
+<B>大致浏览代码后可以发现一些基础规则：</B>
 
 - Launcher.cs进行初始化设置操作
 - View脚本继承自Window
 - Model脚本(领域)继承自ObservableObject
 - ViewModel脚本继承自ViewModelBase
 
+---
+
 ## 业务层面分析
 
-既然我们了解了框架的分层架构方式，那么就来详细看一下这些部分的**用法**
+既然我们了解了框架的分层架构方式，那么就来详细看一下这些部分的<B>用法</B>
 <YL>这里以官方提供的<B>登录界面示例</B>为例进行分析：</YL>
 
 ### Domains
 
-Domains就是领域层，在该示例中，仅有一个**脚本Account**：
+Domains就是领域层，在该示例中，仅有一个<B>脚本Account</B>：
 
 ``` csharp
 public class Account : ObservableObject
@@ -154,15 +166,15 @@ public class Account : ObservableObject
 
 #### ObservableObject简述
 
-那么先来看一下其**声明**：
+那么先来看一下其<B>声明</B>：
 
 ``` csharp
 [Serializable]
 public abstract class ObservableObject : INotifyPropertyChanged
 ```
-可以看到这里继承了WPFMVVM中使用的<B><GN>INotifyPropertyChanged</GN></B>，显然这是**双向绑定的核心**
+可以看到这里继承了WPFMVVM中使用的<B><GN>INotifyPropertyChanged</GN></B>，显然这是<B>双向绑定的核心</B>
 
-**总结一下**是这样的：
+<B>总结一下</B>是这样的：
 
 - PropertyChanged---INotifyPropertyChanged事件本身
 - `Set()`---更新参数
@@ -170,15 +182,15 @@ public abstract class ObservableObject : INotifyPropertyChanged
   - `ParserPropertyName()`---表达式树转换
 
 所以简单来说就是<B><VT>为所有属性添加了一种事件回调机制</VT></B>
-而这里**最关键**的就是：**PropertyChanged的事件订阅**
-在代码中，我们并不能发现任何有关订阅的内容，显然这**被隐藏在其自动订阅机制**中了
+而这里<B>最关键</B>的就是：<B>PropertyChanged的事件订阅</B>
+在代码中，我们并不能发现任何有关订阅的内容，显然这<B>被隐藏在其自动订阅机制</B>中了
 也就是框架中的<B><GN>Binding</GN></B>
 
 不考虑底层，对我们来说使用起来是非常方便的
 
 ### Views
 
-Views就是视图，以**LoginWindow**为例：
+Views就是视图，以<B>LoginWindow</B>为例：
 
 ``` csharp
 public class LoginWindow : Window
@@ -223,7 +235,7 @@ public class LoginWindow : Window
 - 需要手动将该脚本挂载在GameObject上
 - 继承自Window，同时也一定是一个MonoBehaviour脚本
 
-从中我们已经可以简单地了解到**绑定的基本信息**：
+从中我们已经可以简单地了解到<B>绑定的基本信息</B>：
 
 - <B><VT>`BindingSet<LoginWindow, LoginViewModel>`表明了View与ViewModel的具体对象，即`View-LoginWindow`以及`ViewModel-LoginViewModel`</VT></B>
 - <B><VT>绑定方式为从(For)A的某属性到(To)B</VT></B>
@@ -242,13 +254,13 @@ public abstract class Window : WindowView, IWindow, IManageable
 简单看一下代码，大致来说就是：<B><VT>一组视图的管理类</VT></B>
 在这个项目中就有2个：`StartupWindow`用于启动界面，`LoginWindow`用于登录界面，每个界面都是一个Window
 
-简单看一下代码，大致会发现内容就是对接口的实现，显然其本质是一条**继承链**：
+简单看一下代码，大致会发现内容就是对接口的实现，显然其本质是一条<B>继承链</B>：
 `Window`->`WindowView`->`UIView`
 
 ### ViewModels
 
 ViewModels就是使用层面上的Models了，
-在**LoginViewModel**话就是在领域层的Account基础上进行的
+在<B>LoginViewModel</B>话就是在领域层的Account基础上进行的
 可以看到就是一个构造函数以及一些函数/属性：
 
 ``` csharp
@@ -309,7 +321,7 @@ public Account Account
 }
 ```
 
-可以发现这些内容都是View中**绑定**的内容，如：
+可以发现这些内容都是View中<B>绑定</B>的内容，如：
 `bindingSet.Bind().For(v => v.OnInteractionFinished).To(vm => vm.InteractionFinished);`<VT>一个交互请求</VT>
 `bindingSet.Bind(this.confirmButton).For(v => v.onClick).To(vm => vm.LoginCommand);`<VT>是确认按钮上绑定，绑定的操作为</VT>`LoginViewModel.Login()`
 `bindingSet.Bind(this.username).For(v => v.text, v => v.onEndEdit).To(vm => vm.Username).TwoWay();`<VT>是视图上的username绑定到ViewModel上的Username</VT>
@@ -318,7 +330,7 @@ public Account Account
 
 #### ViewModelBase简述
 
-可以看到ViewModel是需要**继承自ViewModelBase**的，其**定义**为：
+可以看到ViewModel是需要<B>继承自ViewModelBase</B>的，其<B>定义</B>为：
 `public abstract class ViewModelBase : ObservableObject, IViewModel`
 而ObservableObject就是前面提到的Domains的继承类，所以ViewModel就是在此基础上再多了一些特性，由IViewModel可得知：多了一个IDisposable接口以及归属于IViewModel
 
@@ -329,9 +341,9 @@ public Account Account
 - Command---熟悉的命令，也就是封装了按钮的操作
 - InteractionRequest---交互请求
 
-**Command**我们大概率很熟悉，就是一个分离出来的函数而已，但问题是：
+<B>Command</B>我们大概率很熟悉，就是一个分离出来的函数而已，但问题是：
 <B><BL>InteractionRequest到底是什么？</BL></B>
-浏览实例代码后可以大概了解其**用法**：
+浏览实例代码后可以大概了解其<B>用法</B>：
 
 ``` csharp
 // LoginViewModel
@@ -379,14 +391,14 @@ public virtual void OnInteractionFinished(object sender, InteractionEventArgs ar
 观察上述代码，可以注意到执行函数有两种：
 
 - InteractionFinished使用了View函数OnInteractionFinished
-- ToastRequest使用了**ToastInteractionAction实例**
+- ToastRequest使用了<B>ToastInteractionAction实例</B>
 
 <B><GN>InteractionAction</GN></B>是<B><VT>一种函数的复用方式</VT></B>
-既然是一个类，那么就可以**复用在任何View中**
+既然是一个类，那么就可以<B>复用在任何View中</B>
 
 #### Services简述
 
-在ViewModel中，存在服务层内容，可以看到在构造函数中就添加了一个**IAccountService**，即**AccountService**：
+在ViewModel中，存在服务层内容，可以看到在构造函数中就添加了一个<B>IAccountService</B>，即<B>AccountService</B>：
 
 ``` csharp
 public class AccountService : IAccountService
@@ -422,8 +434,8 @@ public class AccountService : IAccountService
 ```
 
 可以看到：作为一个服务，存储了Account数据(IAccountRepository即Account组)，并用该数据提供服务函数
-**其中：**
-**<VT>AccountRepository是Account的封装，存储了多个Account并提供函数，但它还是数据本身，而AccountService则是一个需要利用AccountRepository完成某项服务的功能类</VT>**
+<B>其中：</B>
+<B><VT>AccountRepository是Account的封装，存储了多个Account并提供函数，但它还是数据本身，而AccountService则是一个需要利用AccountRepository完成某项服务的功能类</VT></B>
 
 观察ViewModel代码，还能发现其中的
 
@@ -436,7 +448,7 @@ public class AccountService : IAccountService
 
 #### Localization简述
 
-**Localization**也就是**本地化**，在该示例中有2个脚本：
+<B>Localization</B>也就是<B>本地化</B>，在该示例中有2个脚本：
 
 - AssetBundleDataProvider
 - ResourcesDataProvider
@@ -454,7 +466,7 @@ namespace Loxodon.Framework.Localizations
 ```
 
 由其命名空间可知，<VT>这个接口就是专为本地化创建的</VT>
-查询接口的使用，我们可以发现在**Localization.cs**中使用到了：
+查询接口的使用，我们可以发现在<B>Localization.cs</B>中使用到了：
 
 ``` csharp
 protected virtual async Task Load(params ProviderEntry[] providers)
@@ -482,9 +494,9 @@ protected virtual async Task Load(params ProviderEntry[] providers)
 
 #### Locator简述
 
-**Locator**即定位器，也就是<B><GN>服务定位器模式Service Locator Pattern</GN></B>
+<B>Locator</B>即定位器，也就是<B><GN>服务定位器模式Service Locator Pattern</GN></B>
 简单来说功能就是：<B><VT>提供A，找到B(隐藏细节)</VT></B>
-**核心点：<VT>查找能力</VT>**
+<B>核心点：<VT>查找能力</VT></B>
 
 在Launcher.cs中，是这么注册以及使用的：
 
@@ -517,11 +529,11 @@ public class Launcher : MonoBehaviour
 
 也就是说：<B><VT>locator本质上也是一种服务，是偏向于"查找"的服务</VT></B>
 
-在该示例中，类为**ResourcesViewLocator**，它继承于<B><GN>UIViewLocatorBase</GN></B>，内容很简单，就是抽象了一些加载函数等待实现类重写
+在该示例中，类为<B>ResourcesViewLocator</B>，它继承于<B><GN>UIViewLocatorBase</GN></B>，内容很简单，就是抽象了一些加载函数等待实现类重写
 
 ### Launcher
 
-前面也提到过，Launcher为**初始化核心入口**
+前面也提到过，Launcher为<B>初始化核心入口</B>
 如果稍微仔细一点看的话整体内容基本都清晰了：
 
 ``` csharp
@@ -594,37 +606,39 @@ public class Launcher : MonoBehaviour
 
 可以看到基本上就是前面提到的内容，除此以外就是内置的一些功能了
 
+---
+
 ## 框架层面分析
 
-如果只观察业务层的代码，只是稍微了解了一下该框架的使用方式，**框架的本质**才是我们所需要观察的内容
+如果只观察业务层的代码，只是稍微了解了一下该框架的使用方式，<B>框架的本质</B>才是我们所需要观察的内容
 该项目是<B><VT>极其庞大</VT></B>的：
 
-- **核心**部分主要聚焦于2个内容上：**绑定/UI**
-- **辅助**的话就是一些**上下文/容器/配置/本地化**之类的内容
+- <B>核心</B>部分主要聚焦于2个内容上：<B>绑定/UI</B>
+- <B>辅助</B>的话就是一些<B>上下文/容器/配置/本地化</B>之类的内容
 
 ### 宏
 
 这里先提前看一下宏，我们经常会在代码中看到：
 `#elif NETFX_CORE || !NET_LEGACY`
 [Microsoft官方文档](https://learn.microsoft.com/zh-cn/windows/uwp/gaming/missing-dot-net-apis-in-unity-and-uwp)
-以上是官方文档，**大致有：**
-**<VT>`NETFX_CORE`是为了适配UMP代码
-如果是.NET脚本后端，使用`NETFX_CORE`即可，但如果是如IL2CPP等后端，则需要改用`ENABLE_WINMD_SUPPORT`</VT>**
+以上是官方文档，<B>大致有：</B>
+<B><VT>`NETFX_CORE`是为了适配UMP代码
+如果是.NET脚本后端，使用`NETFX_CORE`即可，但如果是如IL2CPP等后端，则需要改用`ENABLE_WINMD_SUPPORT`</VT></B>
 
 ### UI框架
 
 UI框架是我们所希望了解的重点，MVVM必然基于它
-首先在这里列出**UML类图**供参考：
+首先在这里列出<B>UML类图</B>供参考：
 ![](Pic/LoxodonFramework_UI.png)
 
 #### 核心
 
 通过前面示例的分析，我们根据其绑定，我们大概可以了解到：
-**View(Window)与ViewModel(ViewModelBase)两者进行绑定**，如：
+<B>View(Window)与ViewModel(ViewModelBase)两者进行绑定</B>，如：
 `BindingSet<LoginWindow, LoginViewModel> bindingSet = this.CreateBindingSet<LoginWindow, LoginViewModel>();`
 所以核心肯定在Window与ViewModelBase以及绑定机制上了
 
-这里先简单看一下**创建函数**：
+这里先简单看一下<B>创建函数</B>：
 
 ``` csharp
 public static BindingSet<TBehaviour, TSource> CreateBindingSet<TBehaviour, TSource>(this TBehaviour behaviour) where TBehaviour : Behaviour
@@ -638,19 +652,19 @@ public static BindingSet<TBehaviour, TSource> CreateBindingSet<TBehaviour, TSour
 
 ##### Window
 
-Window是**视图的关键**，继承链如下：
+Window是<B>视图的关键</B>，继承链如下：
 `Window : WindowView, IWindow, IManageable`
 `WindowView : UIView, IWindowView`
 `UIView : UIBehaviour, IUIView`
 `UIBehaviour : MonoBehaviour`<VT>(是UGUI的)</VT>
-可以看到其中一个**设计原则**就是：<B><VT>每个类都创建一个IXXX，实现相应内容</VT></B>
+可以看到其中一个<B>设计原则</B>就是：<B><VT>每个类都创建一个IXXX，实现相应内容</VT></B>
 
 <B><GN>UIBehaviour</GN></B>---<VT>UGUI类，一种优化过的MonoBehaviour</VT>
 
 <B><GN>UIView</GN></B>
 既然如此，那么当然先从底层代码看起，简单来说：<B><VT>UIView是一个提供了一些操作并收集了一定UGUI信息的类</VT></B>
 
-- **两个事件：开启/关闭**
+- <B>两个事件：开启/关闭</B>
 <BR>
 
 ``` csharp
@@ -702,7 +716,7 @@ protected void RaiseOnDisabled()
 }
 ```
 
-- **组件属性**
+- <B>组件属性</B>
   - Name：`gameObject.name`
   - Parent：`transform.parent`
   - Owner：`gameObject`
@@ -712,7 +726,7 @@ protected void RaiseOnDisabled()
   - CanvasGroup：组件
     - Alpha：`CanvasGroup.alpha`
     - Interactable：`CanvasGroup.interactable`
-- **附加属性**
+- <B>附加属性</B>
   - EnterAnimation/ExitAnimation：IAnimation
   - ExtraAttributes：IAttributes
 
@@ -721,14 +735,14 @@ protected void RaiseOnDisabled()
 
 <B><GN>WindowView</GN></B>
 大致观察代码后就会发现：<B><VT>WindowView是IUIView，也就是UIView的管理类</VT></B>
-要注意的是**WindowView也继承自UIView**，那么这说明：<B><VT>WindowView同样具有UIView的特性</VT></B>
+要注意的是<B>WindowView也继承自UIView</B>，那么这说明：<B><VT>WindowView同样具有UIView的特性</VT></B>
 
-其**内容**是**简单明了**的：
+其<B>内容</B>是<B>简单明了</B>的：
 
-- **属性**
+- <B>属性</B>
   - Views：IUIView的集合
   - ActivationAnimation/PassivationAnimation：IAnimation
-- **函数**
+- <B>函数</B>
   - GetView()
   - AddView()
   - RemoveView()
@@ -737,7 +751,7 @@ protected void RaiseOnDisabled()
 
 <B><GN>Window</GN></B>
 然后就是Window本体了，内容看起来挺多
-那么先从**接口**观察一下：
+那么先从<B>接口</B>观察一下：
 
 ``` csharp
 public interface IManageable : IWindow
@@ -772,7 +786,7 @@ public interface IWindow
 }
 ```
 
-可以看到可以分为2个部分：**作为窗口的能力**以及**作为管理者的能力**
+可以看到可以分为2个部分：<B>作为窗口的能力</B>以及<B>作为管理者的能力</B>
 
 这里找了几个比较关键的内容：
 
@@ -782,7 +796,7 @@ public interface IWindow
 - Create()：其实是初始化，核心：`this.WindowManager.Add(this);`
 - Show()/Hide()/Dismiss()：显示/隐藏/删除
 
-可以看出其中最关键的就是**windowManager**：
+可以看出其中最关键的就是<B>windowManager</B>：
 
 ``` csharp
 public IWindowManager WindowManager
@@ -792,7 +806,7 @@ public IWindowManager WindowManager
 }
 ```
 
-由此，我们可以知道，UI最终的管理类为**GlobalWindowManager(Base)**
+由此，我们可以知道，UI最终的管理类为<B>GlobalWindowManager(Base)</B>
 
 ##### GlobalWindowManager
 
@@ -807,10 +821,10 @@ public class GlobalWindowManager : GlobalWindowManagerBase
 ```
 
 这意味着它是挂载在Canvas下的
-**<BL>问题：可以存在多个GlobalWindowManager吗</BL>**
+<B><BL>问题：可以存在多个GlobalWindowManager吗</BL></B>
 <BL>可以看得出，原则上肯定是可以的，但是结合Window的寻找方式(FindObjectOfType)，显然<B>只能存在一个</B></BL>
 
-其**父类GlobalWindowManagerBase**也很简单：
+其<B>父类GlobalWindowManagerBase</B>也很简单：
 
 ``` csharp
 [DisallowMultipleComponent]
@@ -831,11 +845,11 @@ public abstract class GlobalWindowManagerBase : WindowManager
 }
 ```
 
-可以说该Manager**是一个"单例"**
+可以说该Manager<B>是一个"单例"</B>
 
-那么核心其实就在**WindowManager**中了，其**声明**如下：
+那么核心其实就在<B>WindowManager</B>中了，其<B>声明</B>如下：
 `public class WindowManager : MonoBehaviour, IWindowManager`
-通过**接口**我们即可知道其作用：
+通过<B>接口</B>我们即可知道其作用：
 
 ``` csharp
 public interface IWindowManager
@@ -862,20 +876,20 @@ public interface IWindowManager
 ```
 
 可以看得出这的的确确就是一个管理类，<B><VT>用于管理Window</VT></B>
-**核心**也就是：`List<IWindow> windows`所有Window | `IWindow Current`当前Window
+<B>核心</B>也就是：`List<IWindow> windows`所有Window | `IWindow Current`当前Window
 所有的操作都必然围绕着它们进行
 
 <BR>
 
-以上基本上就是Window本身的信息了，为了获得更多信息，**Launcher.cs**是值得关注的：
+以上基本上就是Window本身的信息了，为了获得更多信息，<B>Launcher.cs</B>是值得关注的：
 在`Start()`中有：
 `WindowContainer winContainer = WindowContainer.Create("MAIN");`
 
-<B><GN>WindowContainer</GN></B>听名字就知道它是一个**容器**
-先看**声明**：
+<B><GN>WindowContainer</GN></B>听名字就知道它是一个<B>容器</B>
+先看<B>声明</B>：
 `public class WindowContainer : Window, IWindowManager`
-我们会发现它是继承于Window又同时实现IWindowManager，这**说明**：
-**<VT>有2种WindowManager，一种是Global的，所有Window都会反向引用GlobalWindowManager，而另一种是Local的，每个WindowContainer都会有自己的LocalWindowManager</VT>**
+我们会发现它是继承于Window又同时实现IWindowManager，这<B>说明</B>：
+<B><VT>有2种WindowManager，一种是Global的，所有Window都会反向引用GlobalWindowManager，而另一种是Local的，每个WindowContainer都会有自己的LocalWindowManager</VT></B>
 该类所做的操作就是<VT>封装了一下WindowManager</VT>，如：
 
 ``` csharp
@@ -885,7 +899,7 @@ public IWindow Get(int index)
 }
 ```
 
-**核心**在**创建**上：
+<B>核心</B>在<B>创建</B>上：
 
 ``` csharp
 public static WindowContainer Create(string name)
@@ -930,7 +944,7 @@ protected virtual IWindowManager CreateWindowManager()
 <VT>`WindowContainer.Create()`后可以得到一个WindowContainer实例，同时`OnCreate()`的重写会在GameObject中添加一个LocalWindowManager</VT>
 实际情况如下：
 ![](Pic/Loxodon4.png)
-**<BL>问题：为什么MAIN在Canvas子物体上，`new GameObject()`创建应该在根物体上才对</BL>**
+<B><BL>问题：为什么MAIN在Canvas子物体上，`new GameObject()`创建应该在根物体上才对</BL></B>
 <BL>这被隐藏在了`container.Create()`之中，逻辑比较复杂：</BL>
 
 ``` csharp
@@ -976,21 +990,21 @@ protected virtual void AddChild(Transform child, bool worldPositionStays = false
 ```
 
 由以上内容，我们能深刻地感受到：
-**<VT>GlobalWindowManager与LocalWindowManager是MonoBehaviour控制器
+<B><VT>GlobalWindowManager与LocalWindowManager是MonoBehaviour控制器
 WindowContainer是Window，Window派生类也是Window
-几个类相互配合完成了Window的定义</VT>**
+几个类相互配合完成了Window的定义</VT></B>
 
 ##### ViewModelBase
 
 上述Window/WindowManager是用于实现View的，那么ViewModelBase则是用于实现ViewModel的
-其**声明**为：
+其<B>声明</B>为：
 `public abstract class ViewModelBase : ObservableObject, IViewModel`
-**前文已有所提及：**
+<B>前文已有所提及：</B>
 
 - ObservableObject是domain的基础
 - ViewModelBase则是在此基础上实现IViewModel
 
-来看一下其**接口IViewModel**：
+来看一下其<B>接口IViewModel</B>：
 `public interface IViewModel : IDisposable`
 可以发现是除了IDisposable机制外是空接口，那么这说明<B><VT>IViewModel本身其实只是一种身份</VT></B>
 
@@ -1002,7 +1016,7 @@ WindowContainer是Window，Window派生类也是Window
 简单来说<B>`Set()`</B>就是类的唯一功能
 但是结合ObservableObject来看，这只是<B><VT>额外的重载</VT></B>
 也就是说<B><VT>ViewModelBase添加了几种可Broadcast的Set()方法</VT></B>
-**所以：**
+<B>所以：</B>
 <B><VT>ViewModelBase本质上就是ObservableObject</VT></B>
 
 #### 动画
@@ -1042,10 +1056,10 @@ public ITransition Show(IWindow window)
 ```
 
 由此，我们可以很明确地知道：
-**<VT>WindowManager具有自动创建ShowTransition/HideTransition功能</VT>**
+<B><VT>WindowManager具有自动创建ShowTransition/HideTransition功能</VT></B>
 那么就先来详细看看UI框架的动画部分
 
-可以看到<B><GN>ITransition</GN></B>是**动作的核心**，具体如下：
+可以看到<B><GN>ITransition</GN></B>是<B>动作的核心</B>，具体如下：
 
 ``` csharp
 public interface ITransition
@@ -1150,7 +1164,7 @@ protected override IEnumerator DoTransition()
 }
 ```
 
-**<BL>问题：Activate/Passivate与DoShow/DoHide的区别</BL>**
+<B><BL>问题：Activate/Passivate与DoShow/DoHide的区别</BL></B>
 <BL>两者看似是一个意思，但其实并不是，以<B>开</B>为例：</BL>
 
 ``` csharp
@@ -1248,7 +1262,7 @@ public interface IAnimation
 }
 ```
 
-**<BL>子问题：EnterAnimation/ActivationAnimation从哪来的，这里明显没有真正的定义操作</BL>**
+<B><BL>子问题：EnterAnimation/ActivationAnimation从哪来的，这里明显没有真正的定义操作</BL></B>
 它们来自于<B><GN>AlphaAnimation</GN></B>，是一个挂载在GameObject的脚本：
 ![](Pic/Loxodon6.png) ![](Pic/Loxodon5.png)
 在Login界面中，Login根物体上除了基本的LoginWindow组件外，还挂载了两个动画组件
@@ -1330,7 +1344,7 @@ IEnumerator DoPlay()
 }
 ```
 
-**本质**上就是<B><VT>随时间控制Alpha，即`this.CanvasGroup.alpha`</VT></B>
+<B>本质</B>上就是<B><VT>随时间控制Alpha，即`this.CanvasGroup.alpha`</VT></B>
 
 <BL>回到原问题上，由上述名字的反复出现我们其实已经能<B>意识到</B>：
 <B><VT>EnterAnimation/ExitAnimation是UIView的操作
@@ -1356,31 +1370,31 @@ if (this.manager.Activated && current.Equals(this.manager.Current))
 - `Doshow()`---window不可见(GameObject失活状态)
 - `Activate()`---激活状态且window就是激活window(置顶)
 
-**可以看到：**
-**<VT>`Doshow()`只是打开界面，而`Activate()`是激活界面，是开启后可能的操作</VT>**
+<B>可以看到：</B>
+<B><VT>`Doshow()`只是打开界面，而`Activate()`是激活界面，是开启后可能的操作</VT></B>
 
 ##### 连点实现
 
 可以看到，在代码中常常会出现连点的形式，就比如说Launcher.cs中有：
 `window.Show().OnStateChanged((w, state) => {...}`
-之所以能够连点就是因为其**实现方式**：
+之所以能够连点就是因为其<B>实现方式</B>：
 `Show()`是其核心操作，只要操作能够返回ITransition，就能为其添加这些事件，也就是说<B><VT>无论做什么都返回操作所需的类型就可以无限点下去</VT></B>
-**<YL>详细解释一下这个例子：</YL>**
+<B><YL>详细解释一下这个例子：</YL></B>
 <YL>首先是`Window.Show()`，本质上其实是`WindowManager.Show()`，在这里创了一个ShowTransition，也就是一个ITransiton，然后执行`transition.OnStateChanged()`调用了一个事件添加函数，返回的依旧是ITransiton，在此基础上又进行了`.DisableAnimation()`返回一个ITransiton，最后`.OnStateChanged()`依旧返回一个ITransiton</YL>
 
 ##### 动画总结
 
-这里先来简单地对**动画类**进行汇总：
+这里先来简单地对<B>动画类</B>进行汇总：
 
-- **ITransition**：渐变动画核心
+- <B>ITransition</B>：渐变动画核心
   - 派生Transition，再派生业务类XXXTransition
   - 核心操作：`TransitionTask()`，即执行业务类实现的`DoTransition()`操作
-- **IAnimation**：`DoTransition()`操作的核心，即播放动画
+- <B>IAnimation</B>：`DoTransition()`操作的核心，即播放动画
   - 派生UIAnimation，再派生AlphaAnimation，也就是一般用的最基础的渐变动画
   - 是一个挂载脚本(MonoBehaviour)
   - 挂载脚本后会自动将自身注册进Window中
 
-**核心流程：　　<VT>以开为例</VT>**
+<B>核心流程：　　<VT>以开为例</VT></B>
 
 - `window.Show()`
 - `this.WindowManager.Show()`，即通过GlobalWindowManager进行操作
@@ -1395,7 +1409,7 @@ if (this.manager.Activated && current.Equals(this.manager.Current))
 #### 绑定
 
 在上述的分析中，我们已经把UI框架的类大致分析了一遍，虽然我们对其用法已经有了了解，但是我们无法将ViewModel与View联系起来
-那么**核心**其实就在**View进行的绑定**上
+那么<B>核心</B>其实就在<B>View进行的绑定</B>上
 
 回顾一下LoginWindow.cs的`OnCreate()`：
 
@@ -1419,7 +1433,7 @@ protected override void OnCreate(IBundle bundle)
 ```
 
 这就是我们所做的绑定操作
-在文档中提到了**绑定的前置---启动服务**：
+在文档中提到了<B>绑定的前置---启动服务</B>：
 
 ``` csharp
 context = Context.GetApplicationContext();
@@ -1431,7 +1445,7 @@ bundle.Start();
 ##### Context
 
 可以看到，要启动服务，首先需要在构造函数中传入一个context的Container，也就是<B><GN>ApplicationContext</GN></B>
-其**声明**为：
+其<B>声明</B>为：
 `public class ApplicationContext : Context`
 `public class Context : IDisposable`
 观察两个类，可以发现<VT>其构造有些许奇怪</VT>：
@@ -1443,7 +1457,7 @@ bundle.Start();
 - context是单例，存储着唯一ApplicationContext实例
 - contexts存储着多个Context实例
 
-**<BL>问题：contexts是什么</BL>**
+<B><BL>问题：contexts是什么</BL></B>
 <BL>是独立上下文，一般来说无需使用，通过`Context.GetApplicationContext()`获取全局的上下文即可
 如需使用，其用法与单例的ApplicationContext完全一致，毕竟ApplicationContext也是一个Context
 其作用当然是<B>区分上下文</B>，某些时候需要区分服务可能就会用到
@@ -1451,23 +1465,23 @@ bundle.Start();
 
 其函数看起来很多，但实际上就几类：
 
-- **上下文管理**
+- <B>上下文管理</B>
   - `(Add/Get/Remove)Context()`
   - `(Set/Get)ApplicationContext)()`
-- **属性存取**
+- <B>属性存取</B>
   <B><VT>Tip：这里的属性对应的就是C#中具有GetSet方法的那个属性，可用于全局存储属性值</VT></B>
   - `Set()`/`Get()`/`Contains()`/`Remove()`/`GetEnumerator()`
-- **服务相关**
+- <B>服务相关</B>
   - `GetContainer()`---获取容器<VT>(可在其中注册服务)</VT>
   - `GetService()`---获取服务
 
 回顾上述用法`new BindingServiceBundle(context.GetContainer())`，我们可以发现<B>`context.GetContainer()`是服务所需的关键</B>
 
-回到**ApplicationContext**，它也就是充当核心主Context，具有一些**额外的特性**：
+回到<B>ApplicationContext</B>，它也就是充当核心主Context，具有一些<B>额外的特性</B>：
 
-- **`IMainLoopExecutor mainLoopExecutor`**
-  这是一个Executor，在下方会提到其本质**Executors**
-  先看眼**声明**：
+- <B>`IMainLoopExecutor mainLoopExecutor`</B>
+  这是一个Executor，在下方会提到其本质<B>Executors</B>
+  先看眼<B>声明</B>：
   `public class MainLoopExecutor : AbstractExecutor, IMainLoopExecutor`
   <BR>
 
@@ -1489,19 +1503,19 @@ bundle.Start();
 
   此处就可以清晰地了解到：<B><VT>MainLoopExecutor是一个Executors的封装类，在执行前隐式执行了`Executors.Create()`以正常启动</VT></B>
 
-- **Preferences**
+- <B>Preferences</B>
   可以看到有2个：
   - `GetGlobalPreferences()`
   - `GetUserPreferences()`
   它们本质上就是在调用`Preferences.GetPreferences()`
-  **Preferences简述：<VT>一个持久化存储机制</VT>**
+  <B>Preferences简述：<VT>一个持久化存储机制</VT></B>
 
 ##### Container简述
 
-观察代码后会发现，为<B><GN>ServiceContainer</GN></B>，其**声明**为：
+观察代码后会发现，为<B><GN>ServiceContainer</GN></B>，其<B>声明</B>为：
 `public class ServiceContainer : IServiceContainer, IDisposable`
 从名字我们就可以看出，这显然是一个<B><VT>用于存放Service的容器</VT></B>
-简单看一下**接口**：
+简单看一下<B>接口</B>：
 
 ``` csharp
 public interface IServiceContainer : IServiceLocator, IServiceRegistry
@@ -1530,7 +1544,7 @@ public interface IServiceRegistry
 ```
 
 显然这是一个<B><VT>提供了注册/反注册服务与寻找服务的容器</VT></B>
-其实从**实际调用**中也可以**验证**这一点：
+其实从<B>实际调用</B>中也可以<B>验证</B>这一点：
 
 ``` csharp
 // BindingServiceBundle服务开始时
@@ -1572,16 +1586,16 @@ void Awake()
 }
 ```
 
-注册完就是获取，在**Launcher.cs**中有：
+注册完就是获取，在<B>Launcher.cs</B>中有：
 `IUIViewLocator locator = context.GetService<IUIViewLocator>();`
 那么BindingServiceBundle注册的服务一定也在某处使用到了
 
-**<DRD>注意：注册是由Container完成的，而获取是由Context完成的</DRD>**
+<B><DRD>注意：注册是由Container完成的，而获取是由Context完成的</DRD></B>
 
 ##### BindingServiceBundle
 
 回到核心，也就是<B><GN>BindingServiceBundle</GN></B>
-先看**声明**：
+先看<B>声明</B>：
 `public class BindingServiceBundle : AbstractServiceBundle`
 `public abstract class AbstractServiceBundle : IServiceBundle`
 
@@ -1614,13 +1628,13 @@ public abstract class AbstractServiceBundle : IServiceBundle
 ```
 
 <B>即：<VT>开启与关闭功能</VT></B>
-那么具体实现就在BindingServiceBundle之中，简单观察，会发现有**两种注册**：
+那么具体实现就在BindingServiceBundle之中，简单观察，会发现有<B>两种注册</B>：
 
 - Factory注册
 - Container注册
 
-**Container注册**在前面**Container简述**中已经有所提及，
-在这里稍微再看一下**Factory注册**：
+<B>Container注册</B>在前面<B>Container简述</B>中已经有所提及，
+在这里稍微再看一下<B>Factory注册</B>：
 上述代码中有3个工厂：`ObjectSourceProxyFactory`/`SourceProxyFactory`/`TargetProxyFactory`
 它们的继承类都有相似点但各不相同：
 `ObjectSourceProxyFactory : TypedSourceProxyFactory<ObjectSourceDescription>, INodeProxyFactory, INodeProxyFactoryRegister`
@@ -1633,7 +1647,7 @@ public abstract class AbstractServiceBundle : IServiceBundle
 - `Register()`
 - `Unregister()`
 
-**<YL>这里以SourceProxyFactory为例看一下：</YL>**
+<B><YL>这里以SourceProxyFactory为例看一下：</YL></B>
 <YL>内部核心为`List<PriorityFactoryPair> factories`，其中<B><GN>ProiorityFactoryPair</GN></B>是一个<B><VT>具有priority的factory</VT></B>
 `Register()`/`UnRegister()`是用于<B>添加或删除</B>的，而`CreateProxy()`是用于<B>选择并创建的</B></YL>
 
@@ -1666,7 +1680,7 @@ protected virtual bool TryCreateProxy(object source, SourceDescription descripti
 
 这样看Factory是什么就显而易见了，即<B><VT>创建Proxy</VT></B>
 
-**简单总结**一下两种注册：
+<B>简单总结</B>一下两种注册：
 
 - <B>Factory注册：<VT>一种具有优先级的Proxy创建工厂</VT></B>
 - <B>Container注册：<VT>服务注册容器</VT></B>
@@ -1693,8 +1707,8 @@ public static BindingSet<TBehaviour, TSource> CreateBindingSet<TBehaviour, TSour
 在核心中已经提及：
 > TBehaviour指代View，TSource指代ViewModel
 
-那么我们再详细看一下**创建内容**：
-首先就是一个**IBindingContext的绑定**，这绑定函数就在同类BehaviourBindingExtension中定义：
+那么我们再详细看一下<B>创建内容</B>：
+首先就是一个<B>IBindingContext的绑定</B>，这绑定函数就在同类BehaviourBindingExtension中定义：
 
 ``` csharp
 public static IBindingContext BindingContext(this Behaviour behaviour)
@@ -1731,7 +1745,7 @@ public static IBindingContext BindingContext(this Behaviour behaviour)
 查看<B><GN>BindingSet</VT></B>源码，会发现有多个泛型版本，这里就查看非泛型版本：
 `public class BindingSet : BindingSetBase`
 `public abstract class BindingSetBase : IBindingBuilder`
-**IBindingBuilder**只要求了一个功能，即<B>`Build()`</B>
+<B>IBindingBuilder</B>只要求了一个功能，即<B>`Build()`</B>
 在BindingSetBase中有：
 
 ``` csharp
@@ -1754,12 +1768,12 @@ public virtual void Build()
 ```
 
 功能很简单，就是对收集的builders进行`Build()`操作即可
-这所对应的就是View代码中**绑定的最后一句**：
+这所对应的就是View代码中<B>绑定的最后一句</B>：
 `bindingSet.Build();`
 
-那么`Build()`前当然需要的是<B>`Bind()`</B>即可完成**添加**
-仔细观察这里的**连点**：
-**<VT>返回值都是`BindingBuilder<>`类型的，也就是说`Bind()`是在构建，其余的是在设置</VT>**
+那么`Build()`前当然需要的是<B>`Bind()`</B>即可完成<B>添加</B>
+仔细观察这里的<B>连点</B>：
+<B><VT>返回值都是`BindingBuilder<>`类型的，也就是说`Bind()`是在构建，其余的是在设置</VT></B>
 先看`Bind()`：
 
 ``` csharp
@@ -1771,13 +1785,13 @@ public virtual BindingBuilder Bind(object target)
 }
 ```
 
-**BindingBuilder**的**声明**是这样的：　　<VT>对于泛型版本也是如此</VT>
+<B>BindingBuilder</B>的<B>声明</B>是这样的：　　<VT>对于泛型版本也是如此</VT>
 `public class BindingBuilder : BindingBuilderBase`
 `public class BindingBuilderBase : IBindingBuilder`
-简单看一下BindingBuilder源码，会发现其函数都是<VT>对参数进行设置</VT>，所以真正的核心在其**Base类**中
+简单看一下BindingBuilder源码，会发现其函数都是<VT>对参数进行设置</VT>，所以真正的核心在其<B>Base类</B>中
 
 浏览代码后会发现：
-绝大多数的函数都是`SetXXX()`，所操作的当然是其**属性**，有：
+绝大多数的函数都是`SetXXX()`，所操作的当然是其<B>属性</B>，有：
 
 - `bool builded`
 - `object scopeKey`
@@ -1785,7 +1799,7 @@ public virtual BindingBuilder Bind(object target)
 - `IBindingContext context`
 - `BindingDescription description`
 
-除此以外还有2个**功能属性**：
+除此以外还有2个<B>功能属性</B>：
 
 - `IPathParser PathParser`
 - `IConverterRegistry ConverterRegistry`
@@ -1816,7 +1830,7 @@ public void Build()
 ```
 看起来并没有做什么事，唯一的核心操作就是<B><VT>在context中添加了一项</VT></B>
 
-**结合来看：**
+<B>结合来看：</B>
 一旦完成`bindingSet.Build()`，就会收集到最终的context
 而context是BindingSet的成员，并分发给BindingBuilder
 所以<B><VT>在`BindingSet.context`中会收集到所有的绑定信息</VT></B>
@@ -1825,7 +1839,7 @@ public void Build()
 
 由上述内容可知<B><GN>BindingContext</GN></B>必然是最关键的一个类
 
-**IBindingContext**如下所示：
+<B>IBindingContext</B>如下所示：
 
 ``` csharp
 public interface IBindingContext : IDisposable
@@ -1842,8 +1856,8 @@ public interface IBindingContext : IDisposable
 }
 ```
 
-仅有的**操作**即添加`Add()`与清除`Clear()`
-而**属性**`Owner`与`DataContext`查看其构造函数后就会发现是<VT>传入的</VT>：
+仅有的<B>操作</B>即添加`Add()`与清除`Clear()`
+而<B>属性</B>`Owner`与`DataContext`查看其构造函数后就会发现是<VT>传入的</VT>：
 
 ``` csharp
 // 核心构造函数
@@ -1858,7 +1872,7 @@ public BindingContext(object owner, IBinder binder, object dataContext)
 更具体一点，看一下创建使用的构造函数，有`bindingContext = new BindingContext(behaviour, Binder)`：
 `public BindingContext(object owner, IBinder binder) : this(owner, binder, (object)null) {}`
 
-**对应一下：**
+<B>对应一下：</B>
 
 - owner---TBehaviour，即View实例脚本(如LoginWindow.cs)
 - binder---IBinder服务
@@ -1897,9 +1911,9 @@ container.Register<IBinder>(binder);
 
 ###### IBinder服务
 
-可以看到StandardBinder是基于**BindingFactory**的
+可以看到StandardBinder是基于<B>BindingFactory</B>的
 
-**<GN>BindingFactory</GN>**
+<B><GN>BindingFactory</GN></B>
 从名字上可以知道：这是一个用于绑定的工厂
 内容上核心就是两个属性和一个函数：
 
@@ -1907,7 +1921,7 @@ container.Register<IBinder>(binder);
 - `ITargetProxyFactory targetProxyFactory`
 - `Create()`
 
-这**两个工厂**我们会非常熟悉，就是前面提到过的**BindingServiceBundle的Factory注册**
+这<B>两个工厂</B>我们会非常熟悉，就是前面提到过的<B>BindingServiceBundle的Factory注册</B>
 而<B>`Create()`</B>就是：
 
 ``` csharp
@@ -1917,14 +1931,14 @@ public IBinding Create(IBindingContext bindingContext, object source, object tar
 }
 ```
 
-可以看到在IBindingContext之上，还有更高级的**IBinding**的存在，这也就是<B><VT>IBindingContext仅在收集信息而没有绑定操作的原因</VT></B>
+可以看到在IBindingContext之上，还有更高级的<B>IBinding</B>的存在，这也就是<B><VT>IBindingContext仅在收集信息而没有绑定操作的原因</VT></B>
 
-**<GN>Binding</GN>**
-**Binding**的**声明**如下：
+<B><GN>Binding</GN></B>
+<B>Binding</B>的<B>声明</B>如下：
 `public class Binding : AbstractBinding`
 `public abstract class AbstractBinding : IBinding`
 
-先看**接口**：
+先看<B>接口</B>：
 
 ``` csharp
 public interface IBinding : IDisposable
@@ -1935,13 +1949,13 @@ public interface IBinding : IDisposable
 }
 ```
 
-可以看到都是些属性，在**AbstractBinding**可以找到它们具体的内容：
+可以看到都是些属性，在<B>AbstractBinding</B>可以找到它们具体的内容：
 
 - BindingContext---就是IBindingContext
 - Target---一个<B><GN>WeakReference</GN></B>
 - DataContext---就是DataContext(BindingContext中也有该属性)
 
-而**Binding**通过收集到的信息完成了绑定操作，这一切都发生在**构造函数**中<VT>(仅有的公开操作，所有函数都是protected/private的)</VT>
+而<B>Binding</B>通过收集到的信息完成了绑定操作，这一切都发生在<B>构造函数</B>中<VT>(仅有的公开操作，所有函数都是protected/private的)</VT>
 
 ``` csharp
 public Binding(IBindingContext bindingContext, object source, object target, BindingDescription bindingDescription, ISourceProxyFactory sourceProxyFactory, ITargetProxyFactory targetProxyFactory) : base(bindingContext, source, target)
@@ -1959,11 +1973,11 @@ public Binding(IBindingContext bindingContext, object source, object target, Bin
 }
 ```
 
-动作为以**创建Proxy**及**UpdateDataOnBind**
+动作为以<B>创建Proxy</B>及<B>UpdateDataOnBind</B>
 创建Proxy的核心很简单，就是：
 `this.sourceProxyFactory.CreateProxy()`/`this.targetProxyFactory.CreateProxy()`
 
-**Proxy：**
+<B>Proxy：</B>
 ![](Pic/Loxodon7.png)
 根据以上结构我们就能推断出一些内容了：
 
@@ -1971,7 +1985,7 @@ public Binding(IBindingContext bindingContext, object source, object target, Bin
 - 通过具体分支我们能看出<B><VT>Source指的是ViewModel，Target指的是UI控件</VT></B>
 
 在Factory创建Proxy之前，我们更应该理解一下<B><BL>Proxy究竟是什么含义</BL></B>：
-那么这里就来先看一下**共通部分**，也就是<B><GN>BindingProxyBase</GN></B>：
+那么这里就来先看一下<B>共通部分</B>，也就是<B><GN>BindingProxyBase</GN></B>：
 `public abstract class BindingProxyBase : IBindingProxy`
 `public interface IBindingProxy : IDisposable {}`
 
@@ -2016,26 +2030,26 @@ public interface ISourceProxy : IBindingProxy
 <B><GN>TypeCode</GN></B>是来自于System下的一种<B><VT>表示类型的枚举</VT></B>
 这么看来主要就是在<B><VT>管理Source</VT></B>，有表示其类型的Type/TypeCode
 
-那么**Proxy与ProxyFactory的含义**就很明显了：
+那么<B>Proxy与ProxyFactory的含义</B>就很明显了：
 <B><VT>ProxyFactory是一种创建Proxy的工具，而Proxy是一种Source的包装</VT></B>
 
-Factory前面我们已经分析过，它有一个功能就是**筛选优先级最高的工厂**
+Factory前面我们已经分析过，它有一个功能就是<B>筛选优先级最高的工厂</B>
 
 我们会发现一个与它非常相似连名字都很像的类：<B><GN>TypedSourceProxyFactory<></GN></B>
-它们所扮演的角色是**完全不同**的
+它们所扮演的角色是<B>完全不同</B>的
 
 - <B>SourceProxyFactory：<VT>管理TypedSourceProxyFactory</VT></B>
 - <B>TypedSourceProxyFactory：<VT>工厂实现</VT></B>
 
-其实从**声明**上就能看出一丝含义：
+其实从<B>声明</B>上就能看出一丝含义：
 `public class SourceProxyFactory : ISourceProxyFactory, ISourceProxyFactoryRegistry`
 `public abstract class TypedSourceProxyFactory<T> : ISourceProxyFactory where T : SourceDescription`
 首先SourceProxyFactory多了注册功能，而且TypedSourceProxyFactory是抽象的，这都能体现
 
-接下来就应该看一下**具体实现类**了：
+接下来就应该看一下<B>具体实现类</B>了：
 先来看看最简单的<B><GN>LiteralSourceProxy</GN></B>：
 `public class LiteralSourceProxy : SourceProxyBase, ISourceProxy, IObtainable`
-可以看到声明中只是多了一个**IObtainable**，即`GetValue()`
+可以看到声明中只是多了一个<B>IObtainable</B>，即`GetValue()`
 
 ``` csharp
 public class LiteralSourceProxy : SourceProxyBase, ISourceProxy, IObtainable
@@ -2058,7 +2072,7 @@ public class LiteralSourceProxy : SourceProxyBase, ISourceProxy, IObtainable
 }
 ```
 
-可以看到异常简单，这里的**Literal**指的就是如`int`这种字面值
+可以看到异常简单，这里的<B>Literal</B>指的就是如`int`这种字面值
 所做的就是<VT>简单地获取这个字面值</VT>
 
 其对应的工厂当然是<B><GN>LiteralSourceProxyFactory</GN></B>：
@@ -2078,20 +2092,20 @@ public class LiteralSourceProxyFactory : TypedSourceProxyFactory<LiteralSourceDe
 }
 ```
 
-这里有一个**关键点**：
-**<VT>根据description的情况，会选择不同的Proxy，即`LiteralSourceProxy`/`ObservableLiteralSourceProxy`</VT>**
+这里有一个<B>关键点</B>：
+<B><VT>根据description的情况，会选择不同的Proxy，即`LiteralSourceProxy`/`ObservableLiteralSourceProxy`</VT></B>
 先看一下<B><GN>ObservableLiteralSourceProxy</GN></B>：
 `public class ObservableLiteralSourceProxy : NotifiableSourceProxyBase, ISourceProxy, IObtainable`
-显然它们的基不同，这里是**NotifiableSourceProxyBase**：
+显然它们的基不同，这里是<B>NotifiableSourceProxyBase</B>：
 `public abstract class NotifiableSourceProxyBase : SourceProxyBase, INotifiable`
-显然这是一个<VT>基于SourceProxyBase并添加了INotifiable功能</VT>的Proxy，具体体现的话就是一个**ValueChanged事件**
+显然这是一个<VT>基于SourceProxyBase并添加了INotifiable功能</VT>的Proxy，具体体现的话就是一个<B>ValueChanged事件</B>
 
 
 值得我们注意的就是这里的<B><GN>LiteralSourceDescription</GN></B>
 
 ###### Description
 
-所有description的基都是**SourceDescription**，内容很简单：
+所有description的基都是<B>SourceDescription</B>，内容很简单：
 
 ``` csharp
 [Serializable]
@@ -2106,7 +2120,7 @@ public abstract class SourceDescription
 }
 ```
 
-**LiteralSourceDescription**同样很简单：
+<B>LiteralSourceDescription</B>同样很简单：
 
 ``` csharp
 [Serializable]
@@ -2156,9 +2170,9 @@ protected void CreateSourceProxy(object source, SourceDescription description)
 但这其实是正确的：<B><VT>对于Static即类似Literal字面量情况，是不需要source的</VT></B>
 这在工厂中其实有所体现：<B><VT>`TryCreateProxy()`并不需要传入形参source，source来自于description</VT></B>
 
-仔细观察我们会发现一些**异常点**：
+仔细观察我们会发现一些<B>异常点</B>：
 我们也许会认为`Literal`指的是如`int a`这种情况，但是由`value is IObservableProperty`可以发现显然不是
-**<BL>问题：Literal指的是什么</BL>**
+<B><BL>问题：Literal指的是什么</BL></B>
 <BL>这是由BindingBuidler完成的，其中的`ToValue()`进行了`SetLiteral()`操作</BL>
 
 ``` csharp
@@ -2178,13 +2192,13 @@ protected void SetLiteral(object value)
 `this.CreateSourceProxy(this.DataContext, this.bindingDescription.Source);`
 使用时取出即可</BL>
 由此，我们可以这样认为：
-**<VT>Literal当然可以是普通字面值如int，但也可以是一种包装过的IObservableProperty</VT>**
+<B><VT>Literal当然可以是普通字面值如int，但也可以是一种包装过的IObservableProperty</VT></B>
 
-**<BL>问题：怎么设置的</BL>**
+<B><BL>问题：怎么设置的</BL></B>
 <BL>这也是一个非常关键的问题，路线其实是很清晰的，但是还是需要解释一下的
 我们应该已经熟知Window下的绑定了，如：
 `bindingSet.Bind(this.username).For(v => v.text, v => v.onEndEdit).To(vm => vm.Username).TwoWay();`
-`Bind()`操作后，得到的为**BindingBuilder**，该类就是关键：
+`Bind()`操作后，得到的为<B>BindingBuilder</B>，该类就是关键：
 相应的操作为<B>`ToValue()`</B>：</BL>
 
 ``` csharp
@@ -2207,12 +2221,12 @@ protected void SetLiteral(object value)
 
 <BL>由此，会创建一个LiteralSourceDescription放在BindingDescription中</BL>
 
-事实上这是一种为了**本地化**而准备的一组内容，有：
+事实上这是一种为了<B>本地化</B>而准备的一组内容，有：
 `var builder = bindingSet.Bind(target).For(propertyName).ToValue(value);`
 很明显，含义就是将target的某property设置为value
 
 我们可能更想知道的两种设置函数为`For()`/`To()`，在示例中大量出现
-**For()**
+<B>For()</B>
 ``` csharp
 public BindingBuilder<TTarget, TSource> For<TResult, TEvent>(Expression<Func<TTarget, TResult>> memberExpression, Expression<Func<TTarget, TEvent>> updateTriggerExpression)
 {
@@ -2224,11 +2238,11 @@ public BindingBuilder<TTarget, TSource> For<TResult, TEvent>(Expression<Func<TTa
 }
 ```
 
-**memberExpression**具体有：`v => v.text`
-其中**v**就是InputField组件，这是在`Bind()`时已经确认的泛型，也就是`this.username`
-可以看到做的事情就是我们所关心的，即**路径解析**：
+<B>memberExpression</B>具体有：`v => v.text`
+其中<B>v</B>就是InputField组件，这是在`Bind()`时已经确认的泛型，也就是`this.username`
+可以看到做的事情就是我们所关心的，即<B>路径解析</B>：
 `this.PathParser.ParseMemberName(memberExpression)`
-其中PathParser是注册的一个**IPathParser服务**
+其中PathParser是注册的一个<B>IPathParser服务</B>
 具体类就是<B><GN>PathParser</GN></B>:
 解析具体来说是很复杂的，但是简单来看其实就是几种可能，以下是示例：
 
@@ -2272,7 +2286,7 @@ protected void SetMemberPath(Path path)
 <BR>
 
 以上我们能看到另一种形式的description，即ObjectSourceDescription
-显然**ObjectSource**是我们需要分析的
+显然<B>ObjectSource</B>是我们需要分析的
 可以看到Sources.Object文件夹下有大量的Proxy，而且我们会发现：找得到`ObjectSourceProxyFactory`/`ObjectSourceDescription`，但是找不到`ObjectSourceProxy`
 而我们会发现有2种Factory：<B><GN>ObjectSourceProxyFactory</GN></B>和<B><GN>UniversalNodeProxyFactory</B></GN>
 它们之间的关系就有些类似SourceProxyFactory与TypedSourceProxyFactory
@@ -2280,7 +2294,7 @@ protected void SetMemberPath(Path path)
 - ObjectSourceProxyFactory：组织工厂，选择优先级最高的Proxy(不完全是这样，只是一种情况)
 - UniversalNodeProxyFactory：具体Proxy选择工厂
 
-先来看一下更高级别的**ObjectSourceProxyFactory**，`TryCreateProxy()`是其中的关键：
+先来看一下更高级别的<B>ObjectSourceProxyFactory</B>，`TryCreateProxy()`是其中的关键：
 
 ``` csharp
 protected override bool TryCreateProxy(object source, ObjectSourceDescription description, out ISourceProxy proxy)
@@ -2335,7 +2349,7 @@ objectSourceProxyFactory.Register(new UniversalNodeProxyFactory(), 0);
 ```
 
 只有UniversalNodeProxyFactory一种情况
-可以知道<B>`description.Path`</B>才是这里的**关键**，但是还是应该看看**UniversalNodeProxyFactory**是什么
+可以知道<B>`description.Path`</B>才是这里的<B>关键</B>，但是还是应该看看<B>UniversalNodeProxyFactory</B>是什么
 `public class UniversalNodeProxyFactory : INodeProxyFactory`
 INodeProxyFactory只有一个函数：`ISourceProxy Create(object source, PathToken token)`
 
@@ -2378,7 +2392,7 @@ protected void SetMemberPath(Path path)
 显然`Parse()`是转化为Path的关键：
 在BindingBuilderBase中有：
 `protected IPathParser PathParser { get { return this.pathParser ?? (this.pathParser = Context.GetApplicationContext().GetService<IPathParser>()); } }`
-这是一个**服务**，回到注册处，可以发现实际类为<B><GN>PathParser</GN></B>
+这是一个<B>服务</B>，回到注册处，可以发现实际类为<B><GN>PathParser</GN></B>
 这里最好通过一些例子来分析：
 `vm => vm.Username`
 这本身是一个Expression，传入TSource(`vm`)，传出TResult(`vm.Username`)
@@ -2424,7 +2438,7 @@ public virtual Path Parse(LambdaExpression expression)
 ```
 
 由此可见，解析支持多种表达式的解析
-而这里就是**MemberExpression情况**，所对应的具体创建Path的`Parse()`部分如下所示：
+而这里就是<B>MemberExpression情况</B>，所对应的具体创建Path的`Parse()`部分如下所示：
 
 ``` csharp
 if (expression is MemberExpression memberExpression)
@@ -2446,7 +2460,7 @@ if (expression is MemberExpression memberExpression)
 ```
 
 所做的就是<B><VT>在Path中进行头插</VT></B>，而插入的是一个成员Node，即<B><GN>MemberNode</GN></B>
-这样一来，即使不看Node的源码我们也能了解到**Node大致功能**了：<B><VT>支持递归路径</VT></B>
+这样一来，即使不看Node的源码我们也能了解到<B>Node大致功能</B>了：<B><VT>支持递归路径</VT></B>
 这也是类似`vm => vm.GetCustomer().Name`可支持的原因
 
 此时，三种所对应的情况就很清晰了：
@@ -2472,7 +2486,7 @@ public PathToken AsPathToken()
 
 这显然就是<VT>把Path扩展了一个指针，指向当前进行到哪了</VT>
 
-前面这些其实是通过`To()`将`this.description.Source`设置为一个Description，但是在绑定中更关键的可能是**DataContext**：
+前面这些其实是通过`To()`将`this.description.Source`设置为一个Description，但是在绑定中更关键的可能是<B>DataContext</B>：
 `this.CreateSourceProxy(this.DataContext, this.bindingDescription.Source)`
 为了研究具体的`CreateProxy()`流程，首先需要清楚了解<B><BL>DataContext到底是什么
 </BL></B>
@@ -2523,7 +2537,7 @@ public static BindingSet<TBehaviour, TSource> CreateBindingSet<TBehaviour, TSour
 }
 ```
 
-这种情况下DataContext其实就是**ViewModel**
+这种情况下DataContext其实就是<B>ViewModel</B>
 但是我们又会发现另类---LoginWindow中是这么使用的：
 `BindingSet<LoginWindow, LoginViewModel> bindingSet = this.CreateBindingSet<LoginWindow, LoginViewModel>();`
 然而其函数为：
@@ -2562,7 +2576,7 @@ protected override void OnCreate(IBundle bundle)
 
 目前来说我们了解到这就行了，只要知道<B><VT>无论如何dataContext肯定是存在</VT></B>的即可
 
-**举个例子：**
+<B>举个例子：</B>
 `bindingSet.Bind(this.tipText).For(v => v.text).To(vm => vm.ProgressBar.Tip).OneWay();`
 最好的起始点为Binding构造中的`CreateSourceProxy()`：
 
@@ -2589,8 +2603,8 @@ protected void CreateSourceProxy(object source, SourceDescription description)
 - ChainedObjectSourceProxy的构造中执行了`Bind()`，其中有`factory.Create()`，而factory就是其刚刚的ObjectSourceProxyFactory，实际就会选择优先级最高的UniversalNodeProxyFactory(其实只有它)进行`Create()`操作
 - 仔细查看`Bind()`，会发现是递归，所以会多次执行`Bind()`即`Create()`
 
-此时我们可能会意识到一个**与想象中不同的内容**：
-**<VT>ObjectSourceProxyFactory其实具有2层，一层是自己的`CreateProxy()`，会选择创建一种Proxy，另一层是`Create()`，这其实是来自于ChainedObjectSourceProxy情况的创建</VT>**
+此时我们可能会意识到一个<B>与想象中不同的内容</B>：
+<B><VT>ObjectSourceProxyFactory其实具有2层，一层是自己的`CreateProxy()`，会选择创建一种Proxy，另一层是`Create()`，这其实是来自于ChainedObjectSourceProxy情况的创建</VT></B>
 回顾一下`BindingServiceBundle.OnStart()`就知道了：
 
 ``` csharp
@@ -2703,9 +2717,9 @@ protected virtual ISourceProxy CreateProxy(object source, IPathNode node)
 - 转MethodInfo，即方法
 - 转EventInfo，即事件
 
-无论是哪种，核心都是`xxxInfo.AsProxy()`获取相应**IProxyXXXInfo**并调用其`GetValue()`获取实际值
+无论是哪种，核心都是`xxxInfo.AsProxy()`获取相应<B>IProxyXXXInfo</B>并调用其`GetValue()`获取实际值
 
-所以最终会创建**PropertyNodeProxy**：
+所以最终会创建<B>PropertyNodeProxy</B>：
 
 ``` csharp
 public PropertyNodeProxy(object source, IProxyPropertyInfo propertyInfo) : base(source)
@@ -2746,12 +2760,12 @@ protected void CreateSourceProxy(object source, SourceDescription description)
 }
 ```
 
-**<BL>问题：为什么要创建那么多Proxy</BL>**
+<B><BL>问题：为什么要创建那么多Proxy</BL></B>
 <BL>因为我们需要进行对任意层级进行监控，假设就是上面的`vm.ProgressBar.Tip`，ProgressBar.Tip发生改变我们需要检测，ProgressBar本身发生改变我们也需要检测</BL>
 
 ###### UI框架简单总结
 
-首先，我们先**总结**一下我们目前看到的绑定流程：
+首先，我们先<B>总结</B>一下我们目前看到的绑定流程：
 
 - 绑定流程的头必然是View下的绑定，先是大框架`CreateBindingSet()`
   目的当然是创建BindingSet，通过`Bind()`连点构建绑定内容，最终通过`Build()`完成构建
@@ -2774,7 +2788,7 @@ protected void CreateSourceProxy(object source, SourceDescription description)
 
 ###### 其它
 
-以上便是上述内容的总结，流程上框架已经基本出来了，但是如果查看Binding文件夹，会发现有大量的类我们见都没见过，显然还需要**继续深入**
+以上便是上述内容的总结，流程上框架已经基本出来了，但是如果查看Binding文件夹，会发现有大量的类我们见都没见过，显然还需要<B>继续深入</B>
 
 回顾文件夹，有这些子文件夹：
 
@@ -2792,7 +2806,7 @@ protected void CreateSourceProxy(object source, SourceDescription description)
 
 显然目前还有很多我们不太清楚的内容，这里就来继续看看：
 
-先看看**Paths**：
+先看看<B>Paths</B>：
 Path的核心`Path`/`PathParser`/`PathToken`/`TextPathParser`我们都有所了解
 我们所未知的类为<B><GN>ExpressionPathFinder</GN></B>，类极其简单，提供了`FindPaths()`：
 
@@ -2880,7 +2894,7 @@ public virtual Expression Visit(Expression expression)
 ```
 
 可以看得出来，该类的作用就是<B><VT>解析一个Expression，最终会由list接收所有Path</VT></B>
-该类最终会用于**ExpressionSourceProxyFactory的路径获取**：
+该类最终会用于<B>ExpressionSourceProxyFactory的路径获取</B>：
 
 ``` csharp
 protected override bool TryCreateProxy(object source, ExpressionSourceDescription description, out ISourceProxy proxy)
@@ -2898,7 +2912,7 @@ protected override bool TryCreateProxy(object source, ExpressionSourceDescriptio
 ```
 
 <B><GN>Converters</GN></B>　　以及<B><GN>Parameters/Registry</GN></B>
-名字上来看应该是用于转换的，可以看得出**继承链**是这样的：
+名字上来看应该是用于转换的，可以看得出<B>继承链</B>是这样的：
 IConverter--->AbstractConverter--->GenericConverter/ParameterWrapConverter
 两个实现类最明显的差别就是它们的泛型形式：
 `public class ParameterWrapConverter : AbstractConverter`
@@ -2952,7 +2966,7 @@ public interface ICommandParameter<T> : ICommandParameter
 }
 ```
 
-可以看到这看起来好像确实就是一个**参数parameter**
+可以看到这看起来好像确实就是一个<B>参数parameter</B>
 看了实现类就更清晰了：
 
 ``` csharp
@@ -3036,7 +3050,7 @@ public override object Convert(object value)
 ```
 
 可以看到转换支持很多类型，就拿前两个举例：
-**例子1：**
+<B>例子1：</B>
 
 ``` csharp
 if (value is IInvoker<T> invoker)
@@ -3065,7 +3079,7 @@ public class ParameterWrapInvoker<T> : IInvoker
 ```
 
 意思就是<VT>如果是invoker，那么就可以用`Invoke()`传入参数进行invoke</VT>
-**例子2：**
+<B>例子2：</B>
 
 ``` csharp
 if (value is ICommand<T> command)
@@ -3109,12 +3123,12 @@ public class ParameterWrapCommand<T> : ICommand
 
 意思就是<VT>如果是command，那么就可以用`Execute()`传入参数进行execute</VT>
 
-显然Convert的**含义**就是：
+显然Convert的<B>含义</B>就是：
 <B><VT>你给我一个value，我可以利用早已设置好的commandParameter帮助完成Invoker或Command的创建</VT></B>
 
-以上牵扯到了Parameters下的文件夹，基本上就是**Parameter本身/Command/Invoker**
+以上牵扯到了Parameters下的文件夹，基本上就是<B>Parameter本身/Command/Invoker</B>
 
-对于上述例子，绑定阶段我们只是获取了一个Converter，**实际使用**会发现其实在**Binding**中：
+对于上述例子，绑定阶段我们只是获取了一个Converter，<B>实际使用</B>会发现其实在<B>Binding</B>中：
 
 ``` csharp
 protected void SetTargetValue<T>(IModifiable modifier, T value)
@@ -3163,9 +3177,9 @@ public interface IKeyValueRegistry<K,V>
 ```
 
 很显然，这是一个<B><VT>类似与字典的功能</VT></B>，`Register()`就好像`Add()`，`Unregister()`就好像`Remove()`，`Find()`就好像索引访问
-而底层的**KeyValueRegistry**扩展成了类，本质上也确实就是一个**字典**：
+而底层的<B>KeyValueRegistry</B>扩展成了类，本质上也确实就是一个<B>字典</B>：
 `protected readonly Dictionary<K, V> lookups = new Dictionary<K, V>();`
-最后再看一下**实现类ConverterRegistry**：
+最后再看一下<B>实现类ConverterRegistry</B>：
 它仅<B><VT>重写了一下`Unregister()`，完成了具有IDisposable的key的`Dispose()`，仅此而已</VT></B>
 在BindingServiceBundle中可看到注册：
 
@@ -3179,7 +3193,7 @@ protected override void OnStart(IServiceContainer container)
 ```
 
 由此我们也能看出IConverterRegistry接口的本质作用，即<B><VT>为Service做准备</VT></B>
-该服务**最核心的作用**为<B><VT>为BindingBuilderBase提供了一种操作`ConverterByName()`</VT></B>：
+该服务<B>最核心的作用</B>为<B><VT>为BindingBuilderBase提供了一种操作`ConverterByName()`</VT></B>：
 
 ``` csharp
 protected IConverter ConverterByName(string name)
@@ -3200,7 +3214,7 @@ public BindingBuilder<TTarget, TSource> WithConversion(IConverter converter)
 ```
 
 所以这也是<B><VT>一种连点操作，其功能同样是填充Converter</VT></B>
-**举例：ListItemView**
+<B>举例：ListItemView</B>
 `bindingSet.Bind(this.image).For(v => v.sprite).To(vm => vm.Icon).WithConversion("spriteConverter").OneWay();`
 这看起来有些奇怪，因为我们并没有进行注册，其注册点其实在名为ListViewDatabindingExample的MonoBehaviour脚本中：
 `converterRegistry.Register("spriteConverter", new SpriteConverter(sprites));`
@@ -3208,7 +3222,7 @@ public BindingBuilder<TTarget, TSource> WithConversion(IConverter converter)
 
 然后再来看一下<B><GN>Expressions</GN></B>：
 文件夹下仅有2个Visitor和1个Extensions，显然这是<B><VT>用于表达式的功能类</VT></B>
-**继承链**为：ExpressionVisitor派生出EvaluatingVistor与ParameterReplacer
+<B>继承链</B>为：ExpressionVisitor派生出EvaluatingVistor与ParameterReplacer
 观察类后，会发现ParameterReplacer有一种用于EvaluatingVistor的类，所以核心其实是EvaluatingVistor与其父类ExpressionVisitor
 先看父类<B><GN>ExpressionVisitor</GN></B>：
 本质上类只有一个函数，即`Visit()`：
@@ -3342,7 +3356,7 @@ protected override bool TryCreateProxy(object source, ExpressionSourceDescriptio
 }
 ```
 
-**可以了解到：**
+<B>可以了解到：</B>
 <B><VT>Expressions相关类是用于实现动态编译表达式的，在JIT下，正常情况可以直接编译成IL，发生以外则使用备用`DynamicCompile()`，而对于AOT等不支持运行时编译则直接使用`DynamicCompile()`</VT></B>
 
 接下来还剩的就是<B><GN>Reflection了</GN></B>：
@@ -3450,15 +3464,15 @@ public void Register(IProxyMemberInfo memberInfo)
 
 看起来大概就是会根据info的类型放置到对应处
 此时有<B><BL>2个重要的问题：传入的IProxyMemberInfo是什么，获取的ProxyType又是什么</BL></B>
-就以前面的举例的**localPosition**为例：
+就以前面的举例的<B>localPosition</B>为例：
 可以看到就是在尝试Transform类型下名为localPosition的属性或字段，是哪个就创建哪个的info
-localPosition是一个属性，所以创建了一个**ProxyPropertyInfo**，传入信息就是相应PropertyInfo以及传入的getter和setter，这就是info的所有
+localPosition是一个属性，所以创建了一个<B>ProxyPropertyInfo</B>，传入信息就是相应PropertyInfo以及传入的getter和setter，这就是info的所有
 所以简单来说：<B><VT>ProxyPropertyInfo就是PropertyInfo的扩展，多了getter和setter</VT></B>
 那么接下来就清楚了，`proxyMemberInfo.DeclaringType`指的是成员的最初声明类，显然对于localPosition来说，应该就是Transform(因为接下来就在C++层了)
-**所以：<VT>该注册会在Transform(ProxyType)下放置localPosition的PropertyInfo(ProxyPropertyInfo)在properties下</VT>**
-**更深刻一点来说，就是：<VT>在对应类型下(ProxyType)汇总了Unity的各组件的相关成员，注册了一套info(反射info+getter+setter)</VT>**
+<B>所以：<VT>该注册会在Transform(ProxyType)下放置localPosition的PropertyInfo(ProxyPropertyInfo)在properties下</VT></B>
+<B>更深刻一点来说，就是：<VT>在对应类型下(ProxyType)汇总了Unity的各组件的相关成员，注册了一套info(反射info+getter+setter)</VT></B>
 
-**<BL>问题：有啥用呢</BL>**
+<B><BL>问题：有啥用呢</BL></B>
 <BL>其实在前面的分析中我们已经使用过它，也就是`AsProxy()`，在`UniversalNodeProxyFactory.CreateProxy()`中使用到很多：</BL>
 
 ``` csharp
@@ -3485,7 +3499,7 @@ protected virtual ISourceProxy CreateProxy(object source, IPathNode node)
 
 <BR>
 
-除此之外Reflection中基本上只剩下2个**Invoker**了：
+除此之外Reflection中基本上只剩下2个<B>Invoker</B>了：
 就看<B><GN>ProxyInvoker</GN></B>：
 内容很简单，需要触发的即Method，记录并提供`Invoke()`，仅此而已
 
@@ -3509,7 +3523,7 @@ public class ProxyInvoker : IProxyInvoker
 }
 ```
 
-调用处也就是**MethodNodeProxy**，一种函数包装
+调用处也就是<B>MethodNodeProxy</B>，一种函数包装
 <B><GN>WeakProxyInvoker</GN></B>本质上是同理的
 
 <BR>
@@ -3527,7 +3541,7 @@ public class ProxyInvoker : IProxyInvoker
 可以看得出<VT>与携程有关</VT>
 
 在那么多类中，看起来像核心的就是<B><GN>Executors</GN></B>
-同时也有很多**分支Executor**：　　<VT>都继承于AbstractExecutor</VT>
+同时也有很多<B>分支Executor</B>：　　<VT>都继承于AbstractExecutor</VT>
 
 - CoroutineExecutor
 - CoroutineScheduledExecutor
@@ -3535,7 +3549,7 @@ public class ProxyInvoker : IProxyInvoker
 - ThreadExecutor
 - ThreadScheduledExecutor
 
-稍微研究一下会发现一个关键点，在**AbstractExecutor**：
+稍微研究一下会发现一个关键点，在<B>AbstractExecutor</B>：
 
 ``` csharp
 public abstract class AbstractExecutor
@@ -3556,9 +3570,9 @@ public virtual void RunOnMainThread(Action action, bool waitForExecution = false
 }
 ```
 
-**显然：<VT>Executors是集合了所有Executor的汇总类</VT>**
+<B>显然：<VT>Executors是集合了所有Executor的汇总类</VT></B>
 
-**<BL>问题：Scheduled版本是什么</BL>**
+<B><BL>问题：Scheduled版本是什么</BL></B>
 <BL>大致浏览后会发现，这显然是一种更复杂的实现，它会与时间有所联系，以下是官方例子：</BL>
 
 ``` csharp
@@ -3592,12 +3606,12 @@ public class ScheduledExecutorExample : MonoBehaviour
 
 <BL>可以发现：需要Start/Stop，同时具有时间(上述就是延迟1000执行，每2000执行一次)</BL>
 
-稍微看看，我们就会发现一个**奇怪的现象**
-**<BL>问题：明明创建了如MainLoopExecutor的专项类，但实际上几乎没有使用，还是在使用Executors</BL>**
+稍微看看，我们就会发现一个<B>奇怪的现象</B>
+<B><BL>问题：明明创建了如MainLoopExecutor的专项类，但实际上几乎没有使用，还是在使用Executors</BL></B>
 <BL>我们可以发现MainLoopExecutor是的的确确被ApplicationContext获取了，但是其余Executor是没有被使用的
 个人认为还是因为Executors这种汇总类会更好用</BL>
 
-所以我们只需看**Executors**类即可：
+所以我们只需看<B>Executors</B>类即可：
 根据上面所述，`Create()`是一开始执行的操作，即使是Executors本身也是如此：
 
 ``` csharp
@@ -3661,7 +3675,7 @@ private static MainThreadExecutor CreateMainThreadExecutor(bool dontDestroy, boo
 
 显然它是一个挂载在GameObject上的MonoBehaviour，<B><GN>MainThreadExecutor</GN></B>为核心Executor
 这是一个<B><VT>基于队列的协程和回调执行工具</VT></B>
-**特性1：具有队列**
+<B>特性1：具有队列</B>
 `private List<object> pendingQueue = new List<object>();`
 `private List<object> stopingQueue = new List<object>();`
 
@@ -3690,7 +3704,7 @@ void FixedUpdate()
 
 可以看得出核心其实就是`DoPendingQueue()`
 从中我们能发现：
-**特性2：支持同步Action与异步携程**
+<B>特性2：支持同步Action与异步携程</B>
 
 ``` csharp
 protected void DoPendingQueue()
@@ -3738,19 +3752,19 @@ protected void DoPendingQueue()
 }
 ```
 
-在Executors中的调用将**大量依赖**于它
+在Executors中的调用将<B>大量依赖</B>于它
 
 <BR>
 
-AbstractExecutor的派生类其实已经将操作分好了类，排除2种Scheduled版本其实只有**3种**，那么依次来看一下
+AbstractExecutor的派生类其实已经将操作分好了类，排除2种Scheduled版本其实只有<B>3种</B>，那么依次来看一下
 
-**MainLoopExecutor**：
+<B>MainLoopExecutor</B>：
 它被ApplicationContext保存，显然是比较重要的
 简单来说其函数只有一个为<B>`RunOnMainThread()`</B>
 `public static void RunOnMainThread(Action action, bool waitForExecution = false)`
 `public static TResult RunOnMainThread<TResult>(Func<TResult> func)`
-我们会注意到具有一种**返回TResult**的形式，这与<B><GN>AsyncResult</GN></B>有关
-**一般形式**：
+我们会注意到具有一种<B>返回TResult</B>的形式，这与<B><GN>AsyncResult</GN></B>有关
+<B>一般形式</B>：
 
 ``` csharp
 public static void RunOnMainThread(Action action, bool waitForExecution = false)
@@ -3809,19 +3823,19 @@ public static void RunOnMainThread(Action action, IPromise promise)
 }
 ```
 
-稍微看一下**泛型形式**会发现两者<VT>非常相似</VT>，用到的就是<B><VT>waitForExecution情况下的函数的泛型版</VT></B>
-所以**AsyncResult/context**值得看一下
+稍微看一下<B>泛型形式</B>会发现两者<VT>非常相似</VT>，用到的就是<B><VT>waitForExecution情况下的函数的泛型版</VT></B>
+所以<B>AsyncResult/context</B>值得看一下
 
 <BR>
 
 context的本质是一个<B><GN>SynchronizationContext</GN></B>，也就是<B><VT>同步上下文</VT></B>
-这个类我们会有点熟悉，因为在处理**Unity的Action无法在携程主线程执行的问题**就是通过它解决的　　<VT>可以看MFramework的<B>MainThreadUtility/MainThreadSynchronizationContext</B></VT>
+这个类我们会有点熟悉，因为在处理<B>Unity的Action无法在携程主线程执行的问题</B>就是通过它解决的　　<VT>可以看MFramework的<B>MainThreadUtility/MainThreadSynchronizationContext</B></VT>
 可以看到在`Create()`时会进行`context = SynchronizationContext.Current`的设置，即设置为主线程
-**<BL>问题：为什么context会指代的是主线程(UI线程)</BL>**
+<B><BL>问题：为什么context会指代的是主线程(UI线程)</BL></B>
 <BL>Unity自身具有生命周期，代码在BeforeSceneLoad时执行，由于Unity引擎会在此之前进行`SynchronizationContext.Current`的设置，所以此时必然能够获得正在执行的主线程，即UI线程</BL>
 而<B>`context.Post()`</B>则是<B><VT>调回主线程操作</VT></B>
 
-<B><GN>AsyncResult</GN></B>的**声明**是这样的：
+<B><GN>AsyncResult</GN></B>的<B>声明</B>是这样的：
 `AsyncResult : IAsyncResult, IPromise`
 那么来看一下这两个接口：
 
@@ -3851,7 +3865,7 @@ public interface IPromise
 }
 ```
 
-可以看得出，都是一些**异步的状态以及函数**
+可以看得出，都是一些<B>异步的状态以及函数</B>
 以常用的<B><YL>完成</YL></B>为例：
 
 ``` csharp
@@ -3871,13 +3885,13 @@ public virtual void SetResult(object result = null)
 }
 ```
 
-**具体来说有：**
+<B>具体来说有：</B>
 
 - `SetResult()`：完成
 - `SetException()`：异常完成(出错了)
 - `SetCancelled()`：取消
 
-简单来说**AsyncResult**就是一种<B><VT>收集异步状态的类</VT></B>
+简单来说<B>AsyncResult</B>就是一种<B><VT>收集异步状态的类</VT></B>
 
 回顾一下前面的`RunOnMainThread()`，即3种情况：
 
@@ -3912,9 +3926,9 @@ public interface ISynchronizable
 }
 ```
 
-这是当然的，其**功能**就是<B><VT>等待</VT></B>
+这是当然的，其<B>功能</B>就是<B><VT>等待</VT></B>
 
-<B><GN>Synchronizable</GN></B>即具体类，正如上述内容，无非就是：**等待完成/等待结果完成**
+<B><GN>Synchronizable</GN></B>即具体类，正如上述内容，无非就是：<B>等待完成/等待结果完成</B>
 先从用到的`WaitForResult()`看起：
 说到等待结果完成，其实我们能想到携程的一种用法，即：`yield return xxx`
 这里的话是这样实现的：
@@ -3953,14 +3967,14 @@ public object WaitForResult(int millisecondsTimeout = 0)
 }
 ```
 
-这里有一个**重要的概念：是如何等待的**
+这里有一个<B>重要的概念：是如何等待的</B>
 这里不取决于`result.IsDone`，而是<B>`Monitor.Wait()`</B>
 `Wait()`函数有所配对，即：
 
 - `Monitor.Wait()`---等待
 - `Monitor.PulseAll()`---唤醒
 
-**具体来说**会是这样的：
+<B>具体来说</B>会是这样的：
 对于上述`RunOnMainThread()`，子`RunOnMainThread()`有两种行为，即主线程直接执行与非主线程`Post()`执行，但是它们都会进行一次`promise.SetResult()`，其中就有：`Monitor.PulseAll(_lock);`，其中_lock就是AsyncResult传进来的，那么自然会针对该组内容等待完成后唤醒
 再看一下`WaitForDone()`，那就更简单了，即<B><VT>等待完成，返回bool</VT></B>：
 
@@ -3980,7 +3994,7 @@ public bool WaitForDone()
 }
 ```
 
-**CoroutineExecutor**：
+<B>CoroutineExecutor</B>：
 Coroutine我们很熟悉，就是携程，显然是一种用于携程情况下的Executor
 函数有很多，我们能找到最简单的一种为：
 
@@ -4000,7 +4014,7 @@ public static Asynchronous.IAsyncResult RunOnCoroutine(IEnumerator routine)
 }
 ```
 
-首先我们就会发现，**AsyncResult变成CoroutineResult**了
+首先我们就会发现，<B>AsyncResult变成CoroutineResult</B>了
 <B><GN>CoroutineResult</GN></B>是在AsyncResult基础上的扩充：
 `public class CoroutineResult : AsyncResult, ICoroutinePromise`
 看一下扩展的接口：
@@ -4062,8 +4076,8 @@ public virtual bool Cancel()
 ```
 
 对比可以发现，CoroutineResult只是因为用的是携程，所以需要执行`StopCoroutine()`而已
-那么我们还需要了解的就是**Start和Stop的流程**：
-**Start**即`DoRunOnCoroutine()`：
+那么我们还需要了解的就是<B>Start和Stop的流程</B>：
+<B>Start</B>即`DoRunOnCoroutine()`：
 
 ``` csharp
 internal static void DoRunOnCoroutine(IEnumerator routine, ICoroutinePromise promise)
@@ -4110,7 +4124,7 @@ internal static void DoRunOnCoroutine(IEnumerator routine, ICoroutinePromise pro
 而两种方式一旦执行，<B><VT>都会通过UnityMonoBehaviour情况下的`StartCoroutine()`添加携程直接执行</VT></B>
 可以注意到携程IEnumerator的传入是包装类<B><GN>InterceptableEnumerator</GN></B>：
 `public class InterceptableEnumerator : IEnumerator`
-**简单总结**就是：
+<B>简单总结</B>就是：
 <B><VT>InterceptableEnumerator重写了IEnumerator的核心内容：Current/MoveNext()/Reset()</VT></B>，以添加了以下功能：
 
 - 条件检查
@@ -4121,7 +4135,7 @@ internal static void DoRunOnCoroutine(IEnumerator routine, ICoroutinePromise pro
 `enumerator.RegisterConditionBlock()`/`enumerator.RegisterCatchBlock()`/`enumerator.RegisterFinallyBlock()`
 所以<B><VT>本质上其实和IEnumerator无异</VT></B>
 
-**Stop**的话正是因为Start时通过`promise.AddScoroutine()`对携程进行了存储，`Cancel()`就很方便，本质上依旧通过UnityMonoBehaviour下的`StopCoroutine()`完成即可，只是依旧需要考虑是否在主线程：
+<B>Stop</B>的话正是因为Start时通过`promise.AddScoroutine()`对携程进行了存储，`Cancel()`就很方便，本质上依旧通过UnityMonoBehaviour下的`StopCoroutine()`完成即可，只是依旧需要考虑是否在主线程：
 
 ``` csharp
 public override bool Cancel()
@@ -4153,7 +4167,7 @@ internal static void StopCoroutine(Coroutine routine)
 }
 ```
 
-**ThreadExecutor**：
+<B>ThreadExecutor</B>：
 还有一种就是ThreadExecutor，名字上也知道，针对线程
 其声明为：
 `public class ThreadExecutor : AbstractExecutor, IThreadExecutor`
@@ -4242,7 +4256,7 @@ private static void DoRunAsync(Action action)
 
 这里我们主要考虑最后2种情况：
 对于现代.NET平台，会使用一种比较现代的方式执行
-对于传统.NET平台，会使用**传统线程池**执行
+对于传统.NET平台，会使用<B>传统线程池</B>执行
 最简单来说就是<B><VT>通过多线程完成action的执行</VT></B>
 
 <BR>
@@ -4252,7 +4266,7 @@ private static void DoRunAsync(Action action)
 接下来提一下一些有用的信息：
 在WindowManager中，我们用过一种形式：
 `yield return show.WaitForDone();`
-这其实是**AsyncResult**的一种函数：　　<DRD>注意：不是上述提到的Synchronizable的内容</DRD>
+这其实是<B>AsyncResult</B>的一种函数：　　<DRD>注意：不是上述提到的Synchronizable的内容</DRD>
 
 ``` csharp
 public virtual object WaitForDone()
@@ -4320,16 +4334,16 @@ public virtual Preferences GetUserPreferences(string name)
 
 显然<B><VT>一个项目会有一个全局Preference，也有可能有多个用户Preference</VT></B>
 经过查阅后，我们会发现，两者其实都指向一种类，即<B><GN>PlayerPrefsPreferencesFactory</GN></B>
-其**声明**为：
+其<B>声明</B>为：
 `public class PlayerPrefsPreferences : Preferences`
-那么我们先来看一下作为一个**Preferences**有什么功能：
+那么我们先来看一下作为一个<B>Preferences</B>有什么功能：
 
-- **创建**
+- <B>创建</B>
   对于Preferences，创建是通过工厂完成的，即`prefs = GetFactory().Create(name)`
   具体选择哪个工厂当然取决于`GetFactory()`，有2个选项：`_factory`/`_defaultFactory`
   `_defaultFactory`是一个PlayerPrefsPreferencesFactory
   而`_factory`是通过`Register()`注册存放的(只有1个)
-- **获取**
+- <B>获取</B>
   获取其实和创建是合二为一的，如下：
   <BR>
 
@@ -4346,15 +4360,15 @@ public virtual Preferences GetUserPreferences(string name)
   }
   ```
 
-- **Get/Set**
+- <B>Get/Set</B>
   可以说Preferences就是用来进行该操作的，即存储信息获取信息
   在类中可以看到极大量的操作，但核心都指向了`GetObject()`/`SetObject()`
   但其实是abstract函数，需子类实现
-- **其它操作**
+- <B>其它操作</B>
   除此以外还有一些abstract函数，为：`Save()`/`Delete()`/`Load()`/`Remove()`
 
-再来看一下**PlayerPrefsPreferencesFactory**的实现：
-Get/Set必然是其中最重要的操作，先看**Set**：
+再来看一下<B>PlayerPrefsPreferencesFactory</B>的实现：
+Get/Set必然是其中最重要的操作，先看<B>Set</B>：
 
 ``` csharp
 public override void SetObject(string key, object value)
@@ -4392,7 +4406,7 @@ protected string Key(string key)
 }
 ```
 
-所以简单来说这种形式下就是**加了一个前缀**，本质上只是用于<B><VT>区分来自的Preferences</VT></B>
+所以简单来说这种形式下就是<B>加了一个前缀</B>，本质上只是用于<B><VT>区分来自的Preferences</VT></B>
 
 另一件事就是`SaveKeys()`：
 
@@ -4430,9 +4444,9 @@ protected virtual void SaveKeys()
 核心当然是`PlayerPrefs.SetString()`，那么此时key为`_GLOBAL_.LAST_USERNAME`，value为`"mineself"`的加密string形式
 同时`SaveKeys()`也会存储另一份合集形式，此时key为`_GLOBAL_._KEYS_`，value为`"LAST_USERNAME"`
 
-我们能**更清晰第地了解**到：
-**<VT>本质上`PlayerPrefs.SetString()`是存储，而`SaveKeys()`是更高层面的存储，也就是存储了有哪些key</VT>**
-所以我们就有了这种**清除手段**：
+我们能<B>更清晰第地了解</B>到：
+<B><VT>本质上`PlayerPrefs.SetString()`是存储，而`SaveKeys()`是更高层面的存储，也就是存储了有哪些key</VT></B>
+所以我们就有了这种<B>清除手段</B>：
 
 ``` csharp
 public override void RemoveAll()
@@ -4450,13 +4464,13 @@ public override void RemoveAll()
 
 从前面的内容我们可以了解到Preferences是可以具有多个的，除了Global的，还可以自行创建，这没有什么特殊的，只是多份Preference(通过`GetPreferences()`)
 但前面提到了我们是可以`Register()`更换Factory的，项目只能选择一种Factory，默认使用的就是创建PlayerPrefsPreferences的<B><GN>PlayerPrefsPreferencesFactory</GN></B>
-那么这当然是可以换一套的，作者提供了一种**BinaryFile**的形式，从名字我们其实就能了解区别：
+那么这当然是可以换一套的，作者提供了一种<B>BinaryFile</B>的形式，从名字我们其实就能了解区别：
 <B><VT>PlayerPrefsPreferences用的是PlayerPrefs</VT></B>
 <B><VT>BinaryFilePreferences用的是BinaryFile，也就是文件流</VT></B>
 
 #### Configuration
 
-要说和Preferences非常相似的，那么必然是Configuration了，听起来都是**设置相关**的
+要说和Preferences非常相似的，那么必然是Configuration了，听起来都是<B>设置相关</B>的
 大致看一下类的话，其基必然是<B><GN>ConfigurationBase</GN></B>：
 `public abstract class ConfigurationBase : IConfiguration`
 先看接口：
@@ -4503,8 +4517,8 @@ public interface IConfiguration
 }
 ```
 
-可以看到和Preferences有一点相似，由极大量的Get组成，但没有Set，这也说明了两者有**显著差异**
-在**ConfigurationBase**中我们就可以看出：
+可以看到和Preferences有一点相似，由极大量的Get组成，但没有Set，这也说明了两者有<B>显著差异</B>
+在<B>ConfigurationBase</B>中我们就可以看出：
 
 - 一个Get函数有2个版本，其实单key版本就是默认设置默认值版本：
 <BR>
@@ -4545,7 +4559,7 @@ protected virtual T GetProperty<T>(string key, T defaultValue)
 ```
 
 简单来说就是用派生类的实现获取value后转换为相应类型即可
-**转换流程**也很简单：
+<B>转换流程</B>也很简单：
 
 ``` csharp
 protected virtual object ConvertTo(Type type, object value)
@@ -4569,10 +4583,10 @@ protected virtual object ConvertTo(Type type, object value)
 
 <BR>
 
-其派生类有4种，分别为：**MemoryConfiguration/PropertiesConfiguration/SubsetConfiguration/CompositeConfiguration**，显然基础的是前两种
+其派生类有4种，分别为：<B>MemoryConfiguration/PropertiesConfiguration/SubsetConfiguration/CompositeConfiguration</B>，显然基础的是前两种
 
-**<GN>MemoryConfiguration/PropertiesConfiguration</GN>**：
-显然基础是**Property操作**：
+<B><GN>MemoryConfiguration/PropertiesConfiguration</GN></B>：
+显然基础是<B>Property操作</B>：
 
 ``` csharp
 // MemoryConfiguration
@@ -4601,8 +4615,8 @@ public override void RemoveProperty(string key)
 }
 ```
 
-可以说它就是**简单的字典**
-观察PropertiesConfiguration，会发现它们是**完全一致**的，这也意味着它们在其它实现了一定有所区别，但Property操作上是完全一致的
+可以说它就是<B>简单的字典</B>
+观察PropertiesConfiguration，会发现它们是<B>完全一致</B>的，这也意味着它们在其它实现了一定有所区别，但Property操作上是完全一致的
 在此之前先看一下<B>`GetKeys()`</B>：
 `GetKeys()`有一些特别的功能，但基础的来看，它就是一个IEnumerator，可以用于获取或检测，Base中有：
 
@@ -4624,7 +4638,7 @@ public override string ToString()
 }
 ```
 
-两类的具体实现是非常简单的，就是**字典函数的调用**：
+两类的具体实现是非常简单的，就是<B>字典函数的调用</B>：
 
 ``` csharp
 public override IEnumerator<string> GetKeys()
@@ -4686,7 +4700,7 @@ protected void Load(string text)
 - MemoryConfiguration是通过一个来自程序的字典完成的，所以可能来自json等序列化文件
 - PropertiesConfiguration是通过文本完成的，所以可能来自某txt文本
 
-总的来说，MemoryConfiguration更像是一种**基础形式**，而PropertiesConfiguration是一种**自定义形式**，因为文件的读取方式完全是自定义的：
+总的来说，MemoryConfiguration更像是一种<B>基础形式</B>，而PropertiesConfiguration是一种<B>自定义形式</B>，因为文件的读取方式完全是自定义的：
 
 - MemoryConfiguration：<B><VT>基础的一一配对</VT></B>
 - PropertiesConfiguration：<B><VT>基于行的配置</VT></B>
@@ -4695,8 +4709,8 @@ protected void Load(string text)
 <BR>
 
 看完基础的两个，还剩2个更高层面的
-**<GN>SubsetConfiguration</GN>**：
-从其**构造函数**我们就能看出端倪：
+<B><GN>SubsetConfiguration</GN></B>：
+从其<B>构造函数</B>我们就能看出端倪：
 
 ``` csharp
 public SubsetConfiguration(ConfigurationBase parent, string prefix)
@@ -4706,7 +4720,7 @@ public SubsetConfiguration(ConfigurationBase parent, string prefix)
 }
 ```
 
-这与其名中的**Subset子集**对应
+这与其名中的<B>Subset子集</B>对应
 回看接口中存在一个`SubSet()`函数，显然，这是一种<B><VT>组合模式</VT></B>
 其中有几个比较特殊的函数：
 
@@ -4753,9 +4767,9 @@ public override object GetProperty(string key)
 ```
 
 其实<B><VT>SubsetConfiguration并没有进行操作，而是交还给最上级进行</VT></B>
-当然，SubsetConfiguration是**递归的**，无论第几层都将交还给最上级
+当然，SubsetConfiguration是<B>递归的</B>，无论第几层都将交还给最上级
 
-**<GN>CompositeConfiguration</GN>**：
+<B><GN>CompositeConfiguration</GN></B>：
 组合一词充分说明其形态，当然它是一个<B><VT>由多个Configuration组成的Configuration</VT></B>
 其构造函数如下：
 
@@ -4803,9 +4817,9 @@ public override object GetProperty(string key)
 ```
 
 简单来说就是<B><VT>选第一个能用</VT></B>的而已
-比较特殊的是在**构造函数中的预制MemoryConfiguration**，显然这是一个<B><VT>保底选项</VT></B>
+比较特殊的是在<B>构造函数中的预制MemoryConfiguration</B>，显然这是一个<B><VT>保底选项</VT></B>
 
-那么就用一个官方的例子**总结**一下这些内容：
+那么就用一个官方的例子<B>总结</B>一下这些内容：
 
 ``` csharp
 public class ConfigurationExample : MonoBehaviour
@@ -4862,7 +4876,7 @@ public class ConfigurationExample : MonoBehaviour
 
 #### Log
 
-我们会发现Log**充斥在整个项目**之中，几乎在所有内置类开头都有一句：
+我们会发现Log<B>充斥在整个项目</B>之中，几乎在所有内置类开头都有一句：
 `private static readonly ILog log = LogManager.GetLogger(typeof(XXX));`
 那么可以看到<B><GN>LogManager</GN></B>会是创建的关键
 LogManager很简单，大致来说可以说就只有`GetLogger()`一个函数：
@@ -4919,7 +4933,7 @@ public virtual void Debug(object message, Exception exception)
 }
 ```
 
-可以看到就是<VT>添加了一些信息</VT>：**时间/log等级/log对象**
+可以看到就是<VT>添加了一些信息</VT>：<B>时间/log等级/log对象</B>
 level提供了一些等级控制开关，如`IsDebugEnabled()`，这里需要注意的是是否开启取决于对工厂Level的设置，有：
 
 ``` csharp
@@ -4940,16 +4954,16 @@ public enum Level
 }
 ```
 
-可以发现这样就处于一种**包含的层级关系**，就像默认的`Level.ALL`就会记录所有level，而`Level.WARN`就只会记录比本身以及比`Level.WARN`更严重的错误(ERROR/FATAL)
+可以发现这样就处于一种<B>包含的层级关系</B>，就像默认的`Level.ALL`就会记录所有level，而`Level.WARN`就只会记录比本身以及比`Level.WARN`更严重的错误(ERROR/FATAL)
 可以想到：<B><VT>这是一种基于上线的策略，某些情况，只需记录严重bug即可，其余小问题是无所谓的</VT></B>
 
 #### Asynchronous
 
-Asynchronous本身就是异步的意思，其实其中的内容在前面的**Executors**中已经提及，也就是：**AsyncResult/Synchronizable**<VT>(CoroutineResult不是，是Execution命名空间中的扩展类)</VT>等**异步基础建设**
-那么这里再来看看**其余异步内容**
+Asynchronous本身就是异步的意思，其实其中的内容在前面的<B>Executors</B>中已经提及，也就是：<B>AsyncResult/Synchronizable</B><VT>(CoroutineResult不是，是Execution命名空间中的扩展类)</VT>等<B>异步基础建设</B>
+那么这里再来看看<B>其余异步内容</B>
 
-这里先再提及一下**AsyncResult相关**：
-我们可以发现AsyncResult具有大量的派生类，就比如说出现过的CoroutineResult，绝大部分来自**Execution相关**，同时也有**自身相关**派生，有：
+这里先再提及一下<B>AsyncResult相关</B>：
+我们可以发现AsyncResult具有大量的派生类，就比如说出现过的CoroutineResult，绝大部分来自<B>Execution相关</B>，同时也有<B>自身相关</B>派生，有：
 
 - ProgressResult
 - ImmutableAsyncResult
@@ -4974,7 +4988,7 @@ public interface IProgressPromise<TProgress> : IPromise
 ```
 
 很明显，本质上这两个接口其实是原本AsyncResult接口的扩展，扩展的内容就是Progress相关
-**目的**显然是：当`UpdateProgress()`时，<B><VT>根据注册回调完成相应操作</VT></B>，可能有：
+<B>目的</B>显然是：当`UpdateProgress()`时，<B><VT>根据注册回调完成相应操作</VT></B>，可能有：
 
 ``` csharp
 public ProgressResult<float> DownloadFileAsync(string url)
@@ -5034,17 +5048,17 @@ public class ImmutableAsyncResult : AsyncResult
 由于在构造中进行了`SetXXX()`操作，接下来就不可能再设置了<VT>(`SetResult()`后done为true，不可能再次`SetResult()`)</VT>
 
 <B><GN>ImmutableProgressResult</GN></B>：
-ImmutableProgressResult就更加简单了，即**两者结合**
+ImmutableProgressResult就更加简单了，即<B>两者结合</B>
 
 <BR>
 
-除了以上内容，可以发现其实还有一个内容：**Task**
+除了以上内容，可以发现其实还有一个内容：<B>Task</B>
 比如说：AsyncTask/ProgressTask
 但是几乎所有Task都被标记为`[Obsolete]`了，理由很简单：<B><VT>C#本身就有Task操作不需要更多了</VT></B>
 但是还有一个Task被保留了下来，就是<B><GN>CoroutineTask</GN></B>
-**<BL>问题：为什么只有CoroutineTask被保留</BL>**
+<B><BL>问题：为什么只有CoroutineTask被保留</BL></B>
 <BL>显然，CoroutineTask是Coroutine，是Unity的内容，C#当然没有</BL>
-**CoroutineTask**是一个单独的类，并没有继承什么，简单归纳一下其函数：
+<B>CoroutineTask</B>是一个单独的类，并没有继承什么，简单归纳一下其函数：
 
 - 静态
   - `Delay()`---延迟操作
@@ -5068,7 +5082,7 @@ public virtual IAwaiter<object> GetAwaiter()
 #endif
 ```
 
-这其实是一种对**await关键字**的扩充，所以也就存在编译限定了
+这其实是一种对<B>await关键字</B>的扩充，所以也就存在编译限定了
 可能的实现如下：
 
 ``` csharp
@@ -5110,7 +5124,7 @@ Tip：AI说如果一帧内IsCompleted了，那么就不会注册回调
 
 <BR>
 
-**<GN>ObservableObject</GN>**
+<B><GN>ObservableObject</GN></B>
 该类我们前面已经进行过简述，声明有：
 `[Serializable] public abstract class ObservableObject : INotifyPropertyChanged`
 INotifyPropertyChanged就是关键，通常都会有这么一种函数：
@@ -5163,11 +5177,11 @@ public string Username
 }
 ```
 
-这里最关键的是<B><GN>[CallerMemberName]</GN></B>，这是一个**编译期特性**，可以<B><VT>自动传入属性名</VT></B>
+这里最关键的是<B><GN>[CallerMemberName]</GN></B>，这是一个<B>编译期特性</B>，可以<B><VT>自动传入属性名</VT></B>
 所以对于上述例子，就相当于是：`this.Set(ref this.username, value, "Username")`
-那么这里的**含义**就是：<B><VT>先将`username`设置为value，然后通过该string转换为PropertyChangedEventArgs后进行propertyChanged回调</VT></B>
+那么这里的<B>含义</B>就是：<B><VT>先将`username`设置为value，然后通过该string转换为PropertyChangedEventArgs后进行propertyChanged回调</VT></B>
 
-**<BL>问题：回调内容是什么</BL>**
+<B><BL>问题：回调内容是什么</BL></B>
 <BL>显然这才是关键，进行+=的一共有2处：</BL>
 
 - PropertyNodeProxy
@@ -5240,12 +5254,12 @@ protected void Subscribe()
 }
 ```
 
-**<GN>ObservableList/ObservableDictionary</GN>**
+<B><GN>ObservableList/ObservableDictionary</GN></B>
 显然它们两个是一组的，也就是List和Dictionary
 看一下声明：
 `[Serializable] public class ObservableList<T> : IList<T>, IList, INotifyCollectionChanged, INotifyPropertyChanged`
 `[Serializable] public class ObservableDictionary<TKey, TValue> : IDictionary<TKey, TValue>, IDictionary, INotifyCollectionChanged, INotifyPropertyChanged`
-简单来说，它们都是原数据结构的扩展，扩展内容就是**INotifyCollectionChanged与INotifyPropertyChanged**
+简单来说，它们都是原数据结构的扩展，扩展内容就是<B>INotifyCollectionChanged与INotifyPropertyChanged</B>
 INotifyPropertyChanged是与ObservableObject相同的，具体如下：
 
 ``` csharp
@@ -5287,10 +5301,10 @@ protected virtual void InsertItem(int index, T item)
 }
 ```
 
-**要注意的一点是：**
-**<VT>ObservableList/ObservableDictionary与ObservableObject的+=处是相同的，毕竟它们都是INotifyCollectionChanged</VT>**
+<B>要注意的一点是：</B>
+<B><VT>ObservableList/ObservableDictionary与ObservableObject的+=处是相同的，毕竟它们都是INotifyCollectionChanged</VT></B>
 
-再来看一下**INotifyCollectionChanged**：
+再来看一下<B>INotifyCollectionChanged</B>：
 这本应该和INotifyCollectionChanged一样，是一个C#提供的接口，但是这里扩充了一下：
 
 ``` csharp
@@ -5308,9 +5322,9 @@ namespace System.Collections.Specialized
 ```
 
 显然就是<B><VT>针对旧平台提供支持的</VT></B>
-对于INotifyCollectionChanged，功能是类似的，也就是**针对的是Collection**
+对于INotifyCollectionChanged，功能是类似的，也就是<B>针对的是Collection</B>
 
-**<GN>ObservableProperty</GN>**
+<B><GN>ObservableProperty</GN></B>
 对于ObservableProperty同样是类似的，但是它没有继承C#接口而是自己创建了一个：
 `[Serializable] public class ObservableProperty : ObservablePropertyBase<object>, IObservableProperty`
 
@@ -5368,7 +5382,7 @@ bindingSet.Bind().For(v => v.OnInteractionFinished).To(vm => vm.InteractionFinis
 bindingSet.Bind().For(v => v.toastAction).To(vm => vm.ToastRequest);
 ```
 
-Interactivity也能表明这是一组交互操作，简单来说还是一组**触发机制**
+Interactivity也能表明这是一组交互操作，简单来说还是一组<B>触发机制</B>
 这里就先从使用到的<B><GN>InteractionRequest</GN></B>入手看一下：
 
 `public class InteractionRequest : IInteractionRequest`
@@ -5415,8 +5429,8 @@ public class InteractionRequest : IInteractionRequest
 
 可以看到简单来说这就是一个<B><VT>简单的EventHandler触发器</VT></B>
 流程就是<VT>经过绑定后，InteractionFinished在某刻执行到`Raise()`则会执行View中的操作</VT>
-结合上述ViewModel与View，很明显，**绑定**才是这里的关键
-绑定的事这里就不多考虑了，先来这里相关的另一个类**ToastInteractionAction**：
+结合上述ViewModel与View，很明显，<B>绑定</B>才是这里的关键
+绑定的事这里就不多考虑了，先来这里相关的另一个类<B>ToastInteractionAction</B>：
 可以看到对比`OnXXX()`函数形式，这里是<VT>通过一个类来绑定</VT>的，具体如下：
 
 ``` csharp
@@ -5445,7 +5459,7 @@ public class ToastInteractionAction : InteractionActionBase<ToastNotification>
 }
 ```
 
-目前我的**猜测**是：
+目前我的<B>猜测</B>是：
 `Action()`是执行的关键，也就是类似与`OnXXX()`的操作，当然，这里有一定自己的操作，2个形参，Toast类，这些我们都没有见过
 要注意的一点是：<B><VT>这些相关类都是底层的，并非业务类，只是归属于Views中</VT></B>
 
@@ -5496,9 +5510,9 @@ private void OnRequest(object sender, InteractionEventArgs args)
 ```
 
 如何触发就不过多考虑了
-对于**InteractionActionBase**，大致总结就是<B><VT>是一种较特殊的绑定事件，官方进行了一定的扩展预制了一些操作</VT></B>
+对于<B>InteractionActionBase</B>，大致总结就是<B><VT>是一种较特殊的绑定事件，官方进行了一定的扩展预制了一些操作</VT></B>
 
-仔细观察，会发现还有一个内容，就是InteractionRequest中的泛型**ToastNotification**：
+仔细观察，会发现还有一个内容，就是InteractionRequest中的泛型<B>ToastNotification</B>：
 
 ``` csharp
 public class ToastNotification
@@ -5526,23 +5540,23 @@ public class ToastNotification
 }
 ```
 
-它没有继承谁，显然它只是**一些信息**，Request需要而已
+它没有继承谁，显然它只是<B>一些信息</B>，Request需要而已
 类中有很多Notification：
 
 - DialogNotification
 - VisibilityNotification
 - WindowNotification
 
-而它们都是**独立存在**的
+而它们都是<B>独立存在</B>的
 
 #### Messaging
 
 该内容同样出现过，在Window中，为Messenger：
 `public static readonly IMessenger Messenger = new Messenger();`
-其**声明**为：
+其<B>声明</B>为：
 `public class Messenger : IMessenger`
-简单查看接口，本质上就2个函数：`Subscribe()`/`Publish()`，显然这是**发布订阅模式**
-**<YL>这里就拿例子看一看：</YL>**
+简单查看接口，本质上就2个函数：`Subscribe()`/`Publish()`，显然这是<B>发布订阅模式</B>
+<B><YL>这里就拿例子看一看：</YL></B>
 
 ``` csharp
 public class Launcher : MonoBehaviour
@@ -5612,8 +5626,8 @@ public virtual ISubscription<T> Subscribe<T>(Action<T> action)
 }
 ```
 
-可以看到这里的**核心操作**就是<VT>获取SubjectBase然后用它来`Subscribe()`</VT>
-**<VT>对于每一个Type都只有一个notifier(因为是字典)</VT>**
+可以看到这里的<B>核心操作</B>就是<VT>获取SubjectBase然后用它来`Subscribe()`</VT>
+<B><VT>对于每一个Type都只有一个notifier(因为是字典)</VT></B>
 `Subscribe()`的另一个版本增加了一个名为channel的string，其实就是在外面再包了一层字典
 
 再来看<B>`Publish()`</B>：
@@ -5709,15 +5723,15 @@ public void Publish(T message)
 #### ObjectPool
 
 该框架提供了ObjectPool，但事实上并没有去使用它
-一共有**2种形态**：
+一共有<B>2种形态</B>：
 
 - ObjectPool
 - MixedObjectPool
 
 先看单纯的<B><GN>ObjectPool</GN></B>：
-其**声明**为：
+其<B>声明</B>为：
 `public class ObjectPool<T> : IObjectPool<T> where T : class`
-接口内容不多，**核心**就是：`Allocate()`/`Free()`，这也正是对象池该做的事情
+接口内容不多，<B>核心</B>就是：`Allocate()`/`Free()`，这也正是对象池该做的事情
 该类的构造函数表明了它的基：
 
 ``` csharp
@@ -5738,8 +5752,8 @@ public ObjectPool(IObjectFactory<T> factory, int initialSize, int maxSize)
 }
 ```
 
-一共有3个信息：**初始容量/最大容量/创建工厂**
-显然**工厂**是最重要的：
+一共有3个信息：<B>初始容量/最大容量/创建工厂</B>
+显然<B>工厂</B>是最重要的：
 对于ObjectPool，工厂只提供了一种，为<B><GN>UnityGameObjectFactoryBase</GN></B>，内容也很简单：
 
 ``` csharp
@@ -5782,7 +5796,7 @@ public abstract class UnityGameObjectFactoryBase : IObjectFactory<GameObject>
 
 可以看到没什么特殊的，就是<B><VT>创一个GameObject，然后封装成PooledUnityObject</VT></B>
 
-再来看一下**Mixed版本**：
+再来看一下<B>Mixed版本</B>：
 对于Mixed版本，可以发现基础有所变化：
 
 ``` csharp
@@ -5801,7 +5815,7 @@ public MixedObjectPool(IMixedObjectFactory<T> factory, int defaultMaxSizePerType
 
 可以发现entries变为了一个字典，而且多了一个typeSize字典
 最起码我们肯定能知道：<B><VT>这是一个存储多种类型的对象池</VT></B>
-同样的，创建还是通过**工厂**完成，即<B><GN>UnityMixedGameObjectFactoryBase</GN></B>：
+同样的，创建还是通过<B>工厂</B>完成，即<B><GN>UnityMixedGameObjectFactoryBase</GN></B>：
 
 ``` csharp
 public virtual GameObject Create(IMixedObjectPool<GameObject> pool, string typeName)
@@ -5996,7 +6010,7 @@ private void FillData(Dictionary<string, object> dict, TextAsset[] texts, Cultur
 </resources>
 ```
 
-provider需要提供一个**root**，这就是根目录的含义，该例中为`LocalizationExamples`，可以看到：
+provider需要提供一个<B>root</B>，这就是根目录的含义，该例中为`LocalizationExamples`，可以看到：
 ![](Pic/Loxodon8.png)
 
 以上只是初始化的部分，下面简单列举一下发现内容：

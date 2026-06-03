@@ -1,4 +1,4 @@
-**<center><BBBG>C#多线程</BBBG></center>**
+<center><B><BBBG>C#多线程</BBBG></B></center>
 
 <!-- TOC -->
 
@@ -17,16 +17,20 @@
 
 <!-- /TOC -->
 
+---
+---
+---
+
 # 多线程与异步
 
-如果我们只是简单了解过多线程/异步的话，我们可能会认为多线程和异步是同一个概念，但**并不如此**
+如果我们只是简单了解过多线程/异步的话，我们可能会认为多线程和异步是同一个概念，但<B>并不如此</B>
 
 - <B><GN>多线程</GN></B>：<B><VT>并发执行，通过多个线程在同一时间执行多个任务</VT></B>
 - <B><GN>异步</GN></B>：<B><VT>非堵塞执行，任务发起后不堵塞当前线程，等待完成后继续进行<VT></B>
 
 <BR>
 
-两者的**核心区别**就是**堵塞情况**：
+两者的<B>核心区别</B>就是<B>堵塞情况</B>：
 用一个最简单的例子就是多线程的`Thread.Sleep()`与异步的`Task.Delay()`：
 
 - `Thread.Sleep(1000)`：堵塞当前线程，"卡死"1秒
@@ -34,18 +38,20 @@
 
 最直观的来说，如果将两种等待应用于界面显示的话，`Thread.Sleep()`会直接卡死界面，完成后才能进行如拖动操作，`Task.Delay()`则无影响
 
-详细来说**两者的区别**：
+详细来说<B>两者的区别</B>：
 
 - 多线程通常会堵塞完成，异步是不堵塞的
-- **<VT>多线程适合长期任务(CPU密集型操作，同时创建销毁开销大)，而异步适合短暂且数量多的小任务(IO密集型操作)</VT>**
+- <B><VT>多线程适合长期任务(CPU密集型操作，同时创建销毁开销大)，而异步适合短暂且数量多的小任务(IO密集型操作)</VT></B>
 - 多线程更底层，可以使用线程/锁/信号量
 - 多线程不易于传参与返回
 - 异步仅是一种编程模式，可以是多线程实现，同样也可以是单线程实现
 
+---
+
 ## 多线程
 
 多线程即除了主线程以外，还开了其它线程来进行操作
-先介绍一些**概念**：
+先介绍一些<B>概念</B>：
 
 - <B><GN>线程</GN></B>：<B><VT>操作系统中能够独立运行的最小单位，也是程序中能够并发执行的一段指令序列<VT></B>
 - <B><GN>进程</GN></B>：<B><VT>由线程组成，一个进程中可以包含多个多个线程，这些线程共享进程的资源，进程至少有一个入口线程<VT></B>
@@ -54,9 +60,9 @@
 
 ### Thread
 
-**最基础的多线程实现方式**即<B><GN>Thread</GN></B>：
+<B>最基础的多线程实现方式</B>即<B><GN>Thread</GN></B>：
 
-- **创建**
+- <B>创建</B>
   创建很简单，new一个Thread即可，如下：
   <BR>
 
@@ -81,13 +87,13 @@
   - 对于上述ThreadMethod2，为ParameterizedThreadStart(ThreadMethod2)
     `Thread thread2 = new Thread(new ParameterizedThreadStart(ThreadMethod2));`
   
-- **终止**
+- <B>终止</B>
   最简单的终止方式是使用以下2函数：　　<VT>但CancellationToken是更好的</VT>
 
   - `thread.Join()`：堵塞线程直到运行结束
   - `thread.Interrupt()`：打断线程执行并抛出异常
   
-  **<DRD>注意：thread.Abort()由于安全性问题不应该使用(新版本已经强制不让用了)(由于强制中断会导致资源泄露和不可预测问题)</DRD>**
+  <B><DRD>注意：thread.Abort()由于安全性问题不应该使用(新版本已经强制不让用了)(由于强制中断会导致资源泄露和不可预测问题)</DRD></B>
 
   可能的流程如下：
   <BR>
@@ -122,26 +128,26 @@
   } 
   ```
 
-  **<BL>问题：为什么`Interrupt()`后还要`Join()`</BL>**
+  <B><BL>问题：为什么`Interrupt()`后还要`Join()`</BL></B>
   <BL>因为`Interrupt()`只是打断执行，还有catch以及finally的内容需要执行，此时如果不通过`Join()`堵塞线程则可能先输出主线程的"Done"</BL>
 
-- **挂起与恢复**
+- <B>挂起与恢复</B>
 
   - `Thread.Suspend()`
   - `Thread.Resume()`
   
-  **<DRD>和`Thread.Abort()`类似，已不应该使用，因为操作存在安全性问题(死锁/特殊情况挂起)</DRD>**
-  推荐使用**锁/信号量**
+  <B><DRD>和`Thread.Abort()`类似，已不应该使用，因为操作存在安全性问题(死锁/特殊情况挂起)</DRD></B>
+  推荐使用<B>锁/信号量</B>
 
-- **超时**
+- <B>超时</B>
 
   - `Join()`传入Timeout
     - 可通过`Interrupt()`/CancellationToken进行终止
 
 <BR>
 
-**等待状态**
-前面提到的`Interrupt()`可以打断线程执行，从而结束，但存在**无法打断的情况**：
+<B>等待状态</B>
+前面提到的`Interrupt()`可以打断线程执行，从而结束，但存在<B>无法打断的情况</B>：
 
 ``` csharp
 var thread = new Thread(() =>
@@ -161,9 +167,9 @@ var thread = new Thread(() =>
 ```
 
 对于while循环，可以认为线程一直在进行操作，此时无法向操作系统让出CPU时间片，只有等到进入等待状态才可通过`Interrupt()`进行打断
-**<VT>`Interrupt()`本质上是设置了中断标志，一旦切换至等待状态，CLR则会相应中断</VT>**
+<B><VT>`Interrupt()`本质上是设置了中断标志，一旦切换至等待状态，CLR则会相应中断</VT></B>
 
-等待状态的**进入方法**有很多：
+等待状态的<B>进入方法</B>有很多：
 
 - `thread.Join();`
 - `Monitor.Enter(obj);` 如果等待锁(执行时锁获取不到)
@@ -179,21 +185,21 @@ var thread = new Thread(() =>
 ### 线程安全
 
 线程安全是<B><VT>使用多线程必须保证的内容</VT></B>
-所谓线程安全，就是要**防止发生以下情况**：
+所谓线程安全，就是要<B>防止发生以下情况</B>：
 多个线程访问共享资源时，对共享资源的访问不会导致数据不一致或不可预期的结果
 
-**线程安全的方式**有2种：
+<B>线程安全的方式</B>有2种：
 
-- **<GN>同步机制</GN>**
+- <B><GN>同步机制</GN></B>
   用于协调和控制多个线程之间执行顺序和互斥访问共享资源
   确保线程按照特定的顺序执行，避免竞态条件和数值不一致的问题
-- **<GN>原子操作</GN>**
+- <B><GN>原子操作</GN></B>
   在执行过程种不会被中断的操作，<B><DRD>不可分割</DRD></B>
   在多线程环境下，原子操作能够保证数据的一致性和可靠性，避免出现竞态条件和数据竞争的问题
 
 <BR>
 
-**<YL>举例：</YL>**
+<B><YL>举例：</YL></B>
 
 ``` csharp
 class Program
@@ -225,7 +231,7 @@ class Program
 
 理论上，我们这里希望看到的值为2次ThreadMethod()操作的20000000，但事实并非如此：
 14668877/12497755，每次输出的值还不相同
-发生以上现象的**原因**是：<B>`count++`并非原子操作</B>
+发生以上现象的<B>原因</B>是：<B>`count++`并非原子操作</B>
 
 ``` csharp
 // 读取 count 到寄存器
@@ -238,7 +244,7 @@ count = temp;
 
 以上是count++大致的运行情况，显然，只要发生同时拿到寄存器的情况，那么有一个操作就白做了，自然最终结果会变小
 
-**同步机制处理方式：**
+<B>同步机制处理方式：</B>
 
 ``` csharp
 class Program
@@ -262,7 +268,7 @@ class Program
 
 加锁后，同时只有一个线程可操作，自然不会发生上述情况
 
-**原子操作处理方式：**
+<B>原子操作处理方式：</B>
 
 ``` csharp
 private static void ThreadMethod()
@@ -283,7 +289,7 @@ private static void ThreadMethod()
 #### ThreadPool
 
 线程池显然是一个装有线程的池
-**用法**如下：
+<B>用法</B>如下：
 
 ``` csharp
 static void Main()
@@ -319,13 +325,13 @@ static void DoWork2(object state)
 可以发现，不像Thread，这里不需要进行创建操作，因为<B><VT>ThreadPool是一个静态类可直接使用</VT></B>
 而最常用的函数就是上述的<B>`ThreadPool.QueueUserWorkItem()`</B>，
 同时也有<B>`ThreadPool.UnsafeQueueUserWorkItem()`</B>，即<B><VT>不保持上下文版本</VT></B>
-也存在一些**设置/获取函数**：
+也存在一些<B>设置/获取函数</B>：
 
 - `(Get/Set)MaxThreads()`：最大工作线程数
 - `(Get/Set)MinThreads()`：最小工作线程数
 - `GetAvailableThreads()`：可用工作线程数
 
-对于上述例子，有一种**有趣的现象**：
+对于上述例子，有一种<B>有趣的现象</B>：
 
 ``` txt
 // 情况1
@@ -346,7 +352,7 @@ DoWork2执行: Hello ThreadPool - 线程ID: 3
 ```
 
 可以发现情况1中任务3的输出要比任务2快，这是正常的：线程池并不保证顺序(非FIFO)，三者几乎同时开启线程，只是任务3更快完成罢了
-也可以发现情况2中任务1完成后，任务2/3才加入，这也是正常的：可以认为任务1太快了，同时**任务2复用了该线程**进行操作
+也可以发现情况2中任务1完成后，任务2/3才加入，这也是正常的：可以认为任务1太快了，同时<B>任务2复用了该线程</B>进行操作
 
 #### Parallel
 
@@ -390,7 +396,7 @@ private static int HeavyJob(int input)
 
 对于Parallel，可添加<B><GN>ParallelOptions</GN></B>
 
-**循环控制：**
+<B>循环控制：</B>
 
 ``` csharp
 static void Main()
@@ -422,7 +428,7 @@ static void Main()
     }
 ```
 
-**`ForEach()`复杂版本：**
+<B>`ForEach()`复杂版本：</B>
 
 ``` csharp
 static void Main()
@@ -490,12 +496,12 @@ static void Main()
   - local：局部状态
 - localFinally：用各个local进行最终合并(需要lock线程安全)
 
-同样的，**`For()`也能这么写**
+同样的，<B>`For()`也能这么写</B>
 而`Invoke()`不行，这是因为<B><VT>Invoke处理的是不同任务，而For/ForEach是相同任务</VT></B>
 
 #### PLINQ
 
-PLINQ即**Parallel LINQ**，也就是<B><VT>使用LINQ语法完成的Parallel</VT></B>
+PLINQ即<B>Parallel LINQ</B>，也就是<B><VT>使用LINQ语法完成的Parallel</VT></B>
 
 ``` csharp
 static void Main(string[] args)
@@ -533,12 +539,12 @@ private static int HeavyJob(int input)
 
 ### 线程安全扩展
 
-有关线程安全实现，可以分为**原子操作**与**同步机制**
-**<VT>Tip：严格来说原子操作不属于同步机制</VT>**
+有关线程安全实现，可以分为<B>原子操作</B>与<B>同步机制</B>
+<B><VT>Tip：严格来说原子操作不属于同步机制</VT></B>
 
 #### 原子操作
 
-原子操作指的是**一步的操作**
+原子操作指的是<B>一步的操作</B>
 <B><GN>Interlocked</GN></B>是最核心最本质的原子操作，有如下操作：
 
 - `Increment()`
@@ -572,6 +578,10 @@ private static int HeavyJob(int input)
 - lock
 
 <BR>
+
+---
+---
+---
 
 # Unity的多线程
 

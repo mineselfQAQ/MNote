@@ -1,4 +1,4 @@
-**<center><BBBG>SourceTree使用</BBBG></center>**
+<center><B><BBBG>SourceTree使用</BBBG></B></center>
 
 Stash：暂存
 暂存会在STASHES中暂存一个快照

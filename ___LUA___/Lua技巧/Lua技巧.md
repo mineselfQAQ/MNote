@@ -1,4 +1,8 @@
-**<center><BBBG>lua技巧</BBBG></center>**
+<center><B><BBBG>lua技巧</BBBG></B></center>
+
+---
+---
+---
 
 # 查看指令
 

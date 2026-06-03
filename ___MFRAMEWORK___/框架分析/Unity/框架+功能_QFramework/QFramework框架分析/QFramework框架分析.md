@@ -1,4 +1,4 @@
-**<center><BBBG>QFramework框架分析</BBBG></center>**
+<center><B><BBBG>QFramework框架分析</BBBG></B></center>
 
 <!-- TOC -->
 

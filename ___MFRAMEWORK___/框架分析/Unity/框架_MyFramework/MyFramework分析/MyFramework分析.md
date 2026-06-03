@@ -1,4 +1,4 @@
-**<center><BBBG>UnityGameFramework分析</BBBG></center>**
+<center><B><BBBG>UnityGameFramework分析</BBBG></B></center>
 
 <!-- TOC -->
 
@@ -15,13 +15,17 @@
 
 <!-- /TOC -->
 
+---
+---
+---
+
 # 简述
 
 对于该框架，简单看一下项目目录即可知道其复杂度
 整体来说是非常复杂的，包括热更/混淆代码/HybridCLR等各种技术
-其**代码目录结构**如下：
+其<B>代码目录结构</B>如下：
 ![](Pic/pic1.png)
-**模块说明中提到：**
+<B>模块说明中提到：</B>
 
 - Frame_Base是项目的最基层，与项目无关，是一些宏和仅编辑器代码
 - Frame_Game/Frame_HotFix是更高一层，是项目相关内容
@@ -33,6 +37,10 @@
 
 可以看到该框架完全由asmdef完成，没有将Frame部分分层到dll中
 
+---
+---
+---
+
 # 框架
 
 从上述简述我们也能够了解到其结构
@@ -41,13 +49,15 @@
 即：<B><VT>项目只有唯一入口<GN>GameEntryDerived</GN></VT></B>
 也就是说该项目做到了唯一入口，显然这是很好的一件事<VT>(只是一定需要添加UGUIRoot，作为UI部分)</VT>
 
+---
+
 ## GameEntry
 
 先看一下GameEntry的继承链：
 `public class GameEntryDerived : GameEntry`
 `public class GameEntry : MonoBehaviour`
 这其实是显而易见的一条继承链
-**GameEntry**是实现的核心，其中**生命周期**是最关键的：
+<B>GameEntry</B>是实现的核心，其中<B>生命周期</B>是最关键的：
 
 ``` csharp
 protected static GameEntry mInstance;
@@ -188,14 +198,14 @@ protected void OnDestroy()
 - mFrameworkAOT/mFrameworkHotFix是框架的实现核心，是两个IFramework，显然一个是Base部分，一个是HotFix部分
   具体的执行则都是通过它们来完成的
 
-除了生命周期，GameEntry还提供了一些**函数**，这是通过<B><VT>单例</VT></B>完成的：
+除了生命周期，GameEntry还提供了一些<B>函数</B>，这是通过<B><VT>单例</VT></B>完成的：
 
 ``` csharp
 public static GameEntry getInstance() { return mInstance; }
 public static GameObject getInstanceObject() { return mInstance.gameObject; }
 ```
 
-再来看一下**派生类GameEntryDerived**，它复写了Awake：
+再来看一下<B>派生类GameEntryDerived</B>，它复写了Awake：
 
 ``` csharp
 public override void Awake()
@@ -211,22 +221,24 @@ public void setFrameworkAOT(IFramework framework) { mFrameworkAOT = framework; }
 ```
 
 由此可知：
-**<VT>Game是AOT情况的IFramework，同时HotFix情况的IFramework并没有一开始设置(按需创建)</VT>**
+<B><VT>Game是AOT情况的IFramework，同时HotFix情况的IFramework并没有一开始设置(按需创建)</VT></B>
 
 <BR>
+
+---
 
 ## mFrameworkAOT
 
 由上述分析可知，Game则是mFrameworkAOT
-<B><GN>Game</GN></B>的**继承链**如下所示：
+<B><GN>Game</GN></B>的<B>继承链</B>如下所示：
 `public class Game : GameFramework`
 `public class GameFramework : IFramework`
-**GameFramework**内容不多，内容有二：
+<B>GameFramework</B>内容不多，内容有二：
 
 - FrameSystem注册
 - 生命周期函数流程编写
 
-**FrameSystem**即Manager或System，也就是功能部分，GameFramework就是通过这种方式增加功能组件的，其函数为`registeFrameSystem`：
+<B>FrameSystem</B>即Manager或System，也就是功能部分，GameFramework就是通过这种方式增加功能组件的，其函数为`registeFrameSystem`：
 
 ``` csharp
 protected T registeFrameSystem<T>(Action<T> callback) where T : FrameSystem, new()
@@ -254,11 +266,11 @@ registeFrameSystem<ResourceManager>((com) => { mResourceManager = com; });
 registeFrameSystem<AssetVersionSystem>((com) => { mAssetVersionSystem = com; });
 ```
 
-**<BL>问题：mGameSceneManager之类的并没有声明，怎么使用的</BL>**
+<B><BL>问题：mGameSceneManager之类的并没有声明，怎么使用的</BL></B>
 <BL>看似没有在类中声明，但在using语句中有：`using static FrameBase;`，而这些Manager/System则是FrameBase类中的static字段</BL>
 
-流程上来说，更重要的是**生命周期函数**：
-**init**
+流程上来说，更重要的是<B>生命周期函数</B>：
+<B>init</B>
 init是`GameEntryDerived.Awake()`会进行的操作，这里结合上Game扩展的来看：
 
 ``` csharp
@@ -330,10 +342,10 @@ protected void initFrameSystem()
 ```
 
 整体来说，当然就是Base部分的初始化流程，看得出来，Base部分有的系统就是以上7种，每个部分都有自己所需进行的初始化操作，而同一的就是执行各自`init()`
-**最值得注意的操作**则是：
+<B>最值得注意的操作</B>则是：
 `mGameSceneManager.enterScene<LaunchScene>();`<B><VT>场景启动</VT></B>
 
-**update/onApplicationQuit**
+<B>update/onApplicationQuit</B>
 两者同样进行了扩展，但内容本质上很简单，即执行各系统的`update()`/`willDestroy()`/`destroy()`：
 
 ``` csharp
@@ -389,6 +401,8 @@ public void destroy()
 
 <BR>
 
+---
+
 ## mFrameworkHotFix
 
 mFrameworkHotFix会是重头戏，
@@ -406,25 +420,25 @@ public static void startHotFix(Action callback)
 }
 ```
 
-可以发现这流程与GameEntryDerived中的Awake极其相似，其实就是一个简单的**创建+init**而已
+可以发现这流程与GameEntryDerived中的Awake极其相似，其实就是一个简单的<B>创建+init</B>而已
 由此我们也可以知道<B><VT>mFrameworkHotFix所对应的IFramework为GameFrameworkHotFix</VT></B>
 
-**<BL>问题：GameHotFix是何时执行的这一系列操作</BL>**
+<B><BL>问题：GameHotFix是何时执行的这一系列操作</BL></B>
 <BL>如果查看函数调用，会发现根本找不到调用处，这其实能够说明<B><VT>调用是利用反射完成的</VT></B>
 通过<B>断点</B>的方式，我们可以看到在示例流程中是如何进入的：
 细节很多，但简单来说就是由`mGameSceneManager.enterScene<LaunchScene>()`开始场景加载流程，在完成后会由`HybridCLRSystem.launchHotFix()`启动热更</BL>
 
-**<GN>GameHotFix</GN>**
+<B><GN>GameHotFix</GN></B>
 GameHotFix是一套<B><VT>管理GameFrameworkHotFix基本流程</VT></B>的类
-其**声明**为：
+其<B>声明</B>为：
 `public class GameHotFix : GameHotFixBase`
 同样的，核心流程在GameHotFixBase中，操作仅有2个：
 
 - `start()`
 - `prestart()`
 
-两者都会由**反射**进行调用执行，
-在其中也能看到熟悉的**FrameSystem注册流程**：
+两者都会由<B>反射</B>进行调用执行，
+在其中也能看到熟悉的<B>FrameSystem注册流程</B>：
 
 ``` csharp
 // GameHotFix
@@ -490,7 +504,7 @@ protected void registeFrameSystem<T>(Action<T> callback) where T : FrameSystem, 
 }
 ```
 
-可以看到一点两者所做的操作是极为类似的，但**流程**上有很大的**不同**
+可以看到一点两者所做的操作是极为类似的，但<B>流程</B>上有很大的<B>不同</B>
 在HotFix中，对应的几个系统则就是：
 
 ``` csharp
@@ -499,7 +513,7 @@ registeFrameSystem<DemoSystem>((com) => { mDemoSystem = com; });
 registeFrameSystem<BattleSystem>((com) => { mBattleSystem = com; });
 ```
 
-**<GN>GameFrameworkHotFix</GN>**
+<B><GN>GameFrameworkHotFix</GN></B>
 GameFrameworkHotFix才是真正的IFramework，当然这与Game是非常类似的，具有一系列生命周期函数
 重要的是这里具有真正的`registeFrameSystem()`：
 
@@ -620,19 +634,21 @@ protected void initFrameSystem()
 
 由此可见项目的复杂性(功能齐全)
 
+---
+
 ## 启动流程
 
-上述只是简单地讲述了一下AOTFramework与HotFixFramework的内容，基础内容其实算是比较简单的，也就是**设置以及系统的生命周期函数框架编写**
+上述只是简单地讲述了一下AOTFramework与HotFixFramework的内容，基础内容其实算是比较简单的，也就是<B>设置以及系统的生命周期函数框架编写</B>
 同时AOTFramework是一条很明确的流程链，由GameEntryDerived可一路完成初始化以及生命周期函数设置，
-**但HotFixFramework却比较难理解**，在前面了解到有一明确的入口：
+<B>但HotFixFramework却比较难理解</B>，在前面了解到有一明确的入口：
 `mGameSceneManager.enterScene<LaunchScene>()`
 
 ### GameSceneManager
 
 可以看到<B><GN>GameSceneManager</GN></B>会是一重要的起始点
-其**声明**如下：
+其<B>声明</B>如下：
 `public class GameSceneManager : FrameSystem`
-**FrameSystem**也就是所谓的系统，需要具有一定的生命周期函数，有：
+<B>FrameSystem</B>也就是所谓的系统，需要具有一定的生命周期函数，有：
 
 ``` csharp
 public class FrameSystem
@@ -660,10 +676,10 @@ public void enterScene<T>() where T : GameScene, new()
 }
 ```
 
-可以认为这就是**mCurScene的初始化操作**，结合前面调用，初始Scene为<B><GN>LaunchScene</GN></B>
-LaunchScene的**声明**如下所示：
+可以认为这就是<B>mCurScene的初始化操作</B>，结合前面调用，初始Scene为<B><GN>LaunchScene</GN></B>
+LaunchScene的<B>声明</B>如下所示：
 `public class LaunchScene : GameScene`
-**GameScene**则是核心逻辑部分，`mCurScene.init()`执行内容如下：
+<B>GameScene</B>则是核心逻辑部分，`mCurScene.init()`执行内容如下：
 
 ``` csharp
 public virtual void init()
@@ -732,7 +748,7 @@ public T addProcedure<T>() where T : SceneProcedure, new()
 
 也就是说：<B><VT>GameScene是以状态机的形式运行的，启动时会执行相应mStartProcedure，退出时会执行相应mExitProcedure，在Procedure中会有其它`changeProcedure()`以进行状态切换</VT></B>
 
-了解一下**SceneProcedure**：
+了解一下<B>SceneProcedure</B>：
 
 ``` csharp
 public abstract class SceneProcedure
@@ -746,9 +762,9 @@ public abstract class SceneProcedure
 
 即熟悉的几种生命周期函数
 
-**依次检查LaunchScene的几个Procedure：**
+<B>依次检查LaunchScene的几个Procedure：</B>
 
-**LaunchSceneVersion**由名字可以了解到这应该是一个与<B><VT>版本有关</VT></B>的流程
+<B>LaunchSceneVersion</B>由名字可以了解到这应该是一个与<B><VT>版本有关</VT></B>的流程
 
 ``` csharp
 public class LaunchSceneVersion : SceneProcedure
@@ -830,11 +846,11 @@ public class LaunchSceneVersion : SceneProcedure
 可以看到在`init()`中可能发生`mGameSceneManager.getCurScene().changeProcedure<LaunchSceneDownload>()`，但这是在编辑器或非热更情况下的，并非一般情况则需要通过`update()`完成，即完成mRemoteDone/mStreamingDone/mPersistDone三者的任务
 对比可以发现两者进入的Procedure并不相同：
 
-- 对于一般情况：需要先进入**LaunchSceneFileList**，在等待CheckFileList完成后会进入**LaunchSceneDownload**
-- 对于编辑器或非热更情况：则直接进入**LaunchSceneDownload**
+- 对于一般情况：需要先进入<B>LaunchSceneFileList</B>，在等待CheckFileList完成后会进入<B>LaunchSceneDownload</B>
+- 对于编辑器或非热更情况：则直接进入<B>LaunchSceneDownload</B>
 
 可以了解到：<B><VT>整体几个Procedure显然都是为了下载场景资源而存在的</VT></B>
-这里我们看一下**重点**：<B><BL>启动流程为什么会进行Hotfix初始化</BL></B>
+这里我们看一下<B>重点</B>：<B><BL>启动流程为什么会进行Hotfix初始化</BL></B>
 <BL>在LaunchScene流程完成，即调用`onDownloadProgress()`时，最终会调用`LaunchSceneDownload.launch()`：</BL>
 
 ``` csharp
@@ -878,7 +894,7 @@ protected void launch()
 ```
 
 也就是说：
-**<VT>在GameSceneManager流程完成后，会立刻进入到HybridCLRSystem的流程中进行热更流程</VT>**
+<B><VT>在GameSceneManager流程完成后，会立刻进入到HybridCLRSystem的流程中进行热更流程</VT></B>
 
 <BR>
 
@@ -917,7 +933,7 @@ public static void launchHotFix(byte[] aesKey, byte[] aesIV, Action<string, Byte
 可以看到在编辑器下使用的是`launchEditor()`，而在打包情况下使用的是`launchRuntime()`，两者是不同的，这主要是因为：
 对于HybridCLR热更来说，本质流程是通过<B><VT>补充元数据后下载并热更程序集</VT></B>来完成的
 而<B><VT>在编辑器下，直接从已加载程序集去找即可，无需补充元数据</VT></B>
-简单讲述**流程**来说：
+简单讲述<B>流程</B>来说：
 <VT>HybridCLRSystem会处理完程序集的问题，随后反射调用`GameHotFixBase.preStart()`/`GameHotFix.createHotFixInstance()`/`GameHotFixBase.start()`</VT>
 
 由此，mFrameworkHotFix就与流程串联上了
@@ -926,13 +942,13 @@ public static void launchHotFix(byte[] aesKey, byte[] aesIV, Action<string, Byte
 
 ### 整体流程
 
-目前来说，看似我们对框架已经了解了，但是就以示例来说我们还是具有**疑问**：
+目前来说，看似我们对框架已经了解了，但是就以示例来说我们还是具有<B>疑问</B>：
 <YL>(初始界面UILogin有一个登录按钮/游戏界面UIGaming有一个可操作的cube)</YL>
-**<BL>为什么开始界面点击按钮后即可进入游戏界面，以及游戏界面的cube是如何移动的</BL>**
+<B><BL>为什么开始界面点击按钮后即可进入游戏界面，以及游戏界面的cube是如何移动的</BL></B>
 简单来说，以上的问题本质上都是<B><BL>System是如何运作的</BL></B>
-以下以**简单了解**进行解答：
+以下以<B>简单了解</B>进行解答：
 
-**UILogin/UIGaming**都是UI界面，生成涉及大量内容：
+<B>UILogin/UIGaming</B>都是UI界面，生成涉及大量内容：
 首先它们<B><VT>本身就是一个Prefab</VT></B>：
 ![](Pic/pic3.png)<VT>在GameResources下</VT>
 其次，它们都会<B><VT>生成一个继承于LayoutScript的类</VT></B>：UILogin/UIGaming，同时<B><VT>相应内容下都会有自动生成代码</VT></B>
@@ -991,7 +1007,7 @@ protected void onLoginClick()
 
 <BR>
 
-**Cube的创建**也发生在界面流程中，在MainSceneGaming，也就是UIGaming中有：
+<B>Cube的创建</B>也发生在界面流程中，在MainSceneGaming，也就是UIGaming中有：
 
 ``` csharp
 protected override void onInit(SceneProcedure lastProcedure)
@@ -1005,9 +1021,11 @@ protected override void onInit(SceneProcedure lastProcedure)
 
 <BR>
 
+---
+
 ## 总结
 
-根据以上框架分析，可以发现虽然该框架看似非常复杂，但是整理一下逻辑的整体是**比较清晰**的
-但是可以发现流程上是有**固定性**的：启动流程必然是从GameEntryDerived开始，这是不错的，但是AOTFramework完成后紧接着GameSceneManager，继续完成HybridCLRSystem，最后完成HotFixFramework
+根据以上框架分析，可以发现虽然该框架看似非常复杂，但是整理一下逻辑的整体是<B>比较清晰</B>的
+但是可以发现流程上是有<B>固定性</B>的：启动流程必然是从GameEntryDerived开始，这是不错的，但是AOTFramework完成后紧接着GameSceneManager，继续完成HybridCLRSystem，最后完成HotFixFramework
 这样的流程多多少少有点<B>"死板"</B>，其中一点就是<DRD>无法决定我需要加载哪些System(Manager)，且替换不灵活</DRD>
-但是这样也能让我们能够**专注于业务类的编写**，只要了解所需写法，无需考虑过多框架以及功能方面的协调，有就直接用
+但是这样也能让我们能够<B>专注于业务类的编写</B>，只要了解所需写法，无需考虑过多框架以及功能方面的协调，有就直接用

@@ -1,4 +1,4 @@
-**<center><BBBG>MVX分析</BBBG></center>**
+<center><B><BBBG>MVX分析</BBBG></B></center>
 
 <!-- TOC -->
 
@@ -15,35 +15,45 @@
 <!-- /TOC -->
 <BR>
 
-**<VT>MVX指的是任意一种MV变体，即MVC/MVP/MVVM中的一种</VT>**
-**<VT>后续将C/P/VM三者合并称为X</VT>**
+<B><VT>MVX指的是任意一种MV变体，即MVC/MVP/MVVM中的一种</VT></B>
+<B><VT>后续将C/P/VM三者合并称为X</VT></B>
+
+---
+---
+---
 
 # 前言
 
-无论有没有接触过框架，大名鼎鼎的**MVC**一般来说多多少少都听到过
-而**MVP/MVVM**就没那么出名了
+无论有没有接触过框架，大名鼎鼎的<B>MVC</B>一般来说多多少少都听到过
+而<B>MVP/MVVM</B>就没那么出名了
 无论是MVC还是MVP/MVVM，它们都是<B><GN>UI框架</GN></B>的一种
 
-**简述：**
+<B>简述：</B>
 
-- **<DRD>个人认为三者仅在特性上存在一定的区别，如何实现是自由的且区别不大的</DRD>**
+- <B><DRD>个人认为三者仅在特性上存在一定的区别，如何实现是自由的且区别不大的</DRD></B>
 - 三者的主要目的都是用于分离杂糅代码
 - 一开始的MVC/MVP被应用于后端分离，后来逐渐演变到前端(MVC/MVVM)
-  **<VT>Tip：在前后端与MVX思想无关，只是自然演变</VT>**
+  <B><VT>Tip：在前后端与MVX思想无关，只是自然演变</VT></B>
 - MVC是最初最传统的思想，而MVP/MVVM是从MVC演变过来的
-- MV---Model与View，即数据和视图，本质上三者都是希望**用某种方式Model更新后呈现在View上**
+- MV---Model与View，即数据和视图，本质上三者都是希望<B>用某种方式Model更新后呈现在View上</B>
 - MVC的C为<B><GN>Controller</GN></B>，C被用来执行M更新代码并用于更新V
 - MVP的P为<B><GN>Presenter</GN></B>，P是M/C之间沟通的唯一桥梁
-- MVVM的VM为<B><GN>View Model</GN></B>，VM是M的重组，VM收集任意数据，并提供<GN>数据绑定</GN>用于**自动**更新V
+- MVVM的VM为<B><GN>View Model</GN></B>，VM是M的重组，VM收集任意数据，并提供<GN>数据绑定</GN>用于<B>自动</B>更新V
+
+---
+---
+---
 
 # 分析
+
+---
 
 ## MVC
 
 MVC作为最早的版本，所以说架构上会显得"乱"一些，如下图所示：
 ![](Pic/MVC1.png)
 ![](Pic/MVC2.png)
-这两个都是MVC的实现，可以发现**沟通方向**是**不定**的
+这两个都是MVC的实现，可以发现<B>沟通方向</B>是<B>不定</B>的
 <B>所以说：<VT>MVC是自由的，任何MVX其实都可以被称为MVC，即MVP/MVVM是MVC的一种变体</VT></B>
 
 Controller是一个<B><VT>用于将Model数据变化更新到View上的一个沟通类</VT></B>：
@@ -51,10 +61,10 @@ Controller是一个<B><VT>用于将Model数据变化更新到View上的一个沟
 - Controller可以提供`UpdateView()`更新View
 - Controller可以包装Model函数用于控制(执行)
 
-**<YL>随便举个例子就是：</YL>**
+<B><YL>随便举个例子就是：</YL></B>
 <YL>初始`HP=10`，点击Btn后由于监听函数的原因，Controller调用`Damage(10)`更新Model(因为本质上调用的是`_model.TakeDamage(10)`)，同时再次调用`UpdateView()`进行视图更新</YL>
 
-这里比较**关键的点**在于：
+这里比较<B>关键的点</B>在于：
 
 ``` csharp
 // HPController
@@ -70,20 +80,22 @@ public void UpdateHPDisplay(int currentHP, int maxHP)
 }
 ```
 
-**<BL>问题：为什么View不能自己更新视图，要Controller进行</BL>**
+<B><BL>问题：为什么View不能自己更新视图，要Controller进行</BL></B>
 <BL>答案其实很明显，即更新需要提供Model，这就是<B>Controller存在的意义</B>：
 <B><VT>Controller获取Model与View，并在内部将Model提供给View<VT></B></BL>
 
-**<DRD>这一思想是MVX的根，不仅仅是MVC</DRD>**
+<B><DRD>这一思想是MVX的根，不仅仅是MVC</DRD></B>
+
+---
 
 ## MVP
 
 MVP也是一个比较老的版本了，是在后端时代由MVC演变过来的
 如下图所示：
 ![](Pic/MVP1.png)
-可以发现MVP就显得**规整**很多，**即：<VT>Model与Presenter可以交换数据，View与Presenter同样可以交换数据，同时也意味着必须通过Presenter才能将Model传输给View</VT>**
+可以发现MVP就显得<B>规整</B>很多，<B>即：<VT>Model与Presenter可以交换数据，View与Presenter同样可以交换数据，同时也意味着必须通过Presenter才能将Model传输给View</VT></B>
 
-Presenter在**思路**上和Controller比是**恰恰相反**的：
+Presenter在<B>思路</B>上和Controller比是<B>恰恰相反</B>的：
 
 - 由于Presenter是"核心"，<B><VT>具有绝对的掌握权</VT></B>
   - Presenter获取View可自行进行Btn绑定
@@ -93,6 +105,8 @@ Presenter在**思路**上和Controller比是**恰恰相反**的：
 
 显然，MVP的代码会<B><GN>更加规整</GN></B>，同时Presenter<B><DRD>承担的职责也更多了，会变得越来越庞大</DRD></B>
 
+---
+
 ## MVVM
 
 MVVM可以说是MVC演变的最终完整体，如下图所示：
@@ -100,16 +114,16 @@ MVVM可以说是MVC演变的最终完整体，如下图所示：
 ![](Pic/MVVM2.png)
 <B><GN>数据绑定</GN></B>这一特点代表了MVVM，简单来说就是<VT>ViewModel进行了两侧的绑定，使得我们更新ViewModel的数据从而影响真正的Model，同时View也同步刷新</VT>
 
-VM其它方面和C/P没什么区别，重点还是在于**数据绑定**：
+VM其它方面和C/P没什么区别，重点还是在于<B>数据绑定</B>：
 可以说是有<B><VT>四向绑定</VT></B>：
 
-- **Model--->ViewModel (绑定)**
+- <B>Model--->ViewModel (绑定)</B>
   在Model中添加事件以将Model的变化通知ViewModel
-- **ViewModel--->Model (扩展调用)**
+- <B>ViewModel--->Model (扩展调用)</B>
   扩展Model操作
-- **ViewModel--->View (绑定)**
+- <B>ViewModel--->View (绑定)</B>
   由BindableProperty注册的事件触发视图更新
-- **View--->ViewModel (按钮绑定)**
+- <B>View--->ViewModel (按钮绑定)</B>
   Btn绑定，ViewModel提供操作
 <BR>
 
@@ -173,6 +187,8 @@ public class HPViewModel
 }
 ```
 
+---
+
 ## 扩展
 
 MVX本身很简单，就是一个通过X将Model与View分离的框架
@@ -184,8 +200,8 @@ BindableProperty本身就是一种扩展，实现MVVM最简单的方式应该就
 
 ### Command
 
-Command可以说是**最简单最实用**的一种了
-其**作用**为<B><VT>封装X的内容</VT></B>
+Command可以说是<B>最简单最实用</B>的一种了
+其<B>作用</B>为<B><VT>封装X的内容</VT></B>
 
 AI提出的扩展点：
 
@@ -212,5 +228,9 @@ AI提出的扩展点：
   - 差分传输
   - 预取缓存
   - 懒加载
+
+---
+---
+---
 
 # 各框架思路对比

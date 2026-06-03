@@ -1,6 +1,12 @@
-**<center><BBBG>Unity重要设置</BBBG></center>**
+<center><B><BBBG>Unity重要设置</BBBG></B></center>
+
+---
+---
+---
 
 # Project Settings
+
+---
 
 ## Player
 

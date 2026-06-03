@@ -1,4 +1,4 @@
-**<center><BBBG>MyUnityFramework分析</BBBG></center>**
+<center><B><BBBG>MyUnityFramework分析</BBBG></B></center>
 
 <!-- TOC -->
 
@@ -10,19 +10,29 @@
 
 <!-- /TOC -->
 
+---
+---
+---
+
 # 简述
 
 该框架是一个比较老旧的框架了，查看其[Github](https://github.com/kisence-mian/MyUnityFrameWork)会发现上一次更新已经是2020年了，但整体来说也不算太过久远
-简单看一下**框架目录**：
+简单看一下<B>框架目录</B>：
 ![](Pic/pic1.png)
 其中Core是核心部分，查看每一部分(Application/Audio/...)，会发现是<B><VT>由Mananger构成的</VT></B>
 
+---
+---
+---
+
 # 框架
 
-对于该框架，可以说简单到没有框架了，查看其**示例项目main**：
+对于该框架，可以说简单到没有框架了，查看其<B>示例项目main</B>：
 ![](Pic/pic2.png)
-可以看到程序部分由ApplicationManager中的**ApplicationManager.cs**管理
-而UI部分由UIManager中的**UIManager.cs/UIAnimManager.cs/UILayerManager.cs/UIStackManager.cs**管理
+可以看到程序部分由ApplicationManager中的<B>ApplicationManager.cs</B>管理
+而UI部分由UIManager中的<B>UIManager.cs/UIAnimManager.cs/UILayerManager.cs/UIStackManager.cs</B>管理
+
+---
 
 ## ApplicationManager
 
@@ -42,7 +52,7 @@ public static ApplicationManager Instance
 }
 ```
 
-对于该最大的Manager中**启动流程Awake**是至关重要的：
+对于该最大的Manager中<B>启动流程Awake</B>是至关重要的：
 
 ``` csharp
 public void Awake()
@@ -129,7 +139,7 @@ public void AppLaunch()
 可以看到简单来说就是<B><VT>以一定的顺序进行子Manager的初始化操作</VT></B>
 所以我说这个框架并不能算严格意义上的框架
 
-另一点是**生命周期事件回调**：
+另一点是<B>生命周期事件回调</B>：
 
 ``` csharp
 public delegate void ApplicationBoolCallback(bool status);
@@ -216,7 +226,7 @@ private void OnDrawGizmos()
 }
 ```
 
-可以看到本质上仅是一个**delegate**，会在需要时添加而已
+可以看到本质上仅是一个<B>delegate</B>，会在需要时添加而已
 <YL>随便举个例子如Timer：</YL>
 
 ``` csharp
@@ -226,9 +236,11 @@ public static void Init()
 }
 ```
 
+---
+
 ## UIManager
 
-UIManager本质上**管理着其它几个Manager**：
+UIManager本质上<B>管理着其它几个Manager</B>：
 
 ``` csharp
 public class UIManager : MonoBehaviour
@@ -243,7 +255,9 @@ public class UIManager : MonoBehaviour
 看似UIManager独立于ApplicationManager(因为需要挂载)，但事实并不如此：
 UIManager依旧出现在ApplicationManager.Awake的启动流程中
 之所以这样是因为：
-**<VT>ApplicationStatusManager是一个MonoBehaviour，需要挂载，而像Timer/InputManager之类的，虽然有些有Manager后缀，但不意味着继承了MonoBehaviour</VT>**
+<B><VT>ApplicationStatusManager是一个MonoBehaviour，需要挂载，而像Timer/InputManager之类的，虽然有些有Manager后缀，但不意味着继承了MonoBehaviour</VT></B>
+
+---
 
 ## 总结
 

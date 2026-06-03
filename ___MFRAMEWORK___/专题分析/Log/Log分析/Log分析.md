@@ -1,4 +1,4 @@
-**<center><BBBG>Log分析</BBBG></center>**
+<center><B><BBBG>Log分析</BBBG></B></center>
 
 <!-- TOC -->
 
@@ -10,18 +10,28 @@
 
 <!-- /TOC -->
 
+---
+---
+---
+
 # 简述
 
-Log是项目中**极其常见**的一项内容，是一种<B><VT>提示方式</VT></B>
+Log是项目中<B>极其常见</B>的一项内容，是一种<B><VT>提示方式</VT></B>
 Unity自带的Log为<B><GN>Debug类</GN></B>，如`Debug.Log()`，虽然简单输出足够起到提示作用，但功能性略弱
+
+---
+---
+---
 
 # 参考实现
 
 参考对象有以下几个：
 
-- **QFramework**
-- **LoxodonFramework**
-- **MFramework(老)**
+- <B>QFramework</B>
+- <B>LoxodonFramework</B>
+- <B>MFramework(老)</B>
+
+---
 
 ## QFramework
 
@@ -47,7 +57,7 @@ public static void I(object msg, params object[] args)
 }
 ```
 
-可以看到很简单，为`Debug.Log()`/`Debug.LogFormat()`的合并封装，同时增加**Log等级**：
+可以看到很简单，为`Debug.Log()`/`Debug.LogFormat()`的合并封装，同时增加<B>Log等级</B>：
 
 ``` csharp
 public enum LogLevel
@@ -170,6 +180,8 @@ LogKit比较有用的的以下部分：
   #endif
   ```
 
+---
+
 ## LoxodonFramework
 
 LoxodonFramework所对应的核心类为<B><GN>LogManager</GN></B>
@@ -180,6 +192,8 @@ LoxodonFramework所对应的核心类为<B><GN>LogManager</GN></B>
   - 在DefaultLogFactory中，每个ILog都是LogImpl
     - 封装基本上仅实现了额外信息输出(还有inUnity区分，倒是没什么用)
     - 默认不限制Level，需通过如`IsDebugEnabled()`自行开启限制
+
+---
 
 ## MFramework
 
@@ -216,7 +230,7 @@ public static void Print(object message, MLogType type = MLogType.Log, Object co
 }
 ```
 
-除了QFramework也使用的**UnityConsole面板双击后定位源码位置**以外，还有**日志功能**：
+除了QFramework也使用的<B>UnityConsole面板双击后定位源码位置</B>以外，还有<B>日志功能</B>：
 
 ``` csharp
 // 结合框架的INeedInit, INeedQuit，配合MCore自动调用

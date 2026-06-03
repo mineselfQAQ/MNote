@@ -1,4 +1,4 @@
-**<center><BBBG>C#文件读写</BBBG></center>**
+<center><B><BBBG>C#文件读写</BBBG></B></center>
 
 <!-- TOC -->
 
@@ -6,6 +6,10 @@
 - [环境](#环境)
 
 <!-- /TOC -->
+
+---
+---
+---
 
 # 简述
 
@@ -33,6 +37,9 @@
   - StringReader/StringWriter
   - TextReader/TextWriter
 
-# 环境
+---
+---
+---
 
+# 环境
 

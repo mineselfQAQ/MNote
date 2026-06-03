@@ -1,8 +1,8 @@
-**<center><BBBG>WPF简述</BBBG></center>**
+<center><B><BBBG>WPF简述</BBBG></B></center>
 
 这里只是简单做一下WPF的笔记
 
-对于一个新创建的项目，**解决方案**通常是这样的：
+对于一个新创建的项目，<B>解决方案</B>通常是这样的：
 ![](Pic/wpf1.png)
 这里的控制源是App.xaml，其代码为：
 
@@ -54,7 +54,7 @@
 
 而`<Button>`之类的则被称为<B><GN>控件</GN></B>
 
-**<YL>举例：</YL>**
+<B><YL>举例：</YL></B>
 
 ``` xaml
 <Window x:Class="Wpf_Study.MainWindow"
@@ -122,18 +122,18 @@
 <YL>效果如下：</YL>
 ![](Pic/wpf2.png)
 
-简单讲述一下**注意点**：
+简单讲述一下<B>注意点</B>：
 
 - `<Grid>`可嵌套，那么在某一行或某一列时可进行细分
 - 对于`<Grid.RowDefinitions>`/`<Grid.ColumnDefinitions>`来说，可填写`Height`/`Width`，其中：
-  - **<VT>Tip：`1*`代表着一份</VT>**
+  - <B><VT>Tip：`1*`代表着一份</VT></B>
   - 没有填写则会分配`1*`，也可指定具体数值/`x*`/`"AUTO"`
 - 可以看到<B><VT>`<StackPanel>`形成的是非动态的，而`<Grid>`结合Definitions可形成动态的</VT></B>，将窗口大小改变即可发现：
   ![](Pic/wpf3.png)
 
 <BR>
 
-<B><GN>样式</GN></B>也是比较关键的内容，**一般写法**可能如下：
+<B><GN>样式</GN></B>也是比较关键的内容，<B>一般写法</B>可能如下：
 
 ``` xaml
 <Window>
@@ -151,7 +151,7 @@
 
 使用则可以通过`Style = "{StaticResource Style1}"`来指定控件Style
 除了StaticResource还有DynamicResource，也就是可以<VT>自动进行切换</VT>的形式
-还有一种**默认应用+额外的写法**：
+还有一种<B>默认应用+额外的写法</B>：
 
 ``` xaml
 <Window>
@@ -173,7 +173,7 @@
 ```
 
 上述2种都是在该xaml中进行创建的，显然样式只能应用于当前xaml窗口，而且会与布局设置混在一起
-可以通过<B><GN>资源字典</GN></B>的方式进行创建，**对项目右键添加**即可，内容大致如下：
+可以通过<B><GN>资源字典</GN></B>的方式进行创建，<B>对项目右键添加</B>即可，内容大致如下：
 
 ``` xaml
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -184,7 +184,7 @@
 </ResourceDictionary>
 ```
 
-其实很简单，对于使用，则需要**在核心文件App.xaml中进行全局添加**：
+其实很简单，对于使用，则需要<B>在核心文件App.xaml中进行全局添加</B>：
 
 ``` xaml
 <Application x:Class="Wpf_Study.App"
@@ -250,11 +250,11 @@
 
 <B><GN>事件</GN></B>是控件中相当重要的内容，其实相当简单：
 比如说Button的点击事件，添加`Click=`即可，选择创建则会在xaml.cs文件中生成相应的事件，编写C#代码即可，访问控件只需添加`x:Name`即可访问相应控件
-也许我们会不清楚**事件有哪些**，比较好的查看方式是点击相应控件查看其属性：
+也许我们会不清楚<B>事件有哪些</B>，比较好的查看方式是点击相应控件查看其属性：
 ![](Pic/wpf4.png)
 同时输入即创建，也很方便
 
-<B><GN>绑定</GN></B>是更重要的一项内容，绑定可以分为单向绑定以及双向绑定，先看一下**单向绑定**：
+<B><GN>绑定</GN></B>是更重要的一项内容，绑定可以分为单向绑定以及双向绑定，先看一下<B>单向绑定</B>：
 `<TextBox Text="{Binding UserName}" x:Name="txtUserName" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Margin="2"/>`
 `<TextBox Text="{Binding Password}" x:Name="txtPassword" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="2"/>`
 
@@ -288,9 +288,9 @@ public partial class MainWindow : Window
 }
 ```
 
-**注意点：<VT>`this.DataContext = this;`必须设置</VT>**
+<B>注意点：<VT>`this.DataContext = this;`必须设置</VT></B>
 以上只是单项绑定，方向为xaml->C#，修改控件则会传递到C#属性中
-但是需要**双向绑定**才能将数据传递回视图：
+但是需要<B>双向绑定</B>才能将数据传递回视图：
 
 ``` csharp
 public partial class MainWindow : Window, INotifyPropertyChanged
@@ -361,7 +361,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 这其实是一种固定写法，记住即可
 
 <B><GN>MVVM</GN></B>也是编写WPF极常用的概念
-用前面的例子简单应用一下**Model**：
+用前面的例子简单应用一下<B>Model</B>：
 
 ``` csharp
 public partial class MainWindow : Window
@@ -437,10 +437,10 @@ public class LoginModel : INotifyPropertyChanged
 ```
 
 这里其实我们能够理<B>`DataContext`是什么含义</B>：
-**<VT><GN>DataContext</GN>其实就是数据上下文，也就是数据从那个实例中获取，原来之所以是this是因为确实直接在MainWindow中声明的属性，而现在被移至LoginModel后，DataContext也就相应的变为了LoginModel实例</VT>**
+<B><VT><GN>DataContext</GN>其实就是数据上下文，也就是数据从那个实例中获取，原来之所以是this是因为确实直接在MainWindow中声明的属性，而现在被移至LoginModel后，DataContext也就相应的变为了LoginModel实例</VT></B>
 
 以上并非真正意义上的Model，Model仅模型，也就是数据本体，但是这里承担了过多的内容并不符合
-这里扩展成**Model+ViewModel**以此介绍一下<B><GN>命令绑定</GN></B>：
+这里扩展成<B>Model+ViewModel</B>以此介绍一下<B><GN>命令绑定</GN></B>：
 
 ``` csharp
 public partial class MainWindow : Window
@@ -570,7 +570,7 @@ class LoginViewModel : INotifyPropertyChanged
 ```
 
 在这里ViewModel将承担更多的职责，绑定/触发/业务逻辑都是由它来进行
-**命令绑定**就是由<B><GN>ICommand</GN></B>进行的：
+<B>命令绑定</B>就是由<B><GN>ICommand</GN></B>进行的：
 
 ``` csharp
 class RelayCommand : ICommand
@@ -619,15 +619,15 @@ class RelayCommand : ICommand
 }
 ```
 
-总的来说也是一种**固定写法**
+总的来说也是一种<B>固定写法</B>
 
-**关键的是xaml：**
-**<VT>在xaml中需要使用Command属性替代Click属性</VT>**
+<B>关键的是xaml：</B>
+<B><VT>在xaml中需要使用Command属性替代Click属性</VT></B>
 `<Button Command="{Binding LoginAction}" Grid.ColumnSpan="2" Content="登录" Grid.Row="3" Grid.Column="0"/>`
 
 <BR>
 
-**自定义控件**
+<B>自定义控件</B>
 有时我们会需要自定义控件，方法很简单：
 创建一个类，将它继承于原控件(如Button)，在使用时通过`<local:类名 />`即可使用
 而这local正是一开始提到的命名空间：
@@ -670,8 +670,8 @@ class CustomButton : Button
 }
 ```
 
-**可以发现：**
-**<VT>对于C#内置没有提供的绑定内容，可通过创建<GN>DependencyProperty</GN>来完成</VT>**
+<B>可以发现：</B>
+<B><VT>对于C#内置没有提供的绑定内容，可通过创建<GN>DependencyProperty</GN>来完成</VT></B>
 可通过`propdp`+tab快速构建
 
 ``` xaml

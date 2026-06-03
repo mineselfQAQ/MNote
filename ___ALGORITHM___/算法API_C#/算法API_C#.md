@@ -1,4 +1,4 @@
-**<center><BBBG>算法API_C#</BBBG></center>**
+<center><B><BBBG>算法API_C#</BBBG></B></center>
 
 在算法中时常会遇到一些情况需要转化等操作，这里记录一下相应API
 
@@ -20,6 +20,8 @@
 # 数组
 
 注意：string具有不变性，不能直接`[]`访问
+
+---
 
 ## string
 
@@ -45,6 +47,8 @@
 - 拆分
   - `string[] parts = s.Split(' ');`
 
+---
+
 ## char
 
 - 判断
@@ -58,6 +62,8 @@
   - `char.ToLower(c)`
   - `char.ToUpper(c)`
 
+---
+
 ## 数组
 
 - 排序
@@ -67,6 +73,8 @@
   - `Array.Copy(arr1, arr2, len)`
 - 查找
   - `Array.IndexOf(arr, 3)`
+
+---
 
 ## 转换
 

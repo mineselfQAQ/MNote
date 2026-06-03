@@ -1,4 +1,4 @@
-**<center><BBBG>Git规则</BBBG></center>**
+<center><B><BBBG>Git规则</BBBG></B></center>
 
 - 日常提交标题
   `[xxxx_xx_xx][tag] 内容`

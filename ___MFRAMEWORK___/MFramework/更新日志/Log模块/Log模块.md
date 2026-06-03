@@ -1,10 +1,16 @@
-**<center><BBBG>Log模块</BBBG></center>**
+<center><B><BBBG>Log模块</BBBG></B></center>
+
+---
+---
+---
 
 # v1.0
 
+---
+
 ## 概述
 
-**Log设计**如下：
+<B>Log设计</B>如下：
 
 - 核心
   - MLog(static)：核心静态类，基础设置以及日志都在该类中
@@ -16,7 +22,7 @@
 
 <BR>
 
-一些**注意事项**：
+一些<B>注意事项</B>：
 
 - 内部创建使用InternalLog，没有提供封装函数，使用`new Internal(nameof(xxx))`即可
   用户创建提供封装函数`MLog.Create<T>()`，一个类仅存在一个实例
@@ -44,6 +50,8 @@
       return MLog.BUILD_FILTER;
   }
   ```
+
+---
 
 ## 使用例
 

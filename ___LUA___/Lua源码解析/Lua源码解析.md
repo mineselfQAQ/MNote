@@ -1,4 +1,4 @@
-**<center><BBBG>lua5.3.6源码解析</BBBG></center>**
+<center><B><BBBG>lua5.3.6源码解析</BBBG></B></center>
 
 <!-- TOC -->
 
@@ -116,6 +116,8 @@
 # 关键数据结构
 
 lua源码中数据结构众多，涉及面广很容易忘记，但是本质上重要的其实并不算太多
+
+---
 
 ## lua_State / global_State
 
@@ -262,6 +264,8 @@ static void f_luaopen (lua_State *L, void *ud) {
   - `_ENV`预创建（`#define LUA_ENV		"_ENV"`）
   - 保留字预创建，并设置`ts->extra`为非0值
 
+---
+
 ## LexState / FuncState
 
 从名字上来看，和lua_State / global_State是一类内容
@@ -342,6 +346,8 @@ typedef union {
 
 也就是说：如果token代表着一个值（TK_NUMBER/TK_STRING/TK_NAME），则会记录
 
+---
+
 ## _ENV
 
 流程如下：
@@ -395,6 +401,8 @@ end
 
 总有些函数是出现在各个模块之中的，这里简单介绍一下
 
+---
+
 ## `index2addr`
 
 ``` c
@@ -436,9 +444,15 @@ static TValue *index2addr (lua_State *L, int idx) {
 
 <B><VT>Tip：`L->top`不是栈顶而是栈顶后下一个可用位置</VT></B>
 
+---
+---
+---
+
 # 数据结构
 
 在lua中，数据结构具有一定的封装，最常见在源码中见到的就是TValue
+
+---
 
 ## 数据结构基础
 
@@ -798,7 +812,7 @@ typedef struct stringtable {
 
 <B><BL>问题：nuse和size的区别</BL></B>
 <BL>其实很明确，nuse即已存在数量，size为桶大小</BL>
-可以看到`hash`是TString**类型，即数组，这与哈希计算可以对应上，即<B><GN>拉链法</GN></B>哈希冲突方案
+可以看到`hash`是`TString**`类型，即数组，这与哈希计算可以对应上，即<B><GN>拉链法</GN></B>哈希冲突方案
 
 #### 长字符串
 
@@ -2344,6 +2358,8 @@ l_noret luaD_throw (lua_State *L, int errcode) {
 
 # 编译与虚拟机执行流程
 
+---
+
 ## 启动
 
 在lua中，启动方式有很多，简单来说：
@@ -2709,6 +2725,8 @@ typedef unsigned long Instruction;
         - 会通过`luaK_XXX()`生成指令
       - 最终遇到终止符退出
 
+---
+
 ## 执行期
 
 针对官方用法（lua.c），有：
@@ -2831,6 +2849,8 @@ void luaV_execute (lua_State *L) {
 
 当虚拟机执行完毕，<B>最后一次</B>必然会遇到OP_RETURN执行返回
 其中会进行`luaD_poscall()`进行善后处理
+
+---
 
 ## 示例
 
@@ -2993,6 +3013,8 @@ struct UpVal {
   - open：开启状态
   - value：关闭状态，upvalue此时存储在value中
 
+---
+
 ## upvalue判定
 
 在编译期中，寻找顺序如下：
@@ -3022,7 +3044,7 @@ static int newupvalue (FuncState *fs, TString *name, expdesc *v) {
 
 在`singlevaraux()`中根据情况都会设置好
 
-
+---
 
 ## 开启情况
 
@@ -3056,6 +3078,8 @@ f = outer()
 - 函数返回前，为open状态，此时`UpVal.v`是栈上的值
 - 函数返回时，会执行`luaF_close()`，会把所有相关UpVal拷贝至堆(`uv->u.value`)并改指向（`uv->v`->`uv->u.value`）
 - 函数返回后，为closed状态，此时`UpVal->v`是`UpVal->u.value`（与`upisopen()`对应）
+
+---
 
 ## `openupval`
 
@@ -3128,6 +3152,10 @@ void luaF_close (lua_State *L, StkId level) {
 
 # 元表
 
+---
+---
+---
+
 # load
 
 load是加载流程，对于lua文件本身是必定会执行的
@@ -3147,6 +3175,8 @@ lua中的函数有以下几种：
 {"loadfile", luaB_loadfile},
 {"load", luaB_load},
 ```
+
+---
 
 ## `luaB_load`
 
@@ -3175,6 +3205,8 @@ static int luaB_load (lua_State *L) {
 - 否则只能是function，走`lua_load()`
 - 最终由`load_aux()`更改env
 
+---
+
 ## `luaB_loadfile`
 
 ``` c
@@ -3191,6 +3223,8 @@ static int luaB_loadfile (lua_State *L) {
 
 <B><BL>问题：`load_aux()`是什么</BL></B>
 <BL>设置的就是`_ENV`，在此之前无论怎么进入都会执行`lua_load()`，此时第一个upvalue必定会被设置为全局表，经过`load_aux()`后，只要有env就可以进行覆盖</BL>
+
+---
 
 ## `luaB_dofile`
 
@@ -3225,6 +3259,8 @@ return f, err
 local f = assert(loadfile(fname))
 return f()
 ```
+
+---
 
 ## require
 
@@ -3346,6 +3382,8 @@ static int searcher_C (lua_State *L) {
 - table/userdata：对象级元表
 - number/string/function之类的基础类型：类型级元表
 
+---
+
 ## 初始化
 
 在`luaT_init()`中进行了元表名字的初始化：
@@ -3370,6 +3408,8 @@ void luaT_init (lua_State *L) {
 ```
 
 可以看到名字在`G(L)->tmname`中，<B><VT>后续查表方便</VT></B>
+
+---
 
 ## 查询
 
@@ -3413,6 +3453,8 @@ const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
 这里就能看出上述的一个情况：
 <B><VT>table/userdata是特殊的，对象具有metatable，而其他的在`G(L)->mt`存有类级别metatable</VT></B>
 
+---
+
 ## 调用
 
 调用最常用的是以下几种：
@@ -3449,6 +3491,8 @@ void luaT_callTM (lua_State *L, const TValue *f, const TValue *p1,
 元表调用情况如下：
 <B><VT>VM中，大多数运算会先走VM原生快路径（比如a+b可以当然就直接算掉了/表能找到value当然就直接取了），走不通才会尝试元方法，这是流程的一部分并非非法操作
 如果需要原生，则可以调用`rawget()`/`rawset()`/`rawequal()`之类的方法绕过</VT></B>
+
+---
 
 ## 其它
 

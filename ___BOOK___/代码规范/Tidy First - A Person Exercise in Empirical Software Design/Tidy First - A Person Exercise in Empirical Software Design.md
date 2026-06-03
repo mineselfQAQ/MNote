@@ -1,12 +1,16 @@
-**<center><BBBG>Tidy First - A Person Exercise in Empirical Software Design</BBBG></center>**
+<center><B><BBBG>Tidy First - A Person Exercise in Empirical Software Design</BBBG></B></center>
 
 译名：整理优先 小改进，大回报，整洁代码设计指南
 
+---
+---
+---
+
 # 第一部分：整理
 
-<B><GN>重构</GN></B>需满足**不改变行为**：
+<B><GN>重构</GN></B>需满足<B>不改变行为</B>：
 重构的核心原则就是<B><VT>在不改变外部可见行为的前提下，优化代码的内部结构</VT></B>
-也就是说重构应该只是**优化复杂度/修改命名/拆分整合代码之类"让代码更好看"的操作**
+也就是说重构应该只是<B>优化复杂度/修改命名/拆分整合代码之类"让代码更好看"的操作</B>
 如果需要大改，这应该被称为<B><GN>重写</GN></B>
 
 <BR>

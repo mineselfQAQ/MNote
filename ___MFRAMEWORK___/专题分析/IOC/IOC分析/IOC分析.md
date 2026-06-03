@@ -1,4 +1,4 @@
-**<center><BBBG>IOC分析</BBBG></center>**
+<center><B><BBBG>IOC分析</BBBG></B></center>
 
 <!-- TOC -->
 
@@ -15,32 +15,42 @@
 
 <!-- /TOC -->
 
+---
+---
+---
+
 # 简述
 
 <B><GN>控制反转Inversion of Control</GN></B>是重要的一个知识点
-**思想：<VT>将程序中对象创建、依赖管理的控制权，从程序内部代码“反转”到外部容器或框架</VT>**
-**简单来说：<VT>并非自己创建，而是由他人提供(所需的对象)</VT>**
+<B>思想：<VT>将程序中对象创建、依赖管理的控制权，从程序内部代码“反转”到外部容器或框架</VT></B>
+<B>简单来说：<VT>并非自己创建，而是由他人提供(所需的对象)</VT></B>
 
 IOC的实现方式一般有2种：
 
 - <B><GN>依赖注入DI</GN></B>
 - <B><GN>服务定位器SL</GN></B>
 
-**SL**是一种更简单的实现，需**主动获取**
-**DI**是更高级的实现，可**自动注入**
+<B>SL</B>是一种更简单的实现，需<B>主动获取</B>
+<B>DI</B>是更高级的实现，可<B>自动注入</B>
+
+---
+---
+---
 
 # 参考实现
+
+---
 
 ## SL
 
 SL的参考对象有： <VT>由易到难</VT>
 
-- **QFramework**
-- **LoxodonFramework**
+- <B>QFramework</B>
+- <B>LoxodonFramework</B>
 
 ### QFramework
 
-QFramework中的SL实现为**IOCContainer**，是核心中附带的(DI是Kit中的)
+QFramework中的SL实现为<B>IOCContainer</B>，是核心中附带的(DI是Kit中的)
 IOCContainer其实就是<B><VT>用一个字典去存储实例</VT></B>：
 
 ``` csharp
@@ -87,9 +97,9 @@ public class IOCContainer
 ### LoxodonFramework
 
 LoxodonFramework中用于提供IOC的是<B><GN>ServiceContainer</GN></B>
-其**声明**如下：
+其<B>声明</B>如下：
 `public class ServiceContainer : IServiceContainer, IDisposable`
-**IServiceContainer接口**是这样的：
+<B>IServiceContainer接口</B>是这样的：
 
 ``` csharp
 public interface IServiceContainer : IServiceLocator, IServiceRegistry {}
@@ -122,7 +132,7 @@ public interface IServiceRegistry
 
 <BR>
 
-在分析前先了解一下**创建流程**：
+在分析前先了解一下<B>创建流程</B>：
 `IServiceContainer container = context.GetContainer();`
 context为<B><GN>ApplicationContext</GN></B>，是项目的核心之一，有：
 
@@ -147,10 +157,10 @@ public virtual IServiceContainer GetContainer()
 
 <BR>
 
-**回到ServiceContainer：**
+<B>回到ServiceContainer：</B>
 根据上述接口可知：作为SL形态的IOC，无非就是`Register()`/`Resolve()`/`Unregister()`三个操作
 
-**<GN>Entry</GN>**
+<B><GN>Entry</GN></B>
 Entry是用于存储的数据结构，如下：
 
 ``` csharp
@@ -168,9 +178,9 @@ public Entry(string name, Type type, IFactory factory)
 - `GenericFactory<T>`：泛型工厂，传入`Func<T>`，创建时调用返回T
 - `SingleInstanceFactory`：单例工厂，传入target实例，创建时获取返回即可
 
-显然：**泛型工厂**是<B><VT>延迟创建</VT></B>，**单例工厂**相当于是<B><VT>预存结果</VT></B>
+显然：<B>泛型工厂</B>是<B><VT>延迟创建</VT></B>，<B>单例工厂</B>相当于是<B><VT>预存结果</VT></B>
 
-**`Register()`**
+<B>`Register()`</B>
 注册有6种形式，但无非就是两种工厂选一个，注册的核心为`Register0()`：
 
 ``` csharp
@@ -215,26 +225,28 @@ internal void Register0(string name, IFactory factory)
 
 整体来说相当简单，无非就是<VT>将信息收集到字典中，供解析使用</VT>
 
-**`Resolve()`**
+<B>`Resolve()`</B>
 解析那就更简单了，<VT>从字典中获取了调用工厂</VT>即可
 
-**`Unregister()`**
+<B>`Unregister()`</B>
 反注册同样简单，<VT>从字典中移除相应Entry</VT>即可
 有一点需要注意：由于Type形式注册中为两个字典都添加了一份，所以反注册时需要考虑到这一点
+
+---
 
 ## DI
 
 DI的参考对象有： <VT>由易到难</VT>
 
-- **QFramework**
-- **CatLib**
-- **MicrosoftDI**
+- <B>QFramework</B>
+- <B>CatLib</B>
+- <B>MicrosoftDI</B>
 
 ### QFramework
 
-QFramework除了核心附带的**IOCContainer**，另一种是**IOCKit**
+QFramework除了核心附带的<B>IOCContainer</B>，另一种是<B>IOCKit</B>
 IOCKit作为一个Kit提供，实现的是最精简版的DI
-提供了2种注入手段：**[Inject]特性/QFrameworkContainer派生**
+提供了2种注入手段：<B>[Inject]特性/QFrameworkContainer派生</B>
 
 ``` csharp
 public class IOCFrameworkExample : MonoBehaviour
@@ -287,7 +299,7 @@ public class MainContainer : QFrameworkContainer, ISingleton
 
 <BR>
 
-<B><GN>QFrameworkContainer</GN></B>显然是最重要的一个类，核心函数都在其中，由**IQFrameworkContainer接口**可知：
+<B><GN>QFrameworkContainer</GN></B>显然是最重要的一个类，核心函数都在其中，由<B>IQFrameworkContainer接口</B>可知：
 
 ``` csharp
 public interface IQFrameworkContainer
@@ -336,14 +348,14 @@ public interface IQFrameworkContainer
 - <B><GN>TypeInstanceCollection</GN></B>
 - <B><GN>TypeRelationCollection</GN></B>
 
-先看它们的**声明**：
+先看它们的<B>声明</B>：
 `public class TypeMappingCollection : Dictionary<Tuple<Type, string>, Type>`
 `public class TypeInstanceCollection : Dictionary<Tuple<Type, string>, object>`
 `public class TypeRelationCollection : Dictionary<Tuple<Type, Type>, Type>`
-**<VT>Tip：Unity的C#版本还没有Tuple，这里仅实现了一个`Tuple<T1, T2>`</VT>**
+<B><VT>Tip：Unity的C#版本还没有Tuple，这里仅实现了一个`Tuple<T1, T2>`</VT></B>
 也就是说Collection是Dictionary的封装，看示例的话会比较容易看清类型：
 `Mappings[source, name] = target`
-显然，指的是**接口加类型对应实现类型**，如`mappings[typeof(ILogger), "file"] = typeof(FileLogger);`
+显然，指的是<B>接口加类型对应实现类型</B>，如`mappings[typeof(ILogger), "file"] = typeof(FileLogger);`
 
 那么接下来就进行一一对应地分析：
 
@@ -532,20 +544,20 @@ public object CreateInstance(Type type, params object[] constructorArgs)
 }
 ```
 
-显然**注入**就是<B><VT>递归解析获取实例</VT></B>
+显然<B>注入</B>就是<B><VT>递归解析获取实例</VT></B>
 逻辑其实很清晰，这里<B><YL>用上述例子举例</YL></B>：
 
 - 开始时通过`RegisterInstance()`提前注册了实例，如果遇到需要时则会去Instances寻找
-- **注入流：**
+- <B>注入流：</B>
   在类中声明了需要的接口属性(具有[Inject]特性)，`Inject()`则会对其设置，设置方法为`Resolve()`，此时由于Instances中已有，所以可直接获取并设置
   <DRD>注意：Inject的对象为this，大概率就是MonoBehaviour类中的一员</DRD>
-- **解析流：**
+- <B>解析流：</B>
   这种方式就是直接去获取了，跳过了`Inject()`一步，同样由于提前注册可直接获取
 
-显然**大致流程**就是：
-**<VT>Register建立映射，后续可通过Resolve直接解析，也可通过Inject注入，整体来说就是`Resolve()`/`Inject()`/`CreateInstance()`三者不断递归</VT>**
+显然<B>大致流程</B>就是：
+<B><VT>Register建立映射，后续可通过Resolve直接解析，也可通过Inject注入，整体来说就是`Resolve()`/`Inject()`/`CreateInstance()`三者不断递归</VT></B>
 
-**一些注意点：**
+<B>一些注意点：</B>
 
 - Register是必须的，无论使用`Register()`还是`RegisterInstance()`，只要是需要解析的一员
 - `RegisterInstance()`仅可用于简单情况，如果注册内容有形参就不太适合了，此时应该完全使用`Register()`，以自动递归解析
@@ -555,22 +567,22 @@ public object CreateInstance(Type type, params object[] constructorArgs)
   `MainContainer.Container.Resolve<INetworkExampleService>()`
   区别就是无论对象有多少，Inject方式只要添加[Inject]特性并调用同样的`MainContainer.Container.Inject(this)`即可获取对象，而Resolve方式则需要一个一个获取且是局部的
   可以想象到的是Inject有一极其便捷的功能，<VT>任意属性都可注入，无需在构造函数中存在</VT>
-  但是<B><VT>显然是直接Resolve比较好(性能好，一般也不会麻烦太多)</VT></B>，所以总的来说还是需要**按序选择**
+  但是<B><VT>显然是直接Resolve比较好(性能好，一般也不会麻烦太多)</VT></B>，所以总的来说还是需要<B>按序选择</B>
   同时：Inject完全是一种附加功能，如不需要此特性，可在流程中排除
-- `CreateInstance()`中的一段是**不太正确**的：
-  `if (constructor.Length < 1)`，结合BindingFlags筛选，这意味着没有public构造，这种情况一定是写了非public构造的(默认是public无参构造)，也就是该类不想公开，更应该的选择应该是**不创建**
+- `CreateInstance()`中的一段是<B>不太正确</B>的：
+  `if (constructor.Length < 1)`，结合BindingFlags筛选，这意味着没有public构造，这种情况一定是写了非public构造的(默认是public无参构造)，也就是该类不想公开，更应该的选择应该是<B>不创建</B>
   `if (p.ParameterType.IsArray)`，这里的IsArray仅能处理数组情况(`int[]`)
   可以使用`if (p.ParameterType.IsGenericType && p.ParameterType.GetGenericTypeDefinition() == typeof(IEnumerable<>))`，其中`IsGenericType`判断自身，`GetGenericTypeDefinition() == typeof(IEnumerable<>)`判断自身接口
 - `ResolveAll()`只有确认name才能进行
 
-**问题点：**
-**<DRD>没有依赖循环检查</DRD>**
-这点是比较致命的，其它只是功能性内容，依赖循环是**必须避免**的
+<B>问题点：</B>
+<B><DRD>没有依赖循环检查</DRD></B>
+这点是比较致命的，其它只是功能性内容，依赖循环是<B>必须避免</B>的
 
 ### CatLib
 
 对于CatLib和MicrosoftDI，相对来说CatLib实现的DI还是简单一些的
-具体可以参考**CatLib分析**中的，这里简短地再总结一下：
+具体可以参考<B>CatLib分析</B>中的，这里简短地再总结一下：
 
 - DI的核心离不开绑定(注册)与解析(获取)，在这里是`Bind()`/`Make()`
   - `Bind()`：绑定的核心是<B><GN>BindData</GN></B>，本质上是信息集合，即传入的`IOC容器container`/`服务名service`/`创建事件Concrete`/`生命周期IsStatic`，同时提供了一些扩展函数以及内部函数
@@ -650,11 +662,11 @@ protected virtual object CreateInstance(Type makeServiceType, object[] userParam
 ```
 
 可以看到：
-`CreateInstance()`的本质其实相当简单，就是调用`Activator.CreateInstance()`，核心难点在于**获取Params**上，即`GetConstructorsInjectParams()`
+`CreateInstance()`的本质其实相当简单，就是调用`Activator.CreateInstance()`，核心难点在于<B>获取Params</B>上，即`GetConstructorsInjectParams()`
 同时我们也可能会存有<B><BL>疑问</BL></B>：
-**<BL>userParams通过`GetConstructorsInjectParams()`做了什么，返回的userParams和原来的有什么不同</BL>**
+<B><BL>userParams通过`GetConstructorsInjectParams()`做了什么，返回的userParams和原来的有什么不同</BL></B>
 我们首先要明确一件事：
-**可能的调用函数**是这样的：
+<B>可能的调用函数</B>是这样的：
 
 ``` csharp
 public static TService Make<TService>(params object[] userParams)
@@ -663,7 +675,7 @@ public static TService Make<TService>(params object[] userParams)
 }
 ```
 
-问题在于：**userParams不一定包含所有的参数，有可能参数来自于自动注入流程**(如int交给传入params，ILog通过Make后自动解析)
+问题在于：<B>userParams不一定包含所有的参数，有可能参数来自于自动注入流程</B>(如int交给传入params，ILog通过Make后自动解析)
 继续看：
 
 ``` csharp
@@ -833,7 +845,7 @@ for (int index = 0; index < baseParams.Length; ++index)
 ```
 
 结合`ParameterInfo baseParam = baseParams[index]`/`dependencies[index] = instance`，可以意识到<VT>所谓的dependencies数组其实就是所需的参数实例</VT>
-**参数实例获取流程**是以下部分：
+<B>参数实例获取流程</B>是以下部分：
 
 ``` csharp
 object instance = ((paramsMatcher != null ? paramsMatcher(baseParam) : (object) null) ?? this.GetCompactInjectUserParams(baseParam, ref userParams)) ?? this.GetDependenciesFromUserParams(baseParam, ref userParams);
@@ -879,12 +891,12 @@ protected virtual object GetCompactInjectUserParams(
 
 `GetCompactInjectUserParams()`看起来很奇怪，无论baseParam是object还是object[]，都会直接使用userParams输出同时清空，尤其是object[]显得更为奇怪
 其想法可能是这样的：
-**<VT>`GetCompactInjectUserParams()`针对object/object[]与params类似，仅用于最后一个参数</VT>**
+<B><VT>`GetCompactInjectUserParams()`针对object/object[]与params类似，仅用于最后一个参数</VT></B>
 如果这么考虑的话object[]就合理了，userParams是一个一个参数列出来的(不存在装箱情况)，baseParam需要多参，那么就把剩余参数都交给它
 
 - `GetDependenciesFromUserParams()`：
   该函数相对简单，就是简单的匹配，但是可以发现：
-  **<VT>实际位置无需匹配(但不匹配可预想的存在很多问题)</VT>**
+  <B><VT>实际位置无需匹配(但不匹配可预想的存在很多问题)</VT></B>
   <BR>
 
 ``` csharp
@@ -1027,7 +1039,7 @@ protected virtual string GetContextualService(
 
 MicrosoftDI是更加完善的一种DI，毕竟也是Microsoft官方的，CatLib的DI虽然也挺复杂，但是从结构上来看，并没有拆分很多，而Microsoft是十分完善的
 
-同样参考**MicrosoftDI分析**中的，这里简短地再总结一下： <VT>基础调用部分</VT>
+同样参考<B>MicrosoftDI分析</B>中的，这里简短地再总结一下： <VT>基础调用部分</VT>
 
 ``` csharp
 var services = new ServiceCollection();
@@ -1043,8 +1055,8 @@ using (var serviceProvider = services.BuildServiceProvider())
 }
 ```
 
-- **ServiceCollection**是一个IList数据结构，在创建完ServiceCollection后，添加了一个Transient服务
-  由此会在collection中添加一个**ServiceDescriptor**
+- <B>ServiceCollection</B>是一个IList数据结构，在创建完ServiceCollection后，添加了一个Transient服务
+  由此会在collection中添加一个<B>ServiceDescriptor</B>
   descriptor中表明了：
   - 生命周期Lifetime：`ServiceLifetime.Transient`
   - 服务类型ServiceType：IUserService
@@ -1053,22 +1065,22 @@ using (var serviceProvider = services.BuildServiceProvider())
   - `IEnumerable<ServiceDescriptor>`(也就是ServiceCollection)
   - 默认`ServiceProviderOptions`
   
-  由于是默认的，所以**CallSiteValidator**并没有创建，同时使用的engine为**RuntimeServiceProviderEngine**或**DynamicServiceProviderEngine**<VT>(假设使用的是RuntimeServiceProviderEngine)</VT>
+  由于是默认的，所以<B>CallSiteValidator</B>并没有创建，同时使用的engine为<B>RuntimeServiceProviderEngine</B>或<B>DynamicServiceProviderEngine</B><VT>(假设使用的是RuntimeServiceProviderEngine)</VT>
 - 后续通过`serviceProvider.CreateScope()`创建了域，看似ServiceProvider类中没有该函数，这被隐藏在<B><GN>ServiceProviderServiceExtensions</GN></B>之中，本质上其实是`provider.GetRequiredService<IServiceScopeFactory>().CreateScope()`，其实也就是调用`_engine.GetService()`，这些内容都是由基类的ServiceProviderEngine提供
   这段流程就是获取服务的流程：
-  尝试获取服务，获取不到，那么就去调用`CreateServiceAccessor()`，由于在构造函数中已经为**CallSiteFactory**添加了键值对：`CallSiteFactory.Add(typeof(IServiceScopeFactory), new ServiceScopeFactoryCallSite())`，所以将直接获取到callSite以获得`RealizeService()`内的事件并触发，其中scope使用的是Root(**ServiceProviderEngineScope**)，callSite使用的是**ServiceScopeFactoryCallSite**，计算的核心就是`RuntimeResolver.Resolve(callSite, p)`，**CallSiteRuntimeResolver**是CallSiteVisitor的派生类，需要进行逐层解析，由于是`ResultCache.None`所以进行`VisitCallSiteMain()`，由于是`CallSiteKind.ServiceScopeFactory`所以进行`VisitServiceScopeFactory()`，获取内容为`context.Scope.Engine`，这里的Scope即Root，而Root.Engine即RuntimeServiceProviderEngine
+  尝试获取服务，获取不到，那么就去调用`CreateServiceAccessor()`，由于在构造函数中已经为<B>CallSiteFactory</B>添加了键值对：`CallSiteFactory.Add(typeof(IServiceScopeFactory), new ServiceScopeFactoryCallSite())`，所以将直接获取到callSite以获得`RealizeService()`内的事件并触发，其中scope使用的是Root(<B>ServiceProviderEngineScope</B>)，callSite使用的是<B>ServiceScopeFactoryCallSite</B>，计算的核心就是`RuntimeResolver.Resolve(callSite, p)`，<B>CallSiteRuntimeResolver</B>是CallSiteVisitor的派生类，需要进行逐层解析，由于是`ResultCache.None`所以进行`VisitCallSiteMain()`，由于是`CallSiteKind.ServiceScopeFactory`所以进行`VisitServiceScopeFactory()`，获取内容为`context.Scope.Engine`，这里的Scope即Root，而Root.Engine即RuntimeServiceProviderEngine
   由此可知，`provider.GetRequiredService<IServiceScopeFactory>().CreateScope()`并无任何特殊之处，其实就是固定的`相应Engine.CreateScope()`，即创建子Scope
 - `scope.ServiceProvider.GetRequiredService<IUserService>()`则是真正意义上的获取服务，流程上会和IServiceScopeFactory类似，但由于没有`CallSiteFactory.Add()`提前注册，所以会有所不同：
   首先要注意到的一点是<VT>域是不同的</VT>，由于是通过scope进行的获取，`GetService()`会使用的是子域的ServiceProviderEngineScope而非Root
-  流程上核心还是`ServiceProviderEngine.GetService()`，由于是第一次，RealizedServices中必定需要Add而非Get，`CallSiteFactory.Create()`是其中的一步，**CallSiteFactory**记录了存储的ServiceDescriptor，在构造中会进行`Populate()`即记录键值对：Key-IUserService/Value-**ServiceDescriptorCacheItem**<VT>(服务接口所对应的所有ServiceDescriptor)</VT>，这里由于没有提前注册，所以需要`CallSiteFactory.CreateCallSite()`以获取CallSite，对于这种基础的`<IUserService, UserService>`形式会使用`TryCreateExact()`的`CreateConstructorCallSite()`进行创建，对于这种无参构造，是最简单的**ConstructorCallSite**，信息有：
-  - lifetime：一组信息，为**ResultCache**
-    - Location：由ServiceLifetime转义成**CallSiteResultCacheLocation**，这里是`CallSiteResultCacheLocation.Dispose`
-    - Key：为**ServiceCacheKey**，由服务接口Type/格子Slot组成，由于IUserService只对应UserService，所以Slot为0
+  流程上核心还是`ServiceProviderEngine.GetService()`，由于是第一次，RealizedServices中必定需要Add而非Get，`CallSiteFactory.Create()`是其中的一步，<B>CallSiteFactory</B>记录了存储的ServiceDescriptor，在构造中会进行`Populate()`即记录键值对：Key-IUserService/Value-<B>ServiceDescriptorCacheItem</B><VT>(服务接口所对应的所有ServiceDescriptor)</VT>，这里由于没有提前注册，所以需要`CallSiteFactory.CreateCallSite()`以获取CallSite，对于这种基础的`<IUserService, UserService>`形式会使用`TryCreateExact()`的`CreateConstructorCallSite()`进行创建，对于这种无参构造，是最简单的<B>ConstructorCallSite</B>，信息有：
+  - lifetime：一组信息，为<B>ResultCache</B>
+    - Location：由ServiceLifetime转义成<B>CallSiteResultCacheLocation</B>，这里是`CallSiteResultCacheLocation.Dispose`
+    - Key：为<B>ServiceCacheKey</B>，由服务接口Type/格子Slot组成，由于IUserService只对应UserService，所以Slot为0
   - ServiceType：服务接口
   - ConstructorInfo：构造函数
     - ImplementationType：由反射信息可获取实际服务类型
   - Kind：`CallSiteKind.Constructor`
 
-  由于只有一层，也就不用考虑**CallSiteChain**的事情
+  由于只有一层，也就不用考虑<B>CallSiteChain</B>的事情
   同时由于默认创建，也不需要考虑_callback的事
   接下来就是`RealizeService()`的调用，`RuntimeResolver.Resolve()`，由于是`CallSiteResultCacheLocation.Dispose`所以会调用`VisitDisposeCache()`即`return context.Scope.CaptureDisposable(VisitCallSiteMain(transientCallSite, context))`，可以看到这本质上还是在调用`VisitCallSiteMain()`即<VT>无论如何都要重新创建</VT>，对于无参构造相当简单，返回`constructorCallSite.ConstructorInfo.Invoke(Array.Empty<object>())`即可，随后额外处理一下Dispose即可
