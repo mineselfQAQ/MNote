@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [Tip汇总](Tip汇总/Tip汇总.md)
+- [Tip汇总](./Tip汇总/Tip汇总.md)
 

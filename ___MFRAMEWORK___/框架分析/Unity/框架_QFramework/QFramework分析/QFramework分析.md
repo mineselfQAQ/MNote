@@ -35,7 +35,7 @@
 
 # 简述
 
-QFramework是一个**体量比较适中**的框架，相比SKCell这种纯功能框架，QFramework<B><VT>指定了一定的框架规范使得项目体量变大时依旧能很好地管理</B></VT>
+QFramework是一个<B>体量比较适中</B>的框架，相比SKCell这种纯功能框架，QFramework<B><VT>指定了一定的框架规范使得项目体量变大时依旧能很好地管理</B></VT>
 
 ## 简易分析
 
@@ -43,15 +43,15 @@ QFramework是一个**体量比较适中**的框架，相比SKCell这种纯功能
 ![](Pic/QFramework.png)
 显然结构可以分为2部分：
 
-- **Framework**，即<B><VT>框架部分</B></VT>
+- <B>Framework</B>，即<B><VT>框架部分</B></VT>
   仅1个脚本，共不到1000行代码，非常简短(因为说到底就是一些基础规范)
-- **Toolkits**，即<B><VT>功能部分</B></VT>
+- <B>Toolkits</B>，即<B><VT>功能部分</B></VT>
 
-本篇将会详细分析**QFramework脚本**中的内容
+本篇将会详细分析<B>QFramework脚本</B>中的内容
 
 ## UML类图分析
 
-这里尝试制作了**UML类图**来进行归纳总结：
+这里尝试制作了<B>UML类图</B>来进行归纳总结：
 ![](Pic/QFramework_UML.png)
 
 # 框架
@@ -60,10 +60,10 @@ QFramework是一个**体量比较适中**的框架，相比SKCell这种纯功能
 
 ## 框架对比
 
-这里先按着QFramework的**QFramework v1.0 使用指南**进行对比：
+这里先按着QFramework的<B>QFramework v1.0 使用指南</B>进行对比：
 
-**<YL>以一个计数器应用为例：</YL>**
-**不应用框架**是这样的：
+<B><YL>以一个计数器应用为例：</YL></B>
+<B>不应用框架</B>是这样的：
 
 ``` csharp
 // Controller
@@ -119,7 +119,7 @@ public class CounterAppController : MonoBehaviour
 
 <BR>
 
-**QFramework框架定义了以下内容：**
+<B>QFramework框架定义了以下内容：</B>
 
 - Architecture，类似于PureMVC的Facade，用于注册各类内容
 - Model，即M
@@ -134,8 +134,8 @@ public class CounterAppController : MonoBehaviour
 
 <BR>
 
-**应用框架**是这样的：
-首先需要一个**Architecture**入口，即**CounterApp**:
+<B>应用框架</B>是这样的：
+首先需要一个<B>Architecture</B>入口，即<B>CounterApp</B>:
 
 ``` csharp
 public class CounterApp : Architecture<CounterApp>
@@ -169,7 +169,7 @@ public class CounterApp : Architecture<CounterApp>
 ```
 
 可以看到对于该例，注册了3个内容：System/Model/Utility
-**Model**是核心，即**CounterAppModel**：
+<B>Model</B>是核心，即<B>CounterAppModel</B>：
 
 ``` csharp
 public class CounterAppModel : AbstractModel
@@ -203,8 +203,8 @@ public class CounterAppModel : AbstractModel
 }
 ```
 
-可以看到使用了**Event**进行注册，同时我们还需在Command中`SendEvent()`，从而<B><VT>数据变更后自动操作(保存与读取)</VT></B>
-但其实有一种更加智能的数据类**BindableProperty**<VT>(用于替换Event)</VT>：
+可以看到使用了<B>Event</B>进行注册，同时我们还需在Command中`SendEvent()`，从而<B><VT>数据变更后自动操作(保存与读取)</VT></B>
+但其实有一种更加智能的数据类<B>BindableProperty</B><VT>(用于替换Event)</VT>：
 
 ``` csharp
 public interface ICounterAppModel : IModel
@@ -231,7 +231,7 @@ public class CounterAppModel : AbstractModel, ICounterAppModel
 }
 ```
 
-上述保存存储功能由该**Utility**提供，即**Storage**：
+上述保存存储功能由该<B>Utility</B>提供，即<B>Storage</B>：
 
 ``` csharp
 public interface IStorage : IUtility
@@ -253,7 +253,7 @@ public class Storage : IStorage
 }
 ```
 
-**Controller**为另一个核心，这里的是**CounterAppController**：
+<B>Controller</B>为另一个核心，这里的是<B>CounterAppController</B>：
 
 ``` csharp
 public class CounterAppController : MonoBehaviour, IController
@@ -310,7 +310,7 @@ public class CounterAppController : MonoBehaviour, IController
 - 按钮绑定Command(使用`SendCommand()`发送相应命令)
 - 数据Model绑定视图变化(一旦数据更改视图自动随之更改)
 
-**Command**是很简单的，就是动作的具体实现：
+<B>Command</B>是很简单的，就是动作的具体实现：
 
 ``` csharp
 public class IncreaseCountCommand : AbstractCommand 
@@ -331,7 +331,7 @@ public class DecreaseCountCommand : AbstractCommand
 }
 ```
 
-注册中还有一个**System**，即**AchievementSystem**：　　　　<VT>是Model中剥离出的条件判断</VT>
+注册中还有一个<B>System</B>，即<B>AchievementSystem</B>：　　　　<VT>是Model中剥离出的条件判断</VT>
 
 ``` csharp
 public interface IAchievementSystem : ISystem {}
@@ -362,7 +362,7 @@ public class AchievementSystem : AbstractSystem ,IAchievementSystem
 
 <BR>
 
-这就是这套框架实现的所有，这里简单地分析一下**操作流程**：　　<YL>以9加1到10为例</YL>
+这就是这套框架实现的所有，这里简单地分析一下<B>操作流程</B>：　　<YL>以9加1到10为例</YL>
 
 - 点击+号，由于按钮已绑定onClick事件，触发IncreaseCountCommand
 - 执行`model.Count.Value++`，首先Count的值会+1
@@ -373,19 +373,19 @@ public class AchievementSystem : AbstractSystem ,IAchievementSystem
 
 ## 框架分析
 
-虽然QFramework教程中讲解了**框架的演变**，但是本质上代码没有发生改变，这里先自行分析一下
+虽然QFramework教程中讲解了<B>框架的演变</B>，但是本质上代码没有发生改变，这里先自行分析一下
 
 ### 接口(规则)
 
 随意查看QFramework中的一个架构组件，比如说IController：
 `public interface IController : IBelongToArchitecture, ICanSendCommand, ICanGetSystem, ICanGetModel, ICanRegisterEvent, ICanSendQuery, ICanGetUtility`
-QFramework中充斥着**大量接口**，<B><VT>用于指定规范</VT></B>
+QFramework中充斥着<B>大量接口</B>，<B><VT>用于指定规范</VT></B>
 就比如说<B><YL>上述的IController：由于需要实现这些接口，所以我们可以认为：实现了IController接口的某Controller就需要符合具体接口规范</YL></B>
 随意查看某一具体接口：
 `public interface ICanSendCommand : IBelongToArchitecture {}`
 可以发现：<B><VT>接口仅为接口，我们只需要知道"某内容是具有某接口特性的"即可</VT></B>
 
-**具体在后续使用到继续分析**
+<B>具体在后续使用到继续分析</B>
 
 ### Architecture
 
@@ -446,17 +446,17 @@ public abstract class Architecture<T> : IArchitecture where T : Architecture<T>,
 }
 ```
 
-这里可以注意到一种**很不错的设计**：
-**<VT>`Architecture<T>`的声明本身是一种单例写法，结合静态`Interface`，可以做到创建多个单例实现，但无论我使用哪种，当前有且仅有一个单例</VT>**
-<YL><B>比如说</B>：有`A`/`B`两种Architecture，如果我调用`A.Interface`，那么初始化的就是A版本(当然既然初始化了A那么B就用不到了)，反之<YL>
+这里可以注意到一种<B>很不错的设计</B>：
+<B><VT>`Architecture<T>`的声明本身是一种单例写法，结合静态`Interface`，可以做到创建多个单例实现，但无论我使用哪种，当前有且仅有一个单例</VT></B>
+<YL>YL</YL>
 
 #### IOCContainer
 
 在Architecture使用到了一个概念<B><GN>IOCContainer</GN></B>，用于<B><VT>控制反转(Inversion of Control)</VT></B>
 
 IOC其实我们会很熟悉，<B><VT>IOC是一种实现<GN>DI</GN>的手段</VT></B>
-有了IOC，我们能将强耦合剥离出来，通过**注册到IOCContainer，从IOCContainer中取出**，从而<B><VT>降低耦合</VT></B>
-**<VT>Tip：接口本身就是一种IOC，使用IOCContainer是在此基础上的扩展</VT>**
+有了IOC，我们能将强耦合剥离出来，通过<B>注册到IOCContainer，从IOCContainer中取出</B>，从而<B><VT>降低耦合</VT></B>
+<B><VT>Tip：接口本身就是一种IOC，使用IOCContainer是在此基础上的扩展</VT></B>
 
 IOCContainer的本身非常简单，内部存储了一个字典：
 `private Dictionary<Type, object> mInstances = new Dictionary<Type, object>();`
@@ -496,25 +496,25 @@ public void RegisterModel<TModel>(TModel model) where TModel : IModel
 
 IOCContainer的用法也很简单，只要像上述`RegisterModel()`中一样注册过，后续通过<B>`Get<T>()`</B>即可从容器中将相应实例取出
 
-我们同时也知道了一件**关键的事**：
-**<VT>对于该IOCContainer的实现来说，一种TModel对应一个Tmodel的实例，重新注册则会替换</VT>**
-显然这<B><DRD>不能处理复杂情况(比如说需要注册同接口的几种实例)</DRD></B>，如需扩展，可以使用一些**针对DI的框架**，比如说：
+我们同时也知道了一件<B>关键的事</B>：
+<B><VT>对于该IOCContainer的实现来说，一种TModel对应一个Tmodel的实例，重新注册则会替换</VT></B>
+显然这<B><DRD>不能处理复杂情况(比如说需要注册同接口的几种实例)</DRD></B>，如需扩展，可以使用一些<B>针对DI的框架</B>，比如说：
 
 - Microsoft.Extensions.DependencyInjection(C#)
 - Zenject(Unity)
 
 ### Controller与Model
 
-通过前面的例子分析，我们也能很清楚地了解到：**<VT>MVC是框架的根</VT>**
+通过前面的例子分析，我们也能很清楚地了解到：<B><VT>MVC是框架的根</VT></B>
 QFramework其实和PureMVC是类似的：
-**PureMVC**本质上是一个MVC：
+<B>PureMVC</B>本质上是一个MVC：
 
 - 使用门面模式Facade进行管理这是框架上的优化
 - MVC内部演变为Proxy/Mediator/Command，这同样是优化
 - 等等
 
-所以对于QFramework来说，首先需要考虑的还是MVC，但是有所不同：**<VT>V被归入C中了</VT>**
-这其实是一件**有利有弊**的事情：
+所以对于QFramework来说，首先需要考虑的还是MVC，但是有所不同：<B><VT>V被归入C中了</VT></B>
+这其实是一件<B>有利有弊</B>的事情：
 
 - <GN>Controller可以非常容易地访问View，也就是说初始化/按钮绑定/更新视图都可以在一处完成，<B>非常方便，同时无需通信减少开销</B></GN>
 - <DRD>Controller的代码量会变大，容易搞不清楚</DRD>
@@ -527,16 +527,16 @@ QFramework其实和PureMVC是类似的：
 
 #### Controller
 
-Controller并没有实现抽象类，仅有一个**接口<GN>IController</GN>**：
+Controller并没有实现抽象类，仅有一个<B>接口<GN>IController</GN></B>：
 `public interface IController : IBelongToArchitecture, ICanSendCommand, ICanGetSystem, ICanGetModel, ICanRegisterEvent, ICanSendQuery, ICanGetUtility {}`
-这也代表了一个**Controller可以做的操作**(如可以获取Model组件...)
+这也代表了一个<B>Controller可以做的操作</B>(如可以获取Model组件...)
 
 #### Model
 
-同样的，Model也具有**接口<GN>IModel</GN>**：
+同样的，Model也具有<B>接口<GN>IModel</GN></B>：
 `public interface IModel : IBelongToArchitecture, ICanSetArchitecture, ICanGetUtility, ICanSendEvent, ICanInit {}`
 
-对于Model来说，更重要的是实现的**抽象类<GN>AbstractModel</GN>**：
+对于Model来说，更重要的是实现的<B>抽象类<GN>AbstractModel</GN></B>：
 
 ``` csharp
 public abstract class AbstractModel : IModel
@@ -564,14 +564,14 @@ public abstract class AbstractModel : IModel
 - 由于IModel实现了IBelongToArchitecture接口，所以可以获取IArchitecture
 - 由于IModel实现了ICanInit接口，所以具有`Init()`/`Deinit()`操作
 
-这里**值得注意**的是：
+这里<B>值得注意</B>的是：
 
 - 这里使用了<B><GN>显式接口实现</GN></B>，会<B><VT>强制接口访问</VT></B>：
   - 如果想`GetArchitecture()`，必须转换为IBelongToArchitecture调用
   - 如果想`SetArchitecture()`，必须转换为ICanSetArchitecture调用
   - 如果想`Init()`，必须转换为ICanInit调用<VT>(`Deinit()`不用，因为不是显式接口)</VT>
 
-本质上**框架的目的**是：**<VT>内部自行调用，避免用户了解细节</VT>**
+本质上<B>框架的目的</B>是：<B><VT>内部自行调用，避免用户了解细节</VT></B>
 这里举一个<B><YL>例子</YL></B>帮助理解：
 
 ``` csharp
@@ -585,7 +585,7 @@ public static class CanGetModelExtension
 <YL>可以看到，在QFramework内部，常常提供了一些接口方法用于调用
 对于此例，在实际使用时，我们只会感觉到：<B>因为实现了ICanGetModel接口，所以我能通过`GetModel()`获取相应Model</B></YL>
 
-**<BL>问题：看似好像有一系列操作，但是好像没初始化(mArchitecturel没有赋值)？</BL>**
+<B><BL>问题：看似好像有一系列操作，但是好像没初始化(mArchitecturel没有赋值)？</BL></B>
 <BL>确实是这样，这其实在Architecture中：</BL>
 
 ``` csharp
@@ -609,7 +609,7 @@ public TModel GetModel<TModel>() where TModel : class, IModel => mContainer.Get<
 - IBelongToArchitecture接口实现完毕后，初始化执行`SetArchitecture()`，后续可自由调用`GetArchitecture()`获取
 - 将model注册仅IOCContainer后，后续可通过`Get<T>()`从容器中取出，执行其操作
 
-**<BL>问题：model是IModel类型的，为什么能调用`model.Init()`</BL>**
+<B><BL>问题：model是IModel类型的，为什么能调用`model.Init()`</BL></B>
 <BL>虽然在AbstractModel中只有显式接口实现，即`ICanInit.Init()`，但是IModel是个接口，ICanInit是其子接口，是可以直接调用的</BL>
 
 ##### Event
@@ -660,13 +660,13 @@ public class EasyEvent : IEasyEvent
 }
 ```
 
-**<GN>反注册</GN>**
-令我们不太理解的可能是其中的**IUnRegister接口**以及**CustomUnRegister类**
+<B><GN>反注册</GN></B>
+令我们不太理解的可能是其中的<B>IUnRegister接口</B>以及<B>CustomUnRegister类</B>
 之所以需要IUnRegister的原因是很明确的：<B><VT>提供一种反注册的实例方便操作</VT></B>
-**<YL>考虑一种情况：</YL>**
+<B><YL>考虑一种情况：</YL></B>
 <YL>使用`Register(()=>{...})`使用Lambda进行注册，我们会发现想要`UnRegister()`的时候由于得不到注册时的Action而无法反注册，此时提供的IUnRegister就非常有用了</YL>
 
-**IUnRegister**/**CustomUnRegister**具体代码如下：
+<B>IUnRegister</B>/<B>CustomUnRegister</B>具体代码如下：
 
 ``` csharp
 public interface IUnRegister
@@ -688,7 +688,7 @@ public struct CustomUnRegister : IUnRegister
 }
 ```
 
-既然提到了反注册，那么可以再来看**一组便捷类**，具体调用如下：
+既然提到了反注册，那么可以再来看<B>一组便捷类</B>，具体调用如下：
 
 ``` csharp
 mModel.Count.RegisterWithInitValue(newCount =>
@@ -819,16 +819,16 @@ public static class UnRegisterExtension
 #endif
 ```
 
-代码其实是比较**清晰易懂**的：
-**<VT>提供`OnDestroy()`/`OnDisable()`/场景卸载时自动反注册的功能，
-核心是由一个组件记录下反注册内容，在Unity生命周期中自动调用</VT>**
-需要**注意**的是：<B><DRD>在不同的GameObject会创建不同的组件，注意消耗</DRD></B>
+代码其实是比较<B>清晰易懂</B>的：
+<B><VT>提供`OnDestroy()`/`OnDisable()`/场景卸载时自动反注册的功能，
+核心是由一个组件记录下反注册内容，在Unity生命周期中自动调用</VT></B>
+需要<B>注意</B>的是：<B><DRD>在不同的GameObject会创建不同的组件，注意消耗</DRD></B>
 
 结合EasyEvent来看，会发现无非就是<VT>将反注册需要的event包装进Action，等待后续反注册时调用</VT>
 
-EasyEvent提供了**3种泛型方法**：`EasyEvent<T>`/`EasyEvent<T,K>`/`EasyEvent<T,K,S>`
+EasyEvent提供了<B>3种泛型方法</B>：`EasyEvent<T>`/`EasyEvent<T,K>`/`EasyEvent<T,K,S>`
 区别其实就是Action传入参数数量而已
-但是要**注意**：<B><VT>泛型形式额外具有显式接口形式的`IEasyEvent.Register()`</VT></B>
+但是要<B>注意</B>：<B><VT>泛型形式额外具有显式接口形式的`IEasyEvent.Register()`</VT></B>
 这是因为这是<B><VT>备用回退方案(无感知调用)</VT></B>：  <VT>Tip：对BindableProperty同样适用(因为有IEasyEvent+泛型)</VT>
 
 ``` csharp
@@ -886,7 +886,7 @@ public class EasyEvents
 }
 ```
 
-根据代码，我们会联想到：`Dictionary<Type, IEasyEvent>`这种形式正是**IOCContainer**
+根据代码，我们会联想到：`Dictionary<Type, IEasyEvent>`这种形式正是<B>IOCContainer</B>
 
 <B><GN>TypeEventSystem</GN></B>是一种重要的类型，Architecture中的Event操作正是由它提供，对应的有：
 
@@ -923,7 +923,7 @@ public class TypeEventSystem
 }
 ```
 
-可以看到，其中有一个**Global**，这就是用于<B><GN>IOnEvent</GN></B>配合的静态变量：
+可以看到，其中有一个<B>Global</B>，这就是用于<B><GN>IOnEvent</GN></B>配合的静态变量：
 
 ``` csharp
 public interface IOnEvent<T>
@@ -942,10 +942,10 @@ public static class OnGlobalEventExtension
 ```
 
 内容不多，仅提供了一个接口以及对应的注册方法，可以看出其实就是一种<B><VT>半自动化的回调注册方法</VT></B>
-**大致用法**就是：类上加接口，在该类中实现`OnEvent()`并`RegisterEvent()`，在任意处需要调用时通过`TypeEventSystem.Global.Send<XXX>()`即可
+<B>大致用法</B>就是：类上加接口，在该类中实现`OnEvent()`并`RegisterEvent()`，在任意处需要调用时通过`TypeEventSystem.Global.Send<XXX>()`即可
 
 <B><GN>OrEvent</GN></B>是一种<B><VT>链式调用的扩充(像LINQ一样)</VT></B>
-**用法**如下：
+<B>用法</B>如下：
 
 ``` csharp
 private BindableProperty<int> mPropertyA = new BindableProperty<int>(10);
@@ -966,7 +966,7 @@ void Start()
 ```
 
 可以看到这是一个非常便捷的语法，可以同时为多个需要Register的对象进行注册操作，而无需写多次
-**代码**其实并不复杂：
+<B>代码</B>其实并不复杂：
 
 ``` csharp
 public interface IUnRegisterList
@@ -1015,7 +1015,7 @@ public static class OrEventExtensions
 ```
 
 看起来可能一时不太懂，但是只要知道了这一点就非常好理解了：
-**<VT>OrEvent本质上也是一个IEasyEvent，只是他"将前人合并到自己"了</VT>**
+<B><VT>OrEvent本质上也是一个IEasyEvent，只是他"将前人合并到自己"了</VT></B>
 
 核心函数为`Or()`，有2种：
 
@@ -1026,9 +1026,9 @@ public static class OrEventExtensions
 观察<B><VT>`IEasyEvent.Or()`，本质上这还是在调用`OrEvent.Or()`</VT></B>：
 `public static OrEvent Or(this IEasyEvent self, IEasyEvent e) => new OrEvent().Or(self).Or(e);`
 
-**简单理解：**
+<B>简单理解：</B>
 结合两个`Or()`，说明每一个IEsayEvent都会调用一次`OrEvent.Or()`，
-执行`Or()`则会为当前IEasyEvent添加`mOnEvent?.Invoke()`操作<B><DRD>(注意：是该IEasyEvent而非OrEvent)</DRD></B>，即**触发OrEvent中的Register事件**，
+执行`Or()`则会为当前IEasyEvent添加`mOnEvent?.Invoke()`操作<B><DRD>(注意：是该IEasyEvent而非OrEvent)</DRD></B>，即<B>触发OrEvent中的Register事件</B>，
 同时将IUnRegister收集到List供一并反注册
 既然是为IEasyEvent注册的，那么<B><VT>触发方式还是和原来一致</VT></B>：
 
@@ -1054,24 +1054,24 @@ private void Update()
 
 ###### Event总结
 
-可以看到QFramework提供了很多种Event的形式，但是本质上其实就一种：**EasyEvent**，其余的都是在此基础上做扩展罢了
-**具体如下：**
+可以看到QFramework提供了很多种Event的形式，但是本质上其实就一种：<B>EasyEvent</B>，其余的都是在此基础上做扩展罢了
+<B>具体如下：</B>
 
-- **EasyEvent：**
+- <B>EasyEvent：</B>
   事件的基础，是Action的一层封装，提供了注册Register/反注册UnRegister/触发Trigger三种操作，同时注册后提供一种反注册手段CustomUnRegister
-- **EasyEvents：**
+- <B>EasyEvents：</B>
   EasyEvent组，使用IOCContainer(`<Type,IEasyEvent>`)的形式进行事件的存储，无调用封装，仅提供添加AddEvent与获取GetEvent方法
-- **TypeEventSystem：**
+- <B>TypeEventSystem：</B>
   EasyEvents的封装，向外界提供注册Register/反注册UnRegister/发送(触发)Send三种操作
-- **OrEvent：**
+- <B>OrEvent：</B>
   一种特殊的类型，用于实现链式调用，本质上是一个延迟调用器(为所有参加`.Or()`连点方法的IEasyEvent注册Trigger事件，具体内容为连点后的`Register()`内容)
 
-**所以说：<VT>TypeEventSystem其实和EasyEvent是平级的，都是处理事件的一种方法，而EasyEvents仅是一个存储类</VT>**
+<B>所以说：<VT>TypeEventSystem其实和EasyEvent是平级的，都是处理事件的一种方法，而EasyEvents仅是一个存储类</VT></B>
 
 ###### Model中的Event
 
-对于Model来说，**最核心**的就是其**数据**，使用Event可以解决这个问题
-考虑一下**一般情况**，假设有一个数据count，大致是这样的：
+对于Model来说，<B>最核心</B>的就是其<B>数据</B>，使用Event可以解决这个问题
+考虑一下<B>一般情况</B>，假设有一个数据count，大致是这样的：
 
 ``` csharp
 public class CounterAppModel : AbstractModel
@@ -1120,13 +1120,13 @@ public class CountChangeCommand : AbstractCommand
 - 这对应的就是`Architecture.RegisterEvent()/SendEvent()`，最核心的底层当然是`EasyEvent.Register()/Trigger()`
 - 我们需要注册一个事件用于CountChange发生时，即每当`CounterAppModel.Count++`时需要添加`SendEvent()`操作
 
-可以想到一个**致命缺点**：<B><DRD>我们需要手动追踪数据变更的位置并添加代码，很容易忘记<DRD></B>
-但是也可以想到一个**优点**：<B><GN>虽然麻烦容易忘，但是灵活性很高，一个Event可以用于多处，对于不同情况发生的事件可以更改</GN></B>
+可以想到一个<B>致命缺点</B>：<B><DRD>DRD</DRD></B>
+但是也可以想到一个<B>优点</B>：<B><GN>虽然麻烦容易忘，但是灵活性很高，一个Event可以用于多处，对于不同情况发生的事件可以更改</GN></B>
 
 ##### BindableProperty
 
 Event虽然可以解决，但是最好的方式是<B><VT>使用<GN>BindableProperty</GN>作为数据类型</VT></B>
-这里看一下**BindableProperty**的实现：
+这里看一下<B>BindableProperty</B>的实现：
 
 ``` csharp
 public class CounterAppModel : AbstractModel,ICounterAppModel
@@ -1149,10 +1149,10 @@ public class CounterAppModel : AbstractModel,ICounterAppModel
 }
 ```
 
-**对比**发现：BindableProperty对于数据<VT>不再需要声明字段以及属性</VT>，更重要的是<B><VT>不需要在Command中添加事件触发</VT></B>
+<B>对比</B>发现：BindableProperty对于数据<VT>不再需要声明字段以及属性</VT>，更重要的是<B><VT>不需要在Command中添加事件触发</VT></B>
 
-其**实现**还是比较复杂的：
-先从**接口**查看：
+其<B>实现</B>还是比较复杂的：
+先从<B>接口</B>查看：
 
 ``` csharp
 public interface IBindableProperty<T> : IReadonlyBindableProperty<T>
@@ -1184,7 +1184,7 @@ public interface IEasyEvent
 - IBindableProperty
   - IBindableProperty是IReadonlyBindableProperty派生，即"不只读可设置"
 
-**<BL>问题：注册是什么</BL>**
+<B><BL>问题：注册是什么</BL></B>
 <BL>注册显然就是MVVM中的<B><VT>数据驱动方法</VT></B>
 详细需要查看实现类BindableProperty：</BL>
 
@@ -1257,24 +1257,24 @@ public class BindableProperty<T> : IBindableProperty<T>
 ```
 
 可以看到内容很简单：无非就是在调用`EasyEvent<T>`的操作(前面有讲解)
-但是要注意有**2种反注册方法**：
+但是要注意有<B>2种反注册方法</B>：
 
 - 通过`BindableProperty.UnRegister()`直接反注册
 - 通过`BindableProperty.Register()`获取的IUnRegister调用`UnRegister()`进行反注册
 
-根据观察，两种反注册方法**各有优点**：
+根据观察，两种反注册方法<B>各有优点</B>：
 
-- **直接反注册**：<VT>不能使用Lambda，需要通过函数进行反注册</VT>
-- **IUnRegister反注册**：<VT>需要保存IUnRegister，通过IUnRegister才能反注册</VT>
+- <B>直接反注册</B>：<VT>不能使用Lambda，需要通过函数进行反注册</VT>
+- <B>IUnRegister反注册</B>：<VT>需要保存IUnRegister，通过IUnRegister才能反注册</VT>
 
-所以的话**根据实际情况选择**即可
+所以的话<B>根据实际情况选择</B>即可
 
 ### Command
 
 在UI框架中，用Command集合一组操作是非常常见的事，<VT>代码被分离到Command脚本中减轻了原代码处的职责压力</VT>
 
 System<VT>与Model类似</VT>，具有接口ICommand以及抽象类AbstractCommand：
-**接口ISystem：**
+<B>接口ISystem：</B>
 
 ``` csharp
 public interface ICommand : IBelongToArchitecture, ICanSetArchitecture, ICanGetSystem, ICanGetModel, ICanGetUtility,
@@ -1286,7 +1286,7 @@ public interface ICommand : IBelongToArchitecture, ICanSetArchitecture, ICanGetS
 
 <B><VT>属于Command最关键的职责即为`Execute()`</VT></B>
 
-Command也实现了**抽象类<GN>AbstractCommand</GN>**：　<VT>与其余的AbstractXXX无异</VT>
+Command也实现了<B>抽象类<GN>AbstractCommand</GN></B>：　<VT>与其余的AbstractXXX无异</VT>
 
 ``` csharp
 public abstract class AbstractCommand : ICommand
@@ -1303,7 +1303,7 @@ public abstract class AbstractCommand : ICommand
 }
 ```
 
-除此以外，QFramework还提供了一组**有返回值的Command**：
+除此以外，QFramework还提供了一组<B>有返回值的Command</B>：
 `public abstract class AbstractCommand<TResult> : ICommand<TResult>`
 
 ### Utility与System
@@ -1312,7 +1312,7 @@ public abstract class AbstractCommand : ICommand
 
 #### Utility
 
-Utility，即**功能**，为了实现某些内容我们就需要相应的Utility
+Utility，即<B>功能</B>，为了实现某些内容我们就需要相应的Utility
 这有点类似与<B>"纯功能框架"</B>
 
 在QFramework中，<B><VT>Utility仅是一个IUtility接口以及相应规则</VT></B>
@@ -1335,14 +1335,14 @@ public TUtility GetUtility<TUtility>() where TUtility : class, IUtility => mCont
 <B><DRD>注意：System是用于处理某类问题的"管理系统"，并非是Model的子集(System可以获取Model，然后处理Model操作，但不仅仅只能这样)</DRD></B>
 
 System<VT>与Model类似</VT>，具有接口IModel以及抽象类AbstractSystem：
-**接口ISystem：**
+<B>接口ISystem：</B>
 `public interface ISystem : IBelongToArchitecture, ICanSetArchitecture, ICanGetModel, ICanGetUtility, ICanRegisterEvent, ICanSendEvent, ICanGetSystem, ICanInit {}`
 
 同样的，AbstractSystem与注册方法`RegisterSystem()`也是与Model类似的
 
 ### Query
 
-有时，我们可能**想获取一些组件中的值用于某些计算得出一个数值**，此时Query就提供了这种功能
+有时，我们可能<B>想获取一些组件中的值用于某些计算得出一个数值</B>，此时Query就提供了这种功能
 
 接口如下：
 
@@ -1395,13 +1395,13 @@ public interface IArchitecture
 }
 ```
 
-从中我们也可以分析出**一些规律**：
+从中我们也可以分析出<B>一些规律</B>：
 
 - System/Model/Utility是作为一个"系统"存在的，可以注册(到IOCContainer)，也可以获取(从IOCContainer)
 - Command/Query/Event是一种操作，需要发送(执行)
 - Event本质上是Action，具有注册与反注册操作
 
-再来简单看一下**声明**：
+再来简单看一下<B>声明</B>：
 `public abstract class Architecture<T> : IArchitecture where T : Architecture<T>, new()`
 显然这是一种类似与单例的声明方法，用于把T传入内部
 
@@ -1454,14 +1454,14 @@ public static void InitArchitecture()
 
 #### 系统组件
 
-对于**Model/System/Utility**，我们会认为是一种<B>"系统"</B>:
+对于<B>Model/System/Utility</B>，我们会认为是一种<B>"系统"</B>:
 
 - Model中存储着数据，需要将数据绑定至视图，并提供访问Model的方式
 - System中执行着某种功能
 - Utility是某种功能，可供其它部分获取并调用
 
-显然，它们都有一个**共同点**：<B><VT>被别人需要</VT></B>
-所以它们都**提供**了**Register与Get方法**
+显然，它们都有一个<B>共同点</B>：<B><VT>被别人需要</VT></B>
+所以它们都<B>提供</B>了<B>Register与Get方法</B>
 <B><YL>以Model为例：</YL></B>
 
 ``` csharp
@@ -1480,13 +1480,13 @@ public void RegisterModel<TModel>(TModel model) where TModel : IModel
 public TModel GetModel<TModel>() where TModel : class, IModel => mContainer.Get<TModel>(); // 从IOCContainer中取出
 ```
 
-<YL>结合ICanGetModel，我们即可为**可访问**的架构组件提供方法：
+<YL>结合ICanGetModel，我们即可为<B>可访问</B>的架构组件提供方法：
 `var model = this.GetModel<ICounterAppModel>(); // Command中`
 对于该例，最终会找到`T GetModel<T>(this ICanGetModel self)`进行调用</YL>
 
 #### 执行组件
 
-除了以上三者，剩余的是**Command/Query/Event**，它们的**共同点**即为<B><VT>是一段需要执行的内容</VT></B>：
+除了以上三者，剩余的是<B>Command/Query/Event</B>，它们的<B>共同点</B>即为<B><VT>是一段需要执行的内容</VT></B>：
 
 ``` csharp
 // Command
@@ -1514,17 +1514,17 @@ CounterApp.Interface.RegisterEvent<CountChangeEvent>(e =>
 });
 ```
 
-所以它们都**提供**了**Send方法**<VT>(由于Event是"嵌入的"，所以需要Register与UnRegister)</VT>
-与系统组件一致，最终是通过**CanSendXXX接口**进行调用
+所以它们都<B>提供</B>了<B>Send方法</B><VT>(由于Event是"嵌入的"，所以需要Register与UnRegister)</VT>
+与系统组件一致，最终是通过<B>CanSendXXX接口</B>进行调用
 
 问题：为什么Command/Event具有
 
 #### 规则详述
 
-在上述分析中，我们发现**接口**在QFramework中起到了非常重要的作用
+在上述分析中，我们发现<B>接口</B>在QFramework中起到了非常重要的作用
 在QFramework中，这些接口就是<B><GN>规则Rule</GN></B>
 
-**观察后可以总结为以下几类：**
+<B>观察后可以总结为以下几类：</B>
 
 - Architecture：
   `IBelongToArchitecture`/`ICanSetArchitecture`
@@ -1535,9 +1535,9 @@ CounterApp.Interface.RegisterEvent<CountChangeEvent>(e =>
 - 初始化与反初始化：
   `ICanInit`
 
-**Architecture**：
+<B>Architecture</B>：
 本质上`IBelongToArchitecture`其实可以称为`ICanGetArchitecture`
-观察后我们可以得出**2种用法**：
+观察后我们可以得出<B>2种用法</B>：
 
 - <B><VT>接口具有GetArchitecture能力</VT></B>
   如：IModel实现IBelongToArchitecture，在抽象类AbstractModel中具有显式接口实现：`IArchitecture IBelongToArchitecture.GetArchitecture() => mArchitecturel;`
@@ -1596,11 +1596,11 @@ public abstract class AbstractModel : IModel
 }
 ```
 
-**<VT>Controller需要自行指定Architecture获取，Model可自行捕获</VT>**
+<B><VT>Controller需要自行指定Architecture获取，Model可自行捕获</VT></B>
 
-**扩展方法：**
+<B>扩展方法：</B>
 
-可以看到**ICanXXX接口**在QFramework中是极其重要的
+可以看到<B>ICanXXX接口</B>在QFramework中是极其重要的
 以ICanGetModel为例：
 
 ``` csharp
@@ -1615,8 +1615,8 @@ public static class CanGetModelExtension
 }
 ```
 
-首先，在前面也有所提及：<VT>一种组件具有ICanXXX接口的话，自然能调用相应功能</VT>，同时，这些功能都有一个**前提：IBelongToArchitecture**，可以看到，因为是**从Architecture中调用相应方法的**
-这里有一个**重点**：
+首先，在前面也有所提及：<VT>一种组件具有ICanXXX接口的话，自然能调用相应功能</VT>，同时，这些功能都有一个<B>前提：IBelongToArchitecture</B>，可以看到，因为是<B>从Architecture中调用相应方法的</B>
+这里有一个<B>重点</B>：
 <B><VT>事实上调用的是`IBelongToArchitecture.GetArchitecture()`，所以说如果AbstractModel的实现类重写了显式接口实现，即可更改<DRD>(不应该这么做)</DRD>，而如果直接实现`GetArchitecture()`则是无用的</VT></B>
 
 ##### 组件规则
@@ -1631,38 +1631,38 @@ public static class CanGetModelExtension
 - `IUtility(空)`
 - 无Event
 
-**以操作分组**进行分析是比较合理的
+<B>以操作分组</B>进行分析是比较合理的
 
-首先是**获取Get**：
-可获取的组件有：**Model/System/Utility**，也就是我们前面说的**系统组件**
-**<DRD>注意：Get对应的是Register，但并没有相应规则，Register在Architecture有所实现</DRD>**
+首先是<B>获取Get</B>：
+可获取的组件有：<B>Model/System/Utility</B>，也就是我们前面说的<B>系统组件</B>
+<B><DRD>注意：Get对应的是Register，但并没有相应规则，Register在Architecture有所实现</DRD></B>
 
-- **Model：**
+- <B>Model：</B>
   <VT>需要的组件---Controller/System/Command/Query</VT>
   Model可以说是最常用的了，无论什么操作都会用到数据，所以都需要获取
 
-  - **Model获取Model**是一件非常<B><DRD>不建议</DRD></B>的操作，这是一种<VT><B>直接引用，会造成混乱</B>(A要B/C，B要A/C，C要A/B，Model多的话会非常灾难)</VT>
+  - <B>Model获取Model</B>是一件非常<B><DRD>不建议</DRD></B>的操作，这是一种<VT><B>直接引用，会造成混乱</B>(A要B/C，B要A/C，C要A/B，Model多的话会非常灾难)</VT>
   
-- **System：**
+- <B>System：</B>
   <VT>需要的组件---Controller/System/Command/Query</VT>
   System是和Model保持一致，但是原因不同：
   - System可以提供任何可能的功能，所以几乎所有的组件都可以获取
   - Model不能获取是因为Model是数据，<B><VT>System的操作是偏向业务的，职责不同</VT></B>
   
-- **Utility：**
+- <B>Utility：</B>
   <VT>需要的组件---Controller/Model/System/Command</VT>
   
   - Utility是比较好分析的，由于是一种功能，所以基本上肯定能用
   - 没有实现ICanGetUtility的是Query，<B><VT>Query是查询，当然不需要调用任何功能来完成</VT></B>
-  - **<BL>问题：为什么Model需要Utility</BL>**
+  - <B><BL>问题：为什么Model需要Utility</BL></B>
   <BL>Model大部分情况是纯数据，但Model同样可以进行操作(有一个`OnInit()`方法)，此时可能会用到Utility</BL>
 
 <BR>
 
-然后是**发送Send**：
-可发送的组件有：**Command/Event/Query**，也就是我们前面说的**执行组件**
+然后是<B>发送Send</B>：
+可发送的组件有：<B>Command/Event/Query</B>，也就是我们前面说的<B>执行组件</B>
 
-- **Command：**
+- <B>Command：</B>
   <VT>需要的组件---Controller/Command</VT>
   可以发送命令的组件不多，只有Controller与自己Command
 
@@ -1670,20 +1670,20 @@ public static class CanGetModelExtension
   - Controller需要Command是因为<B><VT>Command本质上其实就是为事件监听准备的</VT></B>
 
   > 在UI框架中，用Command集合一组操作是非常常见的事，<VT>代码被分离到Command脚本中减轻了原代码处的职责压力</VT>
-- **Event：**
+- <B>Event：</B>
   <VT>需要的组件---Controller/Model/System/Command</VT>
-  可以发现Event要比Command**泛用**一些，除了Query都可以使用
+  可以发现Event要比Command<B>泛用</B>一些，除了Query都可以使用
 
   - 与Utility一致，Query不可以使用：<B><VT>Query是查询，当然不需要触发任何事件</VT></B>
   
-- **Query：**
+- <B>Query：</B>
   <VT>需要的组件---Controller/Command/Query</VT>
   Query是一个用于查询结果并返回的组件，那么需要的组件一定是需要某项结果的，Model与System不行出于以下原因：
   
   - Model是数据，不能发送查询命令是再正常不过的了
   - System大概是为了减少复杂度，想要操作那就自己运算，不要通过Query查询获取
 
-再然后是**注册Register**：
+再然后是<B>注册Register</B>：
 需要通过接口来注册的只有Event
 <VT>需要的组件---Controller/System</VT>
 
@@ -1694,11 +1694,11 @@ public static class CanGetModelExtension
 
 除此以外还有3个接口：ICanInit/IBelongToArchitecture/ICanSetArchitecture
 
-- **ICanInit**是非常简单的，<VT>需要的组件---Model/System</VT>
+- <B>ICanInit</B>是非常简单的，<VT>需要的组件---Model/System</VT>
   这与Architecture中的`RegisterModel()`/`RegisterSystem()`对应
-- **IBelongToArchitecture/ICanSetArchitecture**则与ICanXXX扩展方法有关：
-**<VT>如果需要来自Architecture的某方法的话就必须实现IBelongToArchitecture与ICanSetArchitecture两个接口</VT>**
+- <B>IBelongToArchitecture/ICanSetArchitecture</B>则与ICanXXX扩展方法有关：
+<B><VT>如果需要来自Architecture的某方法的话就必须实现IBelongToArchitecture与ICanSetArchitecture两个接口</VT></B>
 可以看到大部分组件都实现了两接口，<VT>需要的组件---System/Model/Command/Query</VT>
-**<BL>问题：为什么Controller仅实现了IBelongToArchitecture</BL>**
+<B><BL>问题：为什么Controller仅实现了IBelongToArchitecture</BL></B>
 <BL>回想Controller的实现，会发现：IController并没有实现抽象类，因此我们仅需实现`GetArchitecture()`，之后在调用相应功能时可直接获取
 反过来说，其它组件需要ICanSetArchitecture接口是因为注册时的自动化Set需要，而Controller手动传入了，所以不需要</BL>

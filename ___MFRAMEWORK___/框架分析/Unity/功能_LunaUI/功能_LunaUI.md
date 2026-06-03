@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [LunaUI分析](LunaUI分析/LunaUI分析.md)
+- [LunaUI分析](./LunaUI分析/LunaUI分析.md)
 

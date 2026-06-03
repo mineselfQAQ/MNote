@@ -46,7 +46,7 @@ endlocal
 exit 0
 ```
 
-<B><BL>问题：添加ignore</B>
+<B><BL>问题：添加ignore</BL></B>
 在Git中，通过.ignore文件即可忽略，SVN有所不同但也很简单：
 在需要的svn项目中右键TortoiseSVN->Properties，New->Other，Property name选择svn:ignore或svn:global-ignores，填入忽略列表
 ![](Pic/SVN2.png)

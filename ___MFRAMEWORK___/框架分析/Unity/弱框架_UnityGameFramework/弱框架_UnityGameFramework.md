@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [UnityGameFramework框架分析](UnityGameFramework框架分析/UnityGameFramework框架分析.md)
+- [UnityGameFramework框架分析](./UnityGameFramework框架分析/UnityGameFramework框架分析.md)
 

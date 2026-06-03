@@ -1742,7 +1742,7 @@ public static IBindingContext BindingContext(this Behaviour behaviour)
 经过创建后接下来就是绑定操作，如：
 `bindingSet.Bind(this.username).For(v => v.text, v => v.onEndEdit).To(vm => vm.Username).TwoWay();`
 
-查看<B><GN>BindingSet</VT></B>源码，会发现有多个泛型版本，这里就查看非泛型版本：
+查看<B><GN>BindingSet</GN></B>源码，会发现有多个泛型版本，这里就查看非泛型版本：
 `public class BindingSet : BindingSetBase`
 `public abstract class BindingSetBase : IBindingBuilder`
 <B>IBindingBuilder</B>只要求了一个功能，即<B>`Build()`</B>

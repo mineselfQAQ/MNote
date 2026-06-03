@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [PureMVC分析](PureMVC分析/PureMVC分析.md)
+- [PureMVC分析](./PureMVC分析/PureMVC分析.md)
 

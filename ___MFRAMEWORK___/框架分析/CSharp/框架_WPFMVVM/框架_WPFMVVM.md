@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [WPFMVVM分析](WPFMVVM分析/WPFMVVM分析.md)
+- [WPFMVVM分析](./WPFMVVM分析/WPFMVVM分析.md)
 

@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [MyFramework分析](MyFramework分析/MyFramework分析.md)
+- [MyFramework分析](./MyFramework分析/MyFramework分析.md)
 

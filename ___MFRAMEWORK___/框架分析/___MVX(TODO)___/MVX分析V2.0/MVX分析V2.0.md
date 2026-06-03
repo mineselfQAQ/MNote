@@ -82,7 +82,7 @@ public void UpdateHPDisplay(int currentHP, int maxHP)
 
 <B><BL>问题：为什么View不能自己更新视图，要Controller进行</BL></B>
 <BL>答案其实很明显，即更新需要提供Model，这就是<B>Controller存在的意义</B>：
-<B><VT>Controller获取Model与View，并在内部将Model提供给View<VT></B></BL>
+<B><VT>VT</VT></B></BL>
 
 <B><DRD>这一思想是MVX的根，不仅仅是MVC</DRD></B>
 

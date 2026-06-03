@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [IOC分析](IOC分析/IOC分析.md)
+- [IOC分析](./IOC分析/IOC分析.md)
 

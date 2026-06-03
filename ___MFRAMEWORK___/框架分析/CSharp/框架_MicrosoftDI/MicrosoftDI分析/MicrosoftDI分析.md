@@ -157,7 +157,7 @@ public class SomeOtherService
 <B><VT>ServiceCollection是一个储存了ServiceDescriptor列表的数据结构</VT></B>
 
 <B><BL>问题：`AddXXX()`去哪了</BL></B>
-<BL>既然不在类中，那么只可能会在扩展函数中，有<B><GN>ServiceCollectionServiceExtensions<GN></B></BL>
+<BL>既然不在类中，那么只可能会在扩展函数中，有<B><GN>GN</GN></B></BL>
 观察ServiceCollectionServiceExtensions，可以发现其中有相当多的实现，<B>汇总</B>如下：
 
 - 函数

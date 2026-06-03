@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [codex问题](codex问题/codex问题.md)
+- [codex问题](./codex问题/codex问题.md)
 

@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [Log分析](Log分析/Log分析.md)
+- [Log分析](./Log分析/Log分析.md)
 

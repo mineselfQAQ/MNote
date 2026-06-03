@@ -615,7 +615,7 @@ struct GCObject {
 ```
 
 <B><BL>问题：关于`TValue.tt_` / `GCObject.tt`</BL></B>
-<BL>对于GCObject来说，自身已经完全说明是带有GC的，所以tt不会存储第6位BIT_ISCOLLECTABLE信息</BL></B>
+<BL>对于GCObject来说，自身已经完全说明是带有GC的，所以tt不会存储第6位BIT_ISCOLLECTABLE信息</BL>
 
 GCObject是一个<B><VT>公共头</VT></B>，具体有以下对象：
 
@@ -664,7 +664,7 @@ typedef struct TString {
   - u.lnglen：长度
 
 <B>重点：</B>
-<B><VT>TString本身不带有字节数据（也就是说TString是字符串头），字节数据紧跟在<GN>UTString</GN>后</B>
+<B><VT>TString本身不带有字节数据（也就是说TString是字符串头），字节数据紧跟在<GN>UTString</GN>后</VT></B>
 
 ``` c
 typedef union UTString {
@@ -1234,7 +1234,7 @@ static Node *mainposition (const Table *t, const TValue *key) {
 8：1000 | 7：0111
 16：10000 | 15：01111
 对于&来说，无论n多大，永远只会应用低位，而对于%来说，是全应用的
-重点：一切都是因为二次幂导致了取余的退化，`&(2^k-1)`退化了仅应用低位分布不匀但可做到快速取余，`%(2^k-1)`虽然慢但是分布更均匀</B>
+重点：一切都是因为二次幂导致了取余的退化，`&(2^k-1)`退化了仅应用低位分布不匀但可做到快速取余，`%(2^k-1)`虽然慢但是分布更均匀</BL>
 <B><BL>问题：桶长为n，`%n-1`对吗</BL></B>
 <BL>事实上确实不完全映射，最后一处桶是放不进去的，但是无伤大雅，后续备用桶还能用</BL>
 

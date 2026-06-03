@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [CatLib分析](CatLib分析/CatLib分析.md)
+- [CatLib分析](./CatLib分析/CatLib分析.md)
 

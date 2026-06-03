@@ -771,7 +771,7 @@ async Task<int> HeavyJob(int input)
 其中：`await Task.WhenAll()`等待所有任务完成，这样Result就不会同步卡住了(因为已经全部完成)
 
 <B>任务取消方式：</B>
-<B><GN>CancellationToken<GN></B>
+<B><GN>GN</GN></B>
 <B><VT>建议异步方法都添加---可以不用，但不能没有(万一要用呢)</VT></B>
 
 其它的一些操作：

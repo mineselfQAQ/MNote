@@ -2,5 +2,5 @@
 
 ## 笔记
 
-- [SKCell分析](SKCell分析/SKCell分析.md)
+- [SKCell分析](./SKCell分析/SKCell分析.md)
 

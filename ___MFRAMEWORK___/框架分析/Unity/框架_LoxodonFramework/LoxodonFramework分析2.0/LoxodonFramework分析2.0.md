@@ -1706,7 +1706,7 @@ protected bool Set<T>(ref T field, T newValue, [CallerMemberName] string propert
 }
 ```
 
-触发由`Set()`进行，<B><YL>如：<YL></B>
+触发由`Set()`进行，<B><YL>YL</YL></B>
 
 ``` csharp
 public string Username
@@ -4380,7 +4380,7 @@ public ITransition Show(IWindow window)
 }
 ```
 
-<B><GN>ShowTransition</GN></B>是其中的关键，它实现了抽象的`DoTransition()`</B>：
+<B><GN>ShowTransition</GN></B>是其中的关键，它实现了抽象的`DoTransition()`：
 
 ``` csharp
 protected override IEnumerator DoTransition()
@@ -4544,7 +4544,7 @@ public virtual IAsyncResult Passivate(bool ignoreAnimation)
 ```
 
 <BL>这里除了使用了AsyncResult进行管理，<B>核心</B>就是<B>ActivationAnimation/PassivationAnimation</B>
-再看<B>DoHide()/DoShow()</B>：<BL>
+再看<B>DoHide()/DoShow()</B>：</BL>
 
 ``` csharp
 public virtual IAsyncResult DoShow(bool ignoreAnimation = false)
