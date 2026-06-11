@@ -1,0 +1,188 @@
+<Window x:Class="MNoteCreator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MNote 创建器"
+        Width="860"
+        Height="640"
+        MinWidth="760"
+        MinHeight="560"
+        Loaded="Window_Loaded"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="6,4" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="#F6F7F9">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="#20242B"
+                Padding="22,16">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Left">
+                    <TextBlock Text="MNote 创建器"
+                               Foreground="White"
+                               FontSize="24"
+                               FontWeight="SemiBold" />
+                    <TextBlock x:Name="RootPathTextBlock"
+                               Foreground="#B8C0CC"
+                               Margin="0,6,0,0"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <Button DockPanel.Dock="Right"
+                        Content="刷新"
+                        Click="RefreshButton_Click"
+                        HorizontalAlignment="Right"
+                        Margin="12,4,0,4" />
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="1"
+              Margin="22">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       Grid.Column="0"
+                       Text="主题目录"
+                       VerticalAlignment="Center"
+                       FontWeight="SemiBold" />
+            <Grid Grid.Row="0"
+                  Grid.Column="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox x:Name="TopicComboBox"
+                          Grid.Column="0"
+                          SelectionChanged="Input_Changed" />
+                <Button x:Name="NewTopicButton"
+                        Grid.Column="1"
+                        Content="新建主题"
+                        Click="NewTopicButton_Click"
+                        Margin="8,0,0,0" />
+            </Grid>
+
+            <TextBlock Grid.Row="1"
+                       Grid.Column="0"
+                       Text="笔记名/路径"
+                       VerticalAlignment="Center"
+                       FontWeight="SemiBold"
+                       Margin="0,14,0,0" />
+            <TextBox x:Name="NotePathTextBox"
+                     Grid.Row="1"
+                     Grid.Column="1"
+                     Margin="0,14,0,0"
+                     TextChanged="Input_Changed"
+                     ToolTip="例如：WPF绑定 或 框架分析/Unity/框架_XXX" />
+
+            <TextBlock Grid.Row="2"
+                       Grid.Column="0"
+                       Text="预览"
+                       VerticalAlignment="Top"
+                       FontWeight="SemiBold"
+                       Margin="0,16,0,0" />
+            <Border Grid.Row="2"
+                    Grid.Column="1"
+                    Margin="0,16,0,0"
+                    Padding="12"
+                    Background="White"
+                    BorderBrush="#D7DCE3"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                <StackPanel>
+                    <TextBlock x:Name="PreviewTextBlock"
+                               TextWrapping="Wrap"
+                               Foreground="#222831" />
+                    <TextBlock x:Name="ImpactTextBlock"
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap"
+                               Foreground="#65717F" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Grid.Row="3"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Margin="0,14,0,16">
+                <CheckBox x:Name="OpenAfterCreateCheckBox"
+                          Content="创建后打开 Markdown"
+                          IsChecked="True"
+                          VerticalAlignment="Center"
+                          Margin="0,0,22,0" />
+                <CheckBox x:Name="ExportAfterCreateCheckBox"
+                          Content="创建后导出 HTML"
+                          VerticalAlignment="Center" />
+            </StackPanel>
+
+            <TextBox x:Name="LogTextBox"
+                     Grid.Row="4"
+                     Grid.ColumnSpan="2"
+                     IsReadOnly="True"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     TextWrapping="Wrap"
+                     Background="White"
+                     BorderBrush="#D7DCE3"
+                     BorderThickness="1"
+                     Padding="12"
+                     FontFamily="Consolas"
+                     FontSize="13" />
+
+            <DockPanel Grid.Row="5"
+                       Grid.ColumnSpan="2"
+                       LastChildFill="False"
+                       Margin="0,16,0,0">
+                <TextBlock x:Name="StatusTextBlock"
+                           DockPanel.Dock="Left"
+                           VerticalAlignment="Center"
+                           Foreground="#435160"
+                           Text="准备就绪" />
+                <StackPanel DockPanel.Dock="Right"
+                            Orientation="Horizontal">
+                    <Button x:Name="CreateButton"
+                            Content="创建笔记"
+                            Click="CreateButton_Click"
+                            IsDefault="True" />
+                    <Button Content="导出 HTML"
+                            Click="ExportButton_Click" />
+                    <Button x:Name="OpenCreatedButton"
+                            Content="打开笔记"
+                            Click="OpenCreatedButton_Click"
+                            IsEnabled="False" />
+                    <Button Content="打开 HTML"
+                            Click="OpenHtmlButton_Click" />
+                    <Button Content="打开目录"
+                            Click="OpenRootButton_Click"
+                            Margin="0" />
+                </StackPanel>
+            </DockPanel>
+        </Grid>
+    </Grid>
+</Window>
