@@ -58,6 +58,10 @@ function collectTopics() {
     .sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
 }
 
+function normalizeRel(rel) {
+  return rel.replace(/\\/g, "/").replace(/^\.\/+/, "");
+}
+
 function walkMarkdown(dirRel, out = []) {
   const dir = path.join(root, dirRel.replace(/\//g, path.sep));
   for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -72,12 +76,23 @@ function walkMarkdown(dirRel, out = []) {
   return out;
 }
 
+function walkDirs(dirRel, out = []) {
+  const dir = path.join(root, dirRel.replace(/\//g, path.sep));
+  out.push(normalizeRel(dirRel));
+  for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (item.isDirectory() && item.name !== "Pic") {
+      walkDirs(path.posix.join(dirRel, item.name), out);
+    }
+  }
+  return out;
+}
+
 function stripMdExt(rel) {
   return rel.replace(/\.md$/i, "");
 }
 
 function isEntryRel(rel) {
-  const normalized = rel.replace(/\\/g, "/");
+  const normalized = normalizeRel(rel);
   const dir = path.posix.dirname(normalized);
   const base = path.posix.basename(normalized, ".md");
   const dirBase = path.posix.basename(dir);
@@ -85,7 +100,7 @@ function isEntryRel(rel) {
 }
 
 function isTopicEntryRel(rel) {
-  const normalized = rel.replace(/\\/g, "/");
+  const normalized = normalizeRel(rel);
   const dir = path.posix.dirname(normalized);
   const base = path.posix.basename(normalized, ".md");
   return isTopicDir(dir) && base.toLowerCase() === dir.toLowerCase();
@@ -97,12 +112,12 @@ function isGeneratedNavigationIndex(markdown, sourceRel) {
 }
 
 function markdownToHtmlRel(rel) {
-  const normalized = rel.replace(/\\/g, "/");
+  const normalized = normalizeRel(rel);
   if (isEntryRel(normalized)) {
     const dir = path.posix.dirname(normalized);
     return path.posix.join(dir === "." ? "" : dir, "index.html");
   }
-  return stripMdExt(normalized) + ".html";
+  return path.posix.join(stripMdExt(normalized), "index.html");
 }
 
 function splitMarkdownHref(href) {
@@ -110,17 +125,29 @@ function splitMarkdownHref(href) {
   // Only treat "#" after the .md suffix as an anchor. MNote paths may contain
   // literal "#" characters, such as C# or 算法API_C#.
   const mdIndex = clean.toLowerCase().indexOf(".md");
-  const hashIndex = mdIndex >= 0 ? clean.indexOf("#", mdIndex + 3) : clean.indexOf("#");
+  const hashIndex = mdIndex >= 0 ? clean.indexOf("#", mdIndex + 3) : -1;
   return {
     base: hashIndex >= 0 ? clean.slice(0, hashIndex) : clean,
     hash: hashIndex >= 0 ? clean.slice(hashIndex) : "",
   };
 }
 
-function markdownHrefToHtml(href) {
+function markdownHrefToHtml(href, sourceRel) {
   const { base, hash } = splitMarkdownHref(href);
-  if (!/\.md$/i.test(base) || /^[a-z]+:/i.test(base)) return href;
-  return markdownToHtmlRel(base) + hash;
+  if (/^[a-z]+:/i.test(base)) return href;
+  const sourceDir = path.posix.dirname(normalizeRel(sourceRel));
+  const sourceHtml = markdownToHtmlRel(sourceRel);
+  const targetRel = normalizeRel(path.posix.normalize(path.posix.join(sourceDir === "." ? "" : sourceDir, base)));
+  let targetHtml;
+  if (/\.md$/i.test(base)) {
+    targetHtml = markdownToHtmlRel(targetRel);
+  } else if (base.endsWith("/")) {
+    targetHtml = path.posix.join(targetRel, "index.html");
+  } else {
+    return href;
+  }
+  const fromHtmlDir = path.posix.dirname(sourceHtml);
+  return (path.posix.relative(fromHtmlDir, targetHtml) || "index.html") + hash;
 }
 
 function encodeInternalHref(href) {
@@ -142,6 +169,18 @@ function parseImageAttrs(raw) {
     attrs.push(`${key}="${escapeHtml(value)}"`);
   }
   return attrs.join(" ");
+}
+
+function parseImageReference(rawHref, rawAttrs = "") {
+  let href = rawHref.trim().replace(/^["']|["']$/g, "").replace(/^<|>$/g, "");
+  const attrs = [];
+  const inlineAttrs = href.match(/^(.*?)(?:\{([^}]*)\})$/);
+  if (inlineAttrs) {
+    href = inlineAttrs[1].trim();
+    attrs.push(inlineAttrs[2].trim());
+  }
+  if (rawAttrs.trim()) attrs.push(rawAttrs.trim());
+  return { href, attrs: attrs.join(" ") };
 }
 
 function readImageSize(file) {
@@ -215,14 +254,15 @@ function classifyImage(size, href) {
 }
 
 function imageHtml(alt, href, attrs, sourceRel) {
-  const cleanHref = href.trim().replace(/^["']|["']$/g, "");
+  const imageRef = parseImageReference(href, attrs);
+  const cleanHref = imageRef.href;
   const sourceAbs = path.join(root, sourceRel.replace(/\//g, path.sep));
   const imageAbs = /^(https?:|data:)/i.test(cleanHref)
     ? null
     : path.resolve(path.dirname(sourceAbs), cleanHref);
   const size = imageAbs ? readImageSize(imageAbs) : null;
   const kind = classifyImage(size, cleanHref);
-  const attrText = attrs ? parseImageAttrs(attrs) : "";
+  const attrText = imageRef.attrs ? parseImageAttrs(imageRef.attrs) : "";
   const dimensionAttrs = size ? ` data-width="${size.width}" data-height="${size.height}"` : "";
   return `<img src="${escapeHtml(cleanHref)}" alt="${escapeHtml(alt)}" class="mnote-img mnote-img-${kind}" data-mnote-image="1" data-kind="${kind}"${dimensionAttrs}${attrText ? ` ${attrText}` : ""}>`;
 }
@@ -234,14 +274,14 @@ function preprocessMarkdown(markdown, sourceRel) {
   );
 }
 
-function makeRenderer() {
+function makeRenderer(sourceRel) {
   const renderer = new marked.Renderer();
   const originalLink = renderer.link.bind(renderer);
 
   renderer.link = function link(token) {
     const href = typeof token === "object" ? token.href : arguments[0];
-    if (href && /\.md(?:#.*)?$/i.test(href) && !/^[a-z]+:/i.test(href)) {
-      const next = markdownHrefToHtml(href);
+    if (href && (/\.md(?:#.*)?$/i.test(href) || href.endsWith("/")) && !/^[a-z]+:/i.test(href)) {
+      const next = markdownHrefToHtml(href, sourceRel);
       if (typeof token === "object") {
         const text = token.tokens && this.parser ? this.parser.parseInline(token.tokens) : escapeHtml(token.text || next);
         const title = token.title ? ` title="${escapeHtml(token.title)}"` : "";
@@ -465,14 +505,26 @@ body > .markdown-preview {
 
 function relativeStyleHref(sourceRel) {
   const htmlRel = markdownToHtmlRel(sourceRel);
-  const from = path.dirname(htmlRel);
-  return toPosix(path.relative(from, "styles/mnote.css")) || "styles/mnote.css";
+  const from = path.posix.dirname(htmlRel);
+  return path.posix.relative(from, "styles/mnote.css") || "styles/mnote.css";
 }
 
 function relativeIndexHref(sourceRel) {
   const htmlRel = markdownToHtmlRel(sourceRel);
-  const from = path.dirname(htmlRel);
-  return toPosix(path.relative(from, "index.html")) || "index.html";
+  const from = path.posix.dirname(htmlRel);
+  return path.posix.relative(from, "index.html") || "index.html";
+}
+
+function relativeFromHtml(htmlRel, targetRel) {
+  return path.posix.relative(path.posix.dirname(htmlRel), targetRel) || path.posix.basename(targetRel);
+}
+
+function styleHrefForHtml(htmlRel) {
+  return relativeFromHtml(htmlRel, "styles/mnote.css");
+}
+
+function homeHrefForHtml(htmlRel) {
+  return relativeFromHtml(htmlRel, "index.html");
 }
 
 function lightboxHtml() {
@@ -685,6 +737,29 @@ ${lightboxHtml()}
 `;
 }
 
+function makeGeneratedHtml(title, htmlRel, label, bodyHtml) {
+  const topbar = htmlRel === "index.html"
+    ? ""
+    : `      <div class="mnote-topbar"><a href="${escapeHtml(homeHrefForHtml(htmlRel))}">Index</a> / ${escapeHtml(label)}</div>\n`;
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)}</title>
+  <link rel="stylesheet" href="${escapeHtml(styleHrefForHtml(htmlRel))}">
+</head>
+<body>
+  <div class="preview-container">
+    <article class="markdown-preview markdown-preview crossnote" data-for="preview">
+${topbar}${bodyHtml}
+    </article>
+  </div>
+</body>
+</html>
+`;
+}
+
 function copyDir(src, dest) {
   if (!fs.existsSync(src)) return;
   ensureDir(dest);
@@ -696,13 +771,33 @@ function copyDir(src, dest) {
   }
 }
 
+function copyReferencedImages(mdAbs, markdown, htmlAbs) {
+  const dir = path.dirname(mdAbs);
+  const htmlDir = path.dirname(htmlAbs);
+  const outRootResolved = path.resolve(outRoot);
+  const regex = /!\[[^\]]*]\(([^)]+)\)(?:\{([^}]+)\})?/g;
+  let match;
+  while ((match = regex.exec(markdown))) {
+    const imageRef = parseImageReference(match[1], match[2] || "");
+    const href = imageRef.href;
+    if (!href || /^(https?:|data:|#)/i.test(href)) continue;
+    const src = path.resolve(dir, href);
+    if (!fs.existsSync(src)) continue;
+    const dest = path.resolve(htmlDir, href);
+    if (dest !== outRootResolved && !dest.startsWith(outRootResolved + path.sep)) continue;
+    ensureDir(path.dirname(dest));
+    fs.copyFileSync(src, dest);
+  }
+}
+
 function checkMissingImages(mdAbs, markdown) {
   const missing = [];
   const dir = path.dirname(mdAbs);
   const regex = /!\[[^\]]*\]\(([^)]+)\)/g;
   let match;
   while ((match = regex.exec(markdown))) {
-    let href = match[1].trim().split(/\s+/)[0].replace(/^["']|["']$/g, "");
+    const imageRef = parseImageReference(match[1]);
+    let href = imageRef.href.trim().split(/\s+/)[0].replace(/^["']|["']$/g, "");
     if (/^(https?:|data:|#)/i.test(href)) continue;
     if (!fs.existsSync(path.join(dir, href))) {
       const line = markdown.slice(0, match.index).split(/\r?\n/).length;
@@ -710,6 +805,56 @@ function checkMissingImages(mdAbs, markdown) {
     }
   }
   return missing;
+}
+
+function childDirs(dirRel) {
+  const dir = path.join(root, dirRel.replace(/\//g, path.sep));
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((item) => item.isDirectory() && item.name !== "Pic")
+    .map((item) => path.posix.join(dirRel, item.name))
+    .sort((a, b) => path.posix.basename(a).localeCompare(path.posix.basename(b), "zh-Hans-CN"));
+}
+
+function directMarkdownFiles(dirRel) {
+  const dir = path.join(root, dirRel.replace(/\//g, path.sep));
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((item) => item.isFile() && item.name.toLowerCase().endsWith(".md"))
+    .map((item) => path.posix.join(dirRel, item.name))
+    .sort((a, b) => path.posix.basename(a).localeCompare(path.posix.basename(b), "zh-Hans-CN"));
+}
+
+function listLinkLine(label, href) {
+  return `<li><a href="${escapeHtml(encodeInternalHref(href))}">${escapeHtml(label)}</a></li>`;
+}
+
+function makeDirectoryIndexBody(dirRel) {
+  const dirs = childDirs(dirRel);
+  const childDirNames = new Set(dirs.map((dir) => path.posix.basename(dir).toLowerCase()));
+  const notes = directMarkdownFiles(dirRel).filter((file) => {
+    if (isEntryRel(file)) return false;
+    return !childDirNames.has(path.posix.basename(file, ".md").toLowerCase());
+  });
+
+  const lines = [`<h1>${escapeHtml(path.posix.basename(dirRel))}</h1>`];
+  if (dirs.length) {
+    lines.push("<h2>目录</h2>", "<ul>");
+    for (const dir of dirs) {
+      const href = path.posix.relative(dirRel, path.posix.join(dir, "index.html"));
+      lines.push(listLinkLine(path.posix.basename(dir), href));
+    }
+    lines.push("</ul>");
+  }
+  if (notes.length) {
+    lines.push("<h2>笔记</h2>", "<ul>");
+    for (const note of notes) {
+      const href = path.posix.relative(dirRel, markdownToHtmlRel(note));
+      lines.push(listLinkLine(path.posix.basename(note, ".md"), href));
+    }
+    lines.push("</ul>");
+  }
+  return lines.join("\n");
 }
 
 marked.setOptions({
@@ -722,6 +867,7 @@ marked.setOptions({
 
 const topics = collectTopics();
 const targets = topics.flatMap((dir) => walkMarkdown(dir)).sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+const targetSet = new Set(targets.map(normalizeRel));
 
 const resolvedOutRoot = path.resolve(outRoot);
 if (
@@ -736,23 +882,38 @@ ensureDir(path.join(outRoot, "styles"));
 writeUtf8(path.join(outRoot, "styles", "mnote.css"), loadCss());
 
 const results = [];
+const directoryIndexes = [];
 const missingImages = [];
+const writtenHtml = new Set();
 
 for (const source of targets) {
   const mdAbs = path.join(root, source.replace(/\//g, path.sep));
   const markdown = readUtf8(mdAbs);
-  const body = marked.parse(preprocessMarkdown(markdown, source), { renderer: makeRenderer() });
+  const body = marked.parse(preprocessMarkdown(markdown, source), { renderer: makeRenderer(source) });
   const htmlRel = markdownToHtmlRel(source);
   const htmlAbs = path.join(outRoot, htmlRel.replace(/\//g, path.sep));
   writeUtf8(htmlAbs, makeHtml(path.basename(source, ".md"), source, body));
+  writtenHtml.add(htmlRel);
   copyDir(path.join(path.dirname(mdAbs), "Pic"), path.join(path.dirname(htmlAbs), "Pic"));
+  copyReferencedImages(mdAbs, markdown, htmlAbs);
   for (const item of checkMissingImages(mdAbs, markdown)) missingImages.push({ file: source, ...item });
   results.push({ source, output: htmlRel, navigationIndex: isGeneratedNavigationIndex(markdown, source) });
 }
 
+for (const dirRel of topics.flatMap((topic) => walkDirs(topic))) {
+  const htmlRel = path.posix.join(dirRel, "index.html");
+  if (writtenHtml.has(htmlRel)) continue;
+
+  const body = makeDirectoryIndexBody(dirRel);
+  const htmlAbs = path.join(outRoot, htmlRel.replace(/\//g, path.sep));
+  writeUtf8(htmlAbs, makeGeneratedHtml(path.posix.basename(dirRel), htmlRel, dirRel, body));
+  writtenHtml.add(htmlRel);
+  directoryIndexes.push({ source: dirRel, output: htmlRel });
+}
+
 const cards = topics
   .map((topic) => {
-    const href = markdownToHtmlRel(path.posix.join(topic, `${topic}.md`));
+    const href = path.posix.join(topic, "index.html");
     const count = results.filter((item) => item.source.startsWith(`${topic}/`) && !item.navigationIndex && !isTopicEntryRel(item.source)).length;
     return `<section class="mnote-category-card"><a href="${escapeHtml(href)}">${escapeHtml(topic)}</a><p>${count} 篇笔记</p></section>`;
   })
@@ -788,6 +949,7 @@ writeUtf8(
       output: outRoot,
       topics,
       results,
+      directoryIndexes,
       missingImages,
     },
     null,
@@ -796,5 +958,6 @@ writeUtf8(
 );
 
 console.log(`Exported ${results.length} markdown files to ${outRoot}`);
+console.log(`Generated ${directoryIndexes.length} directory indexes`);
 console.log(`Missing images: ${missingImages.length}`);
 for (const item of missingImages) console.log(`- ${item.file}:${item.line} -> ${item.href}`);
