@@ -30,6 +30,8 @@
 
 `[IO.File]::ReadAllText($path, [Text.UTF8Encoding]::UTF8)`
 
+读取父级 `../AGENTS.md`、本项目 `AGENTS.md` 和项目 default Skill 时，也必须按 UTF-8 处理。
+
 若终端显示中文乱码，先用显式 UTF-8 重新读取确认，不要直接判断文件内容损坏。
 
 ## 工作边界
